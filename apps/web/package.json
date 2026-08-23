@@ -1,0 +1,31 @@
+{
+  "name": "@chess-review/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@chess-review/analysis": "workspace:*",
+    "@chess-review/chess-core": "workspace:*",
+    "@chess-review/openings": "workspace:*",
+    "@chess-review/shared": "workspace:*",
+    "@chess-review/stockfish": "workspace:*",
+    "@chess-review/ui": "workspace:*",
+    "next": "16.3.2",
+    "react": "19.2.8",
+    "react-chessboard": "5.12.1",
+    "react-dom": "19.2.8",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@chess-review/analysis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@chess-review/chess-core": "workspace:*",
+    "@chess-review/shared": "workspace:*",
+    "chess.js": "1.4.0"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "chess-review",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:local-ai": "node scripts/dev.mjs --services-only",
+    "dev:web": "pnpm --filter @chess-review/web dev",
+    "dev:check": "node scripts/dev.mjs --check",
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm -r --if-present run test",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.9.0",
+    "typescript": "5.9.2",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.11"
+  }
+}

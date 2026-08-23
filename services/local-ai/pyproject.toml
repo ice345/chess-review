@@ -1,0 +1,30 @@
+[project]
+name = "chess-review-local-ai"
+version = "0.1.0"
+description = "Optional Maia-3 and grounded coaching service for Open Chess Review"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "httpx>=0.28,<1",
+  "pydantic>=2.11,<3",
+  "python-chess>=1.999,<2",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4,<9"]
+maia = ["maia3 @ git+https://github.com/CSSLab/maia3.git@1e13597"]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chess_review_local_ai"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
