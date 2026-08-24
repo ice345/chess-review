@@ -30,25 +30,51 @@ function scoreLabel(score: EngineScore): string {
 
 function drawBadge(context: CanvasRenderingContext2D, move: MoveAnalysis, x: number, y: number, size: number) {
   const meta = QUALITY_META[move.classification];
-  context.beginPath();
-  context.moveTo(x + size * .17, y + size * .35);
-  context.bezierCurveTo(x + size * .29, y + size * .02, x + size * .73, y - size * .01, x + size * .89, y + size * .28);
-  context.bezierCurveTo(x + size * 1.04, y + size * .57, x + size * .78, y + size * .91, x + size * .48, y + size * .91);
-  context.bezierCurveTo(x + size * .22, y + size * .91, x + size * .07, y + size * .75, x + size * .04, y + size * .58);
-  context.fillStyle = meta.color;
-  context.globalAlpha = .1;
-  context.fill();
-  context.globalAlpha = .9;
-  context.strokeStyle = meta.color;
-  context.lineWidth = Math.max(1.5, size * .025);
+  context.save();
+  context.translate(x, y);
+  context.scale(size / 32, size / 32);
   context.lineCap = "round";
+  context.lineJoin = "round";
+  context.strokeStyle = meta.wash;
+  context.lineWidth = 7;
+  context.beginPath();
+  context.moveTo(4, 21);
+  context.bezierCurveTo(8, 9, 18, 4, 28, 9);
   context.stroke();
-  context.globalAlpha = 1;
-  context.fillStyle = "#3d5661";
-  context.font = `800 ${Math.round(size * 0.35)}px system-ui`;
+  context.strokeStyle = meta.ink;
+  context.lineWidth = 1.5;
+  context.beginPath();
+  switch (meta.motif) {
+    case "twin-glints":
+      context.moveTo(5, 23); context.bezierCurveTo(10, 22, 14, 17, 16, 11);
+      context.moveTo(21, 5); context.lineTo(22, 8); context.lineTo(25, 9); context.moveTo(21, 5); context.lineTo(20, 8); context.lineTo(18, 9);
+      break;
+    case "feather-rise":
+      context.moveTo(7, 25); context.bezierCurveTo(13, 21, 17, 13, 23, 5); context.bezierCurveTo(24, 12, 21, 18, 14, 22);
+      break;
+    case "check": context.moveTo(6, 17); context.lineTo(12, 23); context.lineTo(26, 8); break;
+    case "open-arc": context.moveTo(6, 22); context.bezierCurveTo(8, 10, 17, 5, 26, 10); break;
+    case "dot-check": context.arc(7, 21, 1.5, 0, Math.PI * 2); context.moveTo(11, 18); context.lineTo(15, 22); context.lineTo(25, 11); break;
+    case "book":
+      context.moveTo(5, 9); context.bezierCurveTo(10, 7, 13, 9, 16, 12); context.lineTo(16, 26); context.bezierCurveTo(13, 23, 10, 22, 5, 24); context.closePath();
+      context.moveTo(27, 9); context.bezierCurveTo(22, 7, 19, 9, 16, 12); context.lineTo(16, 26); context.bezierCurveTo(19, 23, 22, 22, 27, 24); context.closePath();
+      break;
+    case "warm-brush": context.moveTo(6, 23); context.lineTo(25, 8); break;
+    case "single-path": context.moveTo(5, 16); context.lineTo(26, 16); context.moveTo(21, 11); context.lineTo(26, 16); context.lineTo(21, 21); break;
+    case "ripple": context.moveTo(5, 22); context.bezierCurveTo(10, 19, 14, 19, 19, 22); context.moveTo(8, 26); context.bezierCurveTo(12, 24, 15, 24, 19, 26); break;
+    case "interrupted": context.moveTo(8, 9); context.bezierCurveTo(12, 5, 21, 6, 22, 12); context.bezierCurveTo(22, 16, 18, 17, 16, 19); context.moveTo(16, 26); context.lineTo(16.1, 26); break;
+    case "broken-pair": context.moveTo(5, 9); context.bezierCurveTo(8, 6, 13, 7, 13, 11); context.moveTo(19, 8); context.bezierCurveTo(23, 6, 27, 8, 26, 12); context.moveTo(8, 24); context.lineTo(11, 22); context.moveTo(21, 24); context.lineTo(25, 21); break;
+    case "cross": context.moveTo(7, 8); context.lineTo(24, 25); context.moveTo(24, 7); context.lineTo(8, 24); break;
+    case "falling": context.moveTo(6, 8); context.bezierCurveTo(13, 10, 18, 15, 24, 25); context.moveTo(18, 23); context.lineTo(24, 25); context.lineTo(23, 19); break;
+    case "fractured": context.moveTo(8, 7); context.lineTo(8, 25); context.moveTo(4, 13); context.lineTo(13, 13); context.moveTo(20, 7); context.bezierCurveTo(25, 8, 27, 13, 23, 17); context.lineTo(20, 19); break;
+  }
+  context.stroke();
+  context.fillStyle = meta.ink;
+  context.font = "800 9px system-ui";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(meta.symbol, x + size / 2, y + size * 0.49);
+  if (meta.symbol) context.fillText(meta.symbol, 16, 18);
+  context.restore();
 }
 
 function drawBlueBishopMark(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
@@ -165,7 +191,7 @@ export async function renderPositionCard(
   drawBoard(context, move.fenAfter, 50, 80, 520, orientation);
 
   drawBadge(context, move, 620, 128, 76);
-  context.fillStyle = QUALITY_META[move.classification].color;
+  context.fillStyle = QUALITY_META[move.classification].ink;
   context.font = "900 34px system-ui";
   context.fillText(QUALITY_META[move.classification].label.toUpperCase(), 718, 174);
   context.fillStyle = "#294653";

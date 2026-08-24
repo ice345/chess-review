@@ -59,15 +59,17 @@ const moveOne: MoveAnalysis = {
   },
   accuracy: 99.2,
   human: {
+    version: "human-v2",
     model: "maia3-5m",
     targetElo: 1400,
     selfElo: 1400,
     opponentElo: 1400,
-    candidates: [{ uci: "e2e4", san: "e4", probability: 0.65 }],
+    candidates: [{ uci: "e2e4", san: "e4", probability: 0.65, policyRank: 1 }],
     candidateProbabilityMass: 0.65,
     playedMoveProbability: 0.65,
+    playedMoveRank: 1,
     expectedHumanMove: "e2e4",
-    humanWdl: { win: 0.4, draw: 0.3, loss: 0.3 },
+    playedMoveWdl: { win: 0.4, draw: 0.3, loss: 0.3 },
     modelPrediction: true,
     findDifficulty: {
       label: "natural",
@@ -186,8 +188,8 @@ describe("canonical coach facts", () => {
     const firstMove = withPracticalAlternative.moves[0];
     if (!firstMove?.human) throw new Error("Expected Maia fixture facts.");
     firstMove.human.candidates = [
-      { uci: "e2e4", san: "e4", probability: 0.15 },
-      { uci: "d2d4", san: "d4", probability: 0.35 },
+      { uci: "e2e4", san: "e4", probability: 0.15, policyRank: 2 },
+      { uci: "d2d4", san: "d4", probability: 0.35, policyRank: 1 },
     ];
 
     const facts = buildMoveCoachFacts(withPracticalAlternative, 1);

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { replayUciLine } from "@chess-review/chess-core";
+import type { CoachExplanation, GameAnalysisV1, GameCoachSummary, HumanAnalysis } from "@chess-review/shared";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { useReviewStore } from "./review-store";
 
@@ -68,5 +69,29 @@ describe("review analysis branch store", () => {
     });
     expect(branch && selectedBranchNode(branch).sources.some((source) => source.kind === "stockfish")).toBe(false);
     expect(useReviewStore.getState().currentPly).toBe(2);
+  });
+
+  it("invalidates Coach assumptions with mismatched Maia enrichment only", () => {
+    const coach = { source: { language: "en" } } as unknown as CoachExplanation;
+    const summary = { source: { language: "en" } } as unknown as GameCoachSummary;
+    const human = {
+      version: "human-v2",
+      model: "maia3-5m",
+      targetElo: 1400,
+    } as unknown as HumanAnalysis;
+    const analysis = {
+      algorithmVersion: "objective-unchanged",
+      moves: [{ ply: 1, classification: "best", human, coach }],
+      coachSummary: summary,
+    } as unknown as GameAnalysisV1;
+    useReviewStore.getState().setAnalysis(analysis);
+
+    const updated = useReviewStore.getState().invalidateHumanAnalysis("maia3-23m", 1600);
+
+    expect(updated?.algorithmVersion).toBe("objective-unchanged");
+    expect(updated?.moves[0]?.classification).toBe("best");
+    expect(updated?.moves[0]?.human).toBeUndefined();
+    expect(updated?.moves[0]?.coach).toBeUndefined();
+    expect(updated?.coachSummary).toBeUndefined();
   });
 });

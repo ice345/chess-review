@@ -2,7 +2,7 @@
 
 Maia-3 is an optional model of Elo-conditioned human behavior. It does not change Stockfish evaluation, Accuracy or objective classification.
 
-The FastAPI adapter records model identity, target/self/opponent Elo, candidate UCI/SAN moves, raw policy probabilities, displayed candidate probability mass, exact played-move probability and human WDL. Maia3-5M is the CPU-friendly default; 23M and 79M are selectable quality tiers.
+The FastAPI adapter has two non-interchangeable contracts. `MaiaMoveReview` is rooted at one canonical move's `fenBefore` plus its played UCI and returns exact played-move probability, policy rank and played-move WDL. `MaiaPositionAnalysis` is rooted at the exact FEN currently displayed and returns root human-game WDL, policy candidates and a bounded set of candidate WDL values. Both record model identity, target/self/opponent Elo and candidate probability mass. Maia3-5M is the CPU-friendly default; 23M and 79M are real selectable tiers.
 
 Maia-3 is an optional direct dependency pinned to the reviewed official Git revision `1e13597c42d4858b7cfd7cfdae01e297263364b2`. `services/local-ai/uv.lock` preserves that commit. Install and run it with:
 
@@ -12,41 +12,52 @@ uv sync --extra dev --extra maia
 uv run --extra maia uvicorn chess_review_local_ai.main:app --host 127.0.0.1 --port 8000
 ```
 
-The provider imports Maia lazily, loads each requested model once, uses CPU without AMP by default and lets the official registry download its checkpoint from Hugging Face on first use. `/health` reports `available`, `not-installed` or `error`; an absent or failed optional service never disables browser Stockfish review. `/maia/moves` and its `/maia/analyze` alias return structured errors for missing runtime/model and inference failures.
+The provider imports Maia lazily and uses CPU without AMP by default. It never downloads a checkpoint during analysis. `/health` reports `available`, `not-installed` or `error` plus `maiaModels` state for all three tiers. Selecting a tier changes settings only; an uncached tier returns a structured `409 maia-model-not-cached` setup state. The user must explicitly call `/maia/models/{model}/download` through the Settings or Review download action. The service keeps at most one resident Maia network and releases the previous network before allocating a different tier.
+
+Product code calls `/maia/move-review` and `/maia/position-analysis`. `/maia/moves` remains a deprecated compatibility adapter and must not be used to infer whether a response describes the played move or the displayed position.
 
 At the repository root, `pnpm dev` manages web plus optional local services. If Next.js is already running, `pnpm dev:local-ai` starts or reuses only FastAPI/Ollama. A browser cannot start native processes itself; while offline the Human UI polls `/health` every five seconds and on window focus, then reconnects automatically.
 
-The adapter asks Maia for all legal move policies internally, even though it only returns the requested Top-K candidates. This makes `playedMoveProbability` exact when the played move falls outside the displayed candidates. `candidateProbabilityMass` makes it explicit that a Top-K list need not sum to one. The returned WDL belongs to the played move when supplied, otherwise to Maia's top candidate.
+One root forward pass produces logits for every legal move and root value logits. This makes `playedMoveProbability` and `playedMoveRank` exact even when the played move falls outside displayed Top-K. A second bounded value batch contains the union of Maia Top-K, caller-supplied Stockfish comparison moves and the played move, with duplicates removed. It does not run all-legal-move MultiPV value inference. `candidateProbabilityMass` makes it explicit that a Top-K list need not sum to one. `rootWdl` always belongs to the exact displayed root from the side-to-move perspective; `playedMoveWdl` belongs to the reviewed mover; candidate `wdl` belongs to the player choosing that candidate.
 
 Human WDL and the UCI-compatible centipawn field emitted by Maia are not Stockfish evaluation. UI labels must say “Maia model prediction” rather than implying an observed population frequency.
 
 ## Review analysis selector
 
-Review exposes two mutually exclusive analysis sources without merging their facts:
+Review exposes three analysis modes without merging their facts:
 
 - **Stockfish** shows ranked MultiPV arrows in the objective blue family.
 - **Maia** shows ranked candidate-policy arrows in a separate sage family,
   conditioned on the selected target Elo.
+- **Compare** preserves Stockfish as the objective primary source while adding
+  Maia candidates, a human-game marker and explicit agreement/disagreement.
 
-The preferred target Elo is stored in application settings and reused across
-reviews. Current-position Maia output is runtime-only, tagged by FEN and target
-Elo, and never becomes `GameAnalysisV1` move truth. If the canonical game has a
-next move, Review can show its exact Maia probability as a model prediction. A
-branch position has no invented “played move” probability.
+The preferred target Elo and model are stored in application settings and reused
+across reviews. Position output is runtime-only and keyed by exact FEN, target Elo
+and model. Move output is accepted only when `fenBefore`, played UCI, target Elo
+and model match the canonical move identity, then persisted as `human-v2` on that
+move in the IndexedDB analysis record. Changing Elo/model clears incompatible
+runtime and stored human enrichments before a new request completes. A branch
+position has no invented “played move” probability.
 
 Selecting a Maia candidate creates a legal analysis-tree edge with Maia target
 Elo and probability as source evidence. It does not attach an objective label.
 The first Stockfish and Maia recommendations are compared explicitly as agreement
-or disagreement; no blended score is calculated.
+or disagreement; no blended score is calculated. The evaluation bar is
+source-aware: Stockfish uses canonical WinPercent, Maia uses root human-game WDL
+converted from side-to-move to White presentation, and Compare keeps Stockfish as
+the bar while adding a Maia marker.
 
 There is no separate Human Lab route. Target Elo, candidate mass, played-move
-probability and Stockfish/Maia comparison live directly in Review when Maia is
-selected. When Maia is offline, users can switch back to Stockfish immediately;
+probability and Stockfish/Maia comparison live directly in Review when Maia or
+Compare is selected. Objective Move Quality and Human Find Difficulty appear as
+separate verdicts; one never changes the other. When Maia is offline, Browser
+Stockfish remains available immediately;
 five-second health polling reconnects without a page refresh.
 
 ## Human Find Difficulty
 
-Human Find Difficulty remains a deterministic analysis-package heuristic with labels Natural, Findable, Hard, Very Hard and Exceptional. It is not official Elo and is never fed back into objective classification. The current Review selector presents raw Maia probabilities instead of a separate difficulty lab.
+Human Find Difficulty remains a deterministic analysis-package heuristic with labels Natural, Findable, Hard, Very Hard and Exceptional. It is not official Elo and is never fed back into objective classification. It is derived only for an identity-matched `MaiaMoveReview`, stored with its evidence in `MoveAnalysis.human`, and rendered with a quieter symbol family than objective Move Quality.
 
 Its probability baseline is:
 

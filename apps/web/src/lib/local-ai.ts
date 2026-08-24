@@ -4,15 +4,21 @@ import type {
   CoachLanguage,
   CoachMoveFacts,
   GameCoachSummary,
+  HumanMoveCandidate,
+  MaiaModel,
+  MaiaMoveReview,
+  MaiaPositionAnalysis,
 } from "@chess-review/shared";
 
-export type MaiaModel = "maia3-5m" | "maia3-23m" | "maia3-79m";
+export type { MaiaModel, MaiaMoveReview, MaiaPositionAnalysis } from "@chess-review/shared";
 export type MaiaAvailability = "available" | "not-installed" | "error";
+export type MaiaModelState = "active" | "cached" | "not-cached" | "unavailable" | "error";
 export type CoachRequestProvider = "ollama" | "openai-compatible";
 
 export interface LocalAiHealth {
   status: "ok";
   maia: MaiaAvailability;
+  maiaModels: Record<MaiaModel, MaiaModelState>;
   coach: {
     ollama: "available" | "offline" | "error";
     ollamaModel: "available" | "missing" | "offline" | "error";
@@ -22,27 +28,22 @@ export interface LocalAiHealth {
   };
 }
 
-export interface MaiaMovesRequest {
-  fen: string;
+interface MaiaRequestConfig {
   targetElo: number;
   selfElo: number;
   opponentElo: number;
-  playedMove?: string;
   multiPv?: number;
-  model?: MaiaModel;
+  model: MaiaModel;
+  candidateMoves?: string[];
 }
 
-export interface MaiaMovesResponse {
-  model: string;
-  targetElo: number;
-  selfElo: number;
-  opponentElo: number;
-  candidates: Array<{ uci: string; san: string; probability: number }>;
-  candidateProbabilityMass: number;
-  playedMoveProbability: number;
-  expectedHumanMove?: string;
-  humanWdl?: { win: number; draw: number; loss: number };
-  modelPrediction: true;
+export interface MaiaMoveReviewRequest extends MaiaRequestConfig {
+  fenBefore: string;
+  playedMove: string;
+}
+
+export interface MaiaPositionAnalysisRequest extends MaiaRequestConfig {
+  fen: string;
 }
 
 export class LocalAiRequestError extends Error {
@@ -83,52 +84,141 @@ export async function getLocalAiHealth(signal?: AbortSignal): Promise<LocalAiHea
   return body as LocalAiHealth;
 }
 
-interface ApiMaiaMovesResponse {
-  model: string;
+interface ApiMaiaCandidate {
+  uci: string;
+  san: string;
+  probability: number;
+  policy_rank: number;
+  wdl: { win: number; draw: number; loss: number } | null;
+}
+
+interface ApiMaiaMoveReview {
+  kind: "move-review";
+  fen_before: string;
+  played_move: string;
+  model: MaiaModel;
   target_elo: number;
   self_elo: number;
   opponent_elo: number;
-  candidates: Array<{ uci: string; san: string; probability: number }>;
+  candidates: ApiMaiaCandidate[];
   candidate_probability_mass: number;
   played_move_probability: number;
+  played_move_rank: number;
   expected_human_move: string | null;
-  human_wdl: { win: number; draw: number; loss: number } | null;
+  played_move_wdl: { win: number; draw: number; loss: number } | null;
   model_prediction: true;
 }
 
-export async function analyzeMaiaMove(
-  request: MaiaMovesRequest,
+interface ApiMaiaPositionAnalysis {
+  kind: "position-analysis";
+  fen: string;
+  side_to_move: "white" | "black";
+  model: MaiaModel;
+  target_elo: number;
+  self_elo: number;
+  opponent_elo: number;
+  candidates: ApiMaiaCandidate[];
+  evaluated_candidates: ApiMaiaCandidate[];
+  candidate_probability_mass: number;
+  root_wdl: { win: number; draw: number; loss: number };
+  expected_human_move: string | null;
+  model_prediction: true;
+}
+
+function candidateFromApi(candidate: ApiMaiaCandidate): HumanMoveCandidate {
+  return {
+    uci: candidate.uci,
+    san: candidate.san,
+    probability: candidate.probability,
+    policyRank: candidate.policy_rank,
+    ...(candidate.wdl === null ? {} : { wdl: candidate.wdl }),
+  };
+}
+
+function maiaConfigBody(request: MaiaRequestConfig) {
+  return {
+    target_elo: request.targetElo,
+    self_elo: request.selfElo,
+    opponent_elo: request.opponentElo,
+    multi_pv: request.multiPv ?? 5,
+    model: request.model,
+    candidate_moves: request.candidateMoves ?? [],
+  };
+}
+
+export async function reviewMaiaMove(
+  request: MaiaMoveReviewRequest,
   signal?: AbortSignal,
-): Promise<MaiaMovesResponse> {
-  const response = await fetch(`${LOCAL_AI_URL}/maia/moves`, {
+): Promise<MaiaMoveReview> {
+  const response = await fetch(`${LOCAL_AI_URL}/maia/move-review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fen: request.fen,
-      target_elo: request.targetElo,
-      self_elo: request.selfElo,
-      opponent_elo: request.opponentElo,
-      ...(request.playedMove === undefined ? {} : { played_move: request.playedMove }),
-      multi_pv: request.multiPv ?? 5,
-      model: request.model ?? "maia3-5m",
+      ...maiaConfigBody(request),
+      fen_before: request.fenBefore,
+      played_move: request.playedMove,
     }),
     ...(signal === undefined ? {} : { signal }),
   });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);
-  const result = body as ApiMaiaMovesResponse;
+  const result = body as ApiMaiaMoveReview;
   return {
+    kind: result.kind,
+    fenBefore: result.fen_before,
+    playedMove: result.played_move,
     model: result.model,
     targetElo: result.target_elo,
     selfElo: result.self_elo,
     opponentElo: result.opponent_elo,
-    candidates: result.candidates,
+    candidates: result.candidates.map(candidateFromApi),
     candidateProbabilityMass: result.candidate_probability_mass,
     playedMoveProbability: result.played_move_probability,
+    playedMoveRank: result.played_move_rank,
     ...(result.expected_human_move === null ? {} : { expectedHumanMove: result.expected_human_move }),
-    ...(result.human_wdl === null ? {} : { humanWdl: result.human_wdl }),
+    ...(result.played_move_wdl === null ? {} : { playedMoveWdl: result.played_move_wdl }),
     modelPrediction: result.model_prediction,
   };
+}
+
+export async function analyzeMaiaPosition(
+  request: MaiaPositionAnalysisRequest,
+  signal?: AbortSignal,
+): Promise<MaiaPositionAnalysis> {
+  const response = await fetch(`${LOCAL_AI_URL}/maia/position-analysis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...maiaConfigBody(request), fen: request.fen }),
+    ...(signal === undefined ? {} : { signal }),
+  });
+  const body = await responseJson(response);
+  if (!response.ok) throw errorFromResponse(response, body);
+  const result = body as ApiMaiaPositionAnalysis;
+  return {
+    kind: result.kind,
+    fen: result.fen,
+    sideToMove: result.side_to_move,
+    model: result.model,
+    targetElo: result.target_elo,
+    selfElo: result.self_elo,
+    opponentElo: result.opponent_elo,
+    candidates: result.candidates.map(candidateFromApi),
+    evaluatedCandidates: result.evaluated_candidates.map(candidateFromApi),
+    candidateProbabilityMass: result.candidate_probability_mass,
+    rootWdl: result.root_wdl,
+    ...(result.expected_human_move === null ? {} : { expectedHumanMove: result.expected_human_move }),
+    modelPrediction: result.model_prediction,
+  };
+}
+
+export async function downloadMaiaModel(model: MaiaModel, signal?: AbortSignal): Promise<MaiaModelState> {
+  const response = await fetch(`${LOCAL_AI_URL}/maia/models/${model}/download`, {
+    method: "POST",
+    ...(signal === undefined ? {} : { signal }),
+  });
+  const body = await responseJson(response);
+  if (!response.ok) throw errorFromResponse(response, body);
+  return (body as { status: MaiaModelState }).status;
 }
 
 interface CoachRequestOptions {

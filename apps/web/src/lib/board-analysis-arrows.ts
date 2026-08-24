@@ -1,8 +1,8 @@
 import type { Arrow } from "react-chessboard";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
-import type { MaiaMovesResponse } from "./local-ai";
+import type { MaiaPositionAnalysis } from "@chess-review/shared";
 
-export type AnalysisLens = "objective" | "human";
+export type AnalysisMode = "stockfish" | "maia" | "compare";
 
 const OBJECTIVE_ARROW_COLORS = [
   "rgba(61, 111, 132, .88)",
@@ -50,7 +50,7 @@ export function candidateRankAtSquare(
 }
 
 export function humanCandidateArrows(
-  result: MaiaMovesResponse | null,
+  result: MaiaPositionAnalysis | null,
   lineCount: number,
   selectedUci?: string,
 ): Arrow[] {
@@ -66,28 +66,39 @@ export function humanCandidateArrows(
 }
 
 export function humanCandidateAtSquare(
-  result: MaiaMovesResponse | null,
+  result: MaiaPositionAnalysis | null,
   square: string,
   lineCount: number,
 ) {
   return result?.candidates.slice(0, lineCount).find((candidate) => candidate.uci.slice(2, 4) === square) ?? null;
 }
 
-export function analysisLensArrows({
-  lens,
+export function analysisModeArrows({
+  mode,
   stockfish,
   human,
   lineCount,
   selectedUci,
 }: {
-  lens: AnalysisLens;
+  mode: AnalysisMode;
   stockfish: StockfishMoveAnalysis | null;
-  human: MaiaMovesResponse | null;
+  human: MaiaPositionAnalysis | null;
   lineCount: number;
   selectedUci?: string;
 }): Arrow[] {
-  if (lens === "objective") return stockfishCandidateArrows(stockfish, lineCount, selectedUci);
-  return humanCandidateArrows(human, lineCount, selectedUci);
+  if (mode === "stockfish") return stockfishCandidateArrows(stockfish, lineCount, selectedUci);
+  if (mode === "maia") return humanCandidateArrows(human, lineCount, selectedUci);
+  const combined = [
+    ...stockfishCandidateArrows(stockfish, lineCount, selectedUci),
+    ...humanCandidateArrows(human, lineCount, selectedUci),
+  ];
+  const byMove = new Map<string, Arrow>();
+  for (const arrow of combined) {
+    const key = `${arrow.startSquare}-${arrow.endSquare}`;
+    if (byMove.has(key)) byMove.set(key, { ...arrow, color: "rgba(76, 126, 126, .96)" });
+    else byMove.set(key, arrow);
+  }
+  return [...byMove.values()];
 }
 
 export interface RecommendationComparison {
@@ -101,7 +112,7 @@ export interface RecommendationComparison {
 
 export function compareRecommendations(
   stockfish: StockfishMoveAnalysis | null,
-  human: MaiaMovesResponse | null,
+  human: MaiaPositionAnalysis | null,
 ): RecommendationComparison {
   const objectiveUci = stockfish?.lines[0]?.pv[0];
   const humanCandidate = human?.candidates[0];

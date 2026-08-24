@@ -4,7 +4,7 @@ Phase 4 is implemented as a language layer over canonical analysis facts. The co
 
 ## Request flow
 
-`packages/analysis` builds versioned `CoachMoveFacts` and `CoachGameFacts`. A move request includes before/after FEN, legal SAN/UCI, phase, White-POV scores, MultiPV and post-move PV, complete classification evidence, opening and phase Accuracy, plus Maia facts only when they have already been requested. Game requests contain canonical player summaries, move records and critical moments.
+`packages/analysis` builds versioned `CoachMoveFacts` and `CoachGameFacts`. A move request includes before/after FEN, legal SAN/UCI, phase, White-POV scores, MultiPV and post-move PV, complete classification evidence, opening and phase Accuracy, plus Maia facts only from the same persisted identity-matched `human-v2` move review shown by Review. Runtime position WDL is never substituted for played-move facts. Game requests contain canonical player summaries, move records and critical moments.
 
 The move fact builder also replays both positions through `chess.js` and derives a bounded position-understanding object. It records legal-move count, checks, captures and other forcing candidates; attacked-and-undefended non-king pieces; center occupancy/contestation; open and semi-open files; king check/castling/pawn-shield indicators; undeveloped starting minors; and doubled, isolated and passed pawns. These are modest deterministic indicators, not an attempt to hide a second chess engine inside the Coach.
 
@@ -45,4 +45,4 @@ Every returned line must be an exact prefix of a supplied engine PV and is repla
 
 The response records provider, model, requested language, `coach-v3` prompt version, generation time, validated-line count and grounding removals. Cached text from another language is hidden instead of being shown under the current language setting. If the provider is offline, unconfigured, times out, exhausts its budget, emits malformed JSON or fails validation, the web app immediately renders matching-language deterministic copy from canonical facts. The failure never blocks objective review.
 
-Generated move explanations and game summaries are written back to the existing IndexedDB analysis record. Cached coach text is retained only when its `promptVersion` matches the current prompt contract, so objective analysis can be reused while stale prose is discarded.
+Generated move explanations and game summaries are written back to the existing IndexedDB analysis record. Cached coach text is retained only when its `promptVersion` and requested language match the current contract. Replacing or invalidating a move's Maia model/Elo enrichment also removes that move's Coach response and the whole-game Coach summary, because either may have incorporated the previous human assumptions. Objective analysis remains reusable while stale prose is discarded.

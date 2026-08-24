@@ -154,11 +154,15 @@ function moverWinPercent(score: EngineScore, color: PlayerColor): number {
   return color === "white" ? white : 100 - white;
 }
 
+function currentHuman(move: MoveAnalysis) {
+  return move.human?.version === "human-v2" ? move.human : undefined;
+}
+
 /** A practical alternative is exposed only when it is in both Stockfish and
  * Maia, costs at most four canonical win-percentage points, and gains at least
  * eight Maia probability points over the objective first choice. */
 function practicalAlternative(move: MoveAnalysis): CoachPracticalAlternativeFacts | undefined {
-  const human = move.human;
+  const human = currentHuman(move);
   const best = move.stockfish.lines.find((line) => line.rank === 1);
   const objectiveBestUci = best?.pv[0];
   if (!human || !best || !objectiveBestUci) return undefined;
@@ -233,6 +237,7 @@ export function buildMoveCoachFacts(analysis: GameAnalysisV1, ply: number): Coac
     ? legalPrefix(move.fenAfter, nextPosition.lines[0]?.pv ?? [], 4)
     : [];
   const alternative = practicalAlternative(move);
+  const human = currentHuman(move);
   return {
     factsVersion: 1,
     position: { fenBefore: move.fenBefore, fenAfter: move.fenAfter, phase: move.phase },
@@ -253,7 +258,7 @@ export function buildMoveCoachFacts(analysis: GameAnalysisV1, ply: number): Coac
       afterCandidates: nextPosition?.fen === move.fenAfter ? candidateFacts(nextPosition.lines) : [],
       classificationReason: move.classificationReason,
     },
-    ...(move.human === undefined ? {} : { human: move.human }),
+    ...(human === undefined ? {} : { human }),
     boardFacts: {
       materialBefore: materialFacts(move.fenBefore),
       materialAfter: materialFacts(move.fenAfter),
@@ -290,18 +295,21 @@ export function buildGameCoachFacts(analysis: GameAnalysisV1): CoachGameFacts {
     ...(analysis.opening === undefined ? {} : { opening: analysis.opening }),
     division: analysis.division,
     players: { white: analysis.white, black: analysis.black },
-    moves: analysis.moves.map((move) => ({
-      ply: move.ply,
-      color: move.color,
-      san: move.san,
-      uci: move.uci,
-      phase: move.phase,
-      classification: move.classification,
-      accuracy: move.accuracy,
-      winPercentLoss: move.classificationReason.winPercentLoss,
-      ...(move.human === undefined ? {} : { humanProbability: move.human.playedMoveProbability }),
-      ...(move.human === undefined ? {} : { humanDifficulty: move.human.findDifficulty.label }),
-    })),
+    moves: analysis.moves.map((move) => {
+      const human = currentHuman(move);
+      return {
+        ply: move.ply,
+        color: move.color,
+        san: move.san,
+        uci: move.uci,
+        phase: move.phase,
+        classification: move.classification,
+        accuracy: move.accuracy,
+        winPercentLoss: move.classificationReason.winPercentLoss,
+        ...(human === undefined ? {} : { humanProbability: human.playedMoveProbability }),
+        ...(human === undefined ? {} : { humanDifficulty: human.findDifficulty.label }),
+      };
+    }),
     criticalMoments: analysis.criticalMoments.map((moment) => ({ ...moment })),
   };
 }

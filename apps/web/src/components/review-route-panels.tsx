@@ -6,6 +6,7 @@ import { replayUciLine } from "@chess-review/chess-core";
 import { QUALITY_META, QualityIcon } from "@chess-review/ui";
 import { CoachPanel } from "./coach-panel";
 import { AnalysisLensPanel } from "./review/analysis-lens-panel";
+import { CurrentMoveVerdict } from "./review/current-move-verdict";
 import { ReviewMoves, ReviewOverview } from "./review-presentation";
 import { useReviewRuntime } from "./review-runtime";
 import { formatEngineScore } from "../lib/review-format";
@@ -48,7 +49,7 @@ function PositionAnalysis() {
       {branch && (
         <div className="variation-banner"><span>Analysis branch · root ply {branch.rootPly} · {branch.selectedIndex}/{branch.activePath.length - 1}</span><button className="text-button" onClick={returnToGame}>Return to game <kbd>Esc</kbd></button></div>
       )}
-      {runtime.analysisLens === "objective" && <div className="continuation-list" aria-label="Stockfish continuations">
+      {runtime.analysisMode !== "maia" && <div className="continuation-list" aria-label="Stockfish continuations">
         {lines.map((line) => {
           const san = (() => {
             try {
@@ -68,7 +69,7 @@ function PositionAnalysis() {
         })}
         {lines.length === 0 && <p className="continuation-empty">{runtime.continuationState === "running" ? "Analyzing this position…" : "Stockfish candidates appear here when this position is analyzed."}</p>}
       </div>}
-      {runtime.analysisLens === "objective" && runtime.continuationError && <p className="error">{runtime.continuationError} <button className="text-button" onClick={() => void runtime.analyzeContinuations()}>Retry</button></p>}
+      {runtime.analysisMode !== "maia" && runtime.continuationError && <p className="error">{runtime.continuationError} <button className="text-button" onClick={() => void runtime.analyzeContinuations()}>Retry</button></p>}
     </section>
   );
 }
@@ -77,14 +78,18 @@ export function ObjectiveRoutePanel() {
   const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
   const currentPly = useReviewStore((store) => store.currentPly);
+  const branch = useReviewStore((store) => store.branch);
   if (!analysis) return <div className="route-panel objective-route"><PositionAnalysis /><AnalysisGate section="Objective review" /></div>;
-  const move = currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
+  const move = branch || currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   return (
     <div className="route-panel objective-route">
       <div className="route-heading"><span className="kicker">Objective review</span><h1>What happened?</h1><p>Engine truth first; interpretation comes later.</p></div>
-      {move && <section className="position-verdict-card"><QualityIcon classification={move.classification} size={38} /><div><span>{move.ply}. {move.san}</span><strong>{QUALITY_META[move.classification].label}</strong><small>Objective move quality · Stockfish · Accuracy {move.accuracy.toFixed(1)} · {formatEngineScore(move.evaluationBefore)} → {formatEngineScore(move.playedMoveScore)}</small></div><details><summary>Why this label?</summary><p>{move.classificationReason.precedenceRule.replaceAll("-", " ")} · Win% loss {move.classificationReason.winPercentLoss.toFixed(1)}</p></details></section>}
+      {move && <CurrentMoveVerdict move={move} />}
+      <section className="game-summary-section" aria-label="Game summary">
+        <div className="section-heading"><span className="kicker">Game summary</span><h2>Accuracy, phases and Move Quality</h2></div>
+        <ReviewOverview analysis={analysis} onSelectPly={runtime.navigateToPly} allMomentsHref={`/review/${runtime.gameId}/moves`} />
+      </section>
       <PositionAnalysis />
-      <ReviewOverview analysis={analysis} onSelectPly={runtime.navigateToPly} allMomentsHref={`/review/${runtime.gameId}/moves`} />
     </div>
   );
 }

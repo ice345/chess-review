@@ -3,6 +3,7 @@ export * from "./classification";
 export * from "./coach-facts";
 export * from "./divider";
 export * from "./game-analysis";
+export * from "./human-analysis";
 export * from "./human-difficulty";
 export * from "./sacrifice";
 export * from "./score";

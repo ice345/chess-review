@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { CoachLanguage } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
 import { DEFAULT_APP_SETTINGS, loadAppSettings, saveAppSettings, type AppSettings } from "../lib/app-settings";
-import { type CoachRequestProvider } from "../lib/local-ai";
+import { downloadMaiaModel, type CoachRequestProvider, type MaiaModel } from "../lib/local-ai";
 import { ConnectedAccounts } from "./connected-accounts";
 import { useLocalAiHealth } from "../lib/use-local-ai-health";
 
@@ -15,6 +15,10 @@ export function SettingsPage() {
   const checking = localAi.state === "checking";
   const ollamaModels = health?.coach.ollamaModels ?? [];
   const selectedModelInstalled = ollamaModels.includes(settings.coachModel);
+  const humanModelState = health?.maiaModels?.[settings.humanModel] ?? "unavailable";
+  const humanModelReady = humanModelState === "active" || humanModelState === "cached";
+  const [humanSetupState, setHumanSetupState] = useState<"idle" | "running" | "error">("idle");
+  const [humanSetupNotice, setHumanSetupNotice] = useState<string | null>(null);
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,6 +31,20 @@ export function SettingsPage() {
   function update(next: AppSettings) {
     setSettings(next);
     saveAppSettings(next);
+  }
+
+  async function setupHumanModel() {
+    setHumanSetupState("running");
+    setHumanSetupNotice(null);
+    try {
+      await downloadMaiaModel(settings.humanModel);
+      await localAi.refresh();
+      setHumanSetupState("idle");
+      setHumanSetupNotice(`${settings.humanModel} is cached and ready.`);
+    } catch (error) {
+      setHumanSetupState("error");
+      setHumanSetupNotice(error instanceof Error ? error.message : "Maia model download failed.");
+    }
   }
 
   return (
@@ -46,7 +64,16 @@ export function SettingsPage() {
         <section className="settings-card">
           <div><span className="kicker">Human defaults</span><h2>Maia prediction</h2></div>
           <label>Preferred target Elo<input type="number" min={400} max={3000} step={50} value={settings.humanTargetElo} onChange={(event) => update({ ...settings, humanTargetElo: Math.max(400, Math.min(3000, Number(event.target.value))) })} /></label>
-          <small>This Elo conditions Maia's move-probability model. It is remembered across reviews and never changes Stockfish evaluation or move quality.</small>
+          <label>Maia model<select value={settings.humanModel} onChange={(event) => update({ ...settings, humanModel: event.target.value as MaiaModel })}>
+            <option value="maia3-5m">Maia-3 5M · Fastest · Recommended for CPU</option>
+            <option value="maia3-23m">Maia-3 23M · More accurate · Balanced</option>
+            <option value="maia3-79m">Maia-3 79M · Highest accuracy · Heavy</option>
+          </select></label>
+          <div className="human-model-status"><span><i className={`service-dot ${humanModelReady ? "available" : humanModelState === "not-cached" ? "not-installed" : humanModelState}`} />{settings.humanModel} · {humanModelState}</span>
+            {!humanModelReady && health?.maia === "available" && <button className="secondary" disabled={humanSetupState === "running"} onClick={() => void setupHumanModel()}>{humanSetupState === "running" ? "Downloading…" : "Download model"}</button>}
+          </div>
+          {humanSetupNotice && <small role="status">{humanSetupNotice}</small>}
+          <small>Changing the selector never downloads or loads a checkpoint. Use Download model explicitly. Elo and model identity are remembered across reviews and never change Stockfish evaluation or Move Quality.</small>
         </section>
         <section className="settings-card">
           <div><span className="kicker">Coach defaults</span><h2>Explanation layer</h2></div>
@@ -65,6 +92,7 @@ export function SettingsPage() {
           {health ? (
             <div className="runtime-status">
               <span><i className={`service-dot ${health.maia}`} />Maia · {health.maia}</span>
+              <span><i className={`service-dot ${humanModelReady ? "available" : "not-installed"}`} />Human model · {settings.humanModel} · {humanModelState}</span>
               <span><i className={`service-dot ${health.coach.ollama}`} />Ollama · {health.coach.ollama}</span>
               <span><i className={`service-dot ${selectedModelInstalled ? "available" : "not-installed"}`} />Selected model · {selectedModelInstalled ? "available" : "missing"}</span>
               <span>{ollamaModels.length} installed model{ollamaModels.length === 1 ? "" : "s"} discovered</span>

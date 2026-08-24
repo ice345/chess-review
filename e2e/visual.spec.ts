@@ -13,7 +13,7 @@ async function dragChessPiece(page: import("@playwright/test").Page, fromSquare:
   await page.mouse.up();
 }
 
-test("representative Phase 5.1 workspace states", async ({ page }) => {
+test("representative Phase 5.2 workspace states", async ({ page }) => {
   await mockLocalAi(page, "available");
   const { record } = await seedReview(page, { visualLabels: true });
   await seedConnectedLibrary(page, 84);
@@ -40,7 +40,7 @@ test("representative Phase 5.1 workspace states", async ({ page }) => {
   await page.locator(".position-workspace .return-to-game").click();
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("button", { name: "Maia" }).click();
+  await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.getByText("Stockfish and Maia recommend the same move")).toBeVisible();
   await expect(page).toHaveScreenshot("combined-stockfish-maia-1440.png");
 
@@ -55,4 +55,9 @@ test("representative Phase 5.1 workspace states", async ({ page }) => {
   await page.goto("/history");
   await expect(page.locator(".history-list > article, .history-list > a")).toHaveCount(60);
   await expect(page).toHaveScreenshot("library-1920.png");
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/design/quality-icons");
+  await expect(page.locator(".quality-fixture-grid > section")).toHaveCount(14);
+  await expect(page).toHaveScreenshot("quality-icons-v2-1440.png", { fullPage: true });
 });

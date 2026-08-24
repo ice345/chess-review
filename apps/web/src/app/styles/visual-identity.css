@@ -1,4 +1,4 @@
-/* Original Blue Bishop brand and annotation-seal finishing rules. */
+/* Original Blue Bishop brand finishing rules. */
 
 .brand-mark {
   width: 38px;
@@ -31,10 +31,6 @@
 .home-chess-identity > span { display: grid; gap: 4px; }
 .home-chess-identity b { color: #3e5f6e; font: 500 15px Georgia, "Songti SC", serif; }
 .home-chess-identity small { color: #829399; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-
-.board-quality-badge svg {
-  filter: drop-shadow(0 1px 1px rgba(48, 62, 67, .18));
-}
 
 @media (max-width: 760px) {
   .home-chess-identity { margin-bottom: 20px; }

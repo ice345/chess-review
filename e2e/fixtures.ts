@@ -183,7 +183,8 @@ export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<
   });
 }
 
-export async function mockLocalAi(page: Page, state: "available" | "offline" = "available"): Promise<void> {
+export async function mockLocalAi(page: Page, state: "available" | "offline" = "available"): Promise<{ requests: Array<{ path: string; body: Record<string, unknown> }> }> {
+  const requests: Array<{ path: string; body: Record<string, unknown> }> = [];
   await page.route(/http:\/\/(?:127\.0\.0\.1|localhost):8000\/.*/, async (route) => {
     if (state === "offline") return route.abort("connectionrefused");
     const url = new URL(route.request().url());
@@ -191,24 +192,69 @@ export async function mockLocalAi(page: Page, state: "available" | "offline" = "
     if (url.pathname === "/health") return route.fulfill({ status: 200, headers, json: {
       status: "ok",
       maia: "available",
+      maiaModels: { "maia3-5m": "cached", "maia3-23m": "cached", "maia3-79m": "not-cached" },
       coach: { ollama: "available", ollamaModel: "available", configuredModel: "fixture", ollamaModels: ["fixture"], openaiCompatible: "not-configured" },
     } });
-    if (url.pathname === "/maia/moves") return route.fulfill({ status: 200, headers, json: {
-      model: "maia3-5m",
-      target_elo: 1400,
-      self_elo: 1400,
-      opponent_elo: 1400,
-      candidates: [
-        { uci: "e2e4", san: "e4", probability: .41 },
-        { uci: "d2d4", san: "d4", probability: .27 },
-        { uci: "g1f3", san: "Nf3", probability: .11 },
-      ],
-      candidate_probability_mass: .79,
-      played_move_probability: .41,
-      expected_human_move: "e2e4",
-      human_wdl: { win: .39, draw: .31, loss: .3 },
-      model_prediction: true,
-    } });
+    const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    if (url.pathname.startsWith("/maia/")) requests.push({ path: url.pathname, body });
+    if (url.pathname.endsWith("/download")) return route.fulfill({ status: 200, headers, json: { model: url.pathname.split("/")[3], status: "cached" } });
+    if (url.pathname === "/maia/move-review") {
+      const played = String(body.played_move);
+      const supplied = Array.isArray(body.candidate_moves) ? body.candidate_moves.map(String) : [];
+      const moves = [...new Set([...supplied, played])];
+      const playedRank = Math.max(1, moves.indexOf(played) + 1);
+      const probabilities = [.41, .27, .11, .07, .04];
+      const candidates = moves.slice(0, 5).map((uci, index) => ({
+        uci,
+        san: uci,
+        probability: probabilities[index] ?? .02,
+        policy_rank: index + 1,
+        wdl: { win: .39, draw: .31, loss: .3 },
+      }));
+      return route.fulfill({ status: 200, headers, json: {
+        kind: "move-review",
+        fen_before: body.fen_before,
+        played_move: played,
+        model: body.model,
+        target_elo: body.target_elo,
+        self_elo: body.self_elo,
+        opponent_elo: body.opponent_elo,
+        candidates,
+        candidate_probability_mass: Math.min(.99, candidates.reduce((sum, candidate) => sum + candidate.probability, 0)),
+        played_move_probability: probabilities[playedRank - 1] ?? .02,
+        played_move_rank: playedRank,
+        expected_human_move: candidates[0]?.uci ?? null,
+        played_move_wdl: { win: .39, draw: .31, loss: .3 },
+        model_prediction: true,
+      } });
+    }
+    if (url.pathname === "/maia/position-analysis") {
+      const supplied = Array.isArray(body.candidate_moves) ? body.candidate_moves.map(String) : [];
+      const probabilities = [.41, .27, .11, .07, .04];
+      const candidates = supplied.slice(0, 5).map((uci, index) => ({
+        uci,
+        san: uci,
+        probability: probabilities[index] ?? .02,
+        policy_rank: index + 1,
+        wdl: { win: .39, draw: .31, loss: .3 },
+      }));
+      return route.fulfill({ status: 200, headers, json: {
+        kind: "position-analysis",
+        fen: body.fen,
+        side_to_move: String(body.fen).split(" ")[1] === "b" ? "black" : "white",
+        model: body.model,
+        target_elo: body.target_elo,
+        self_elo: body.self_elo,
+        opponent_elo: body.opponent_elo,
+        candidates,
+        evaluated_candidates: candidates,
+        candidate_probability_mass: Math.min(.99, candidates.reduce((sum, candidate) => sum + candidate.probability, 0)),
+        root_wdl: { win: .46, draw: .32, loss: .22 },
+        expected_human_move: candidates[0]?.uci ?? null,
+        model_prediction: true,
+      } });
+    }
     return route.fulfill({ status: 503, headers, json: { detail: "deterministic e2e fallback" } });
   });
+  return { requests };
 }

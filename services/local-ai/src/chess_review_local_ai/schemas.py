@@ -4,16 +4,33 @@ import chess
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class MaiaMovesRequest(BaseModel):
-    fen: str
+MaiaModelName = Literal["maia3-5m", "maia3-23m", "maia3-79m"]
+MaiaModelState = Literal["active", "cached", "not-cached", "unavailable", "error"]
+
+
+class MaiaRequestConfig(BaseModel):
     target_elo: int = Field(ge=400, le=3000)
     self_elo: int = Field(ge=400, le=3000)
     opponent_elo: int = Field(ge=400, le=3000)
     multi_pv: int = Field(default=5, ge=1, le=20)
-    played_move: str | None = Field(default=None, pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
-    model: Literal["maia3-5m", "maia3-23m", "maia3-79m"] = "maia3-5m"
+    model: MaiaModelName = "maia3-5m"
     temperature: float = Field(default=0, ge=0, le=5)
     top_p: float = Field(default=1, gt=0, le=1)
+    candidate_moves: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("candidate_moves")
+    @classmethod
+    def validate_candidate_moves(cls, value: list[str]) -> list[str]:
+        for move in value:
+            try:
+                chess.Move.from_uci(move)
+            except ValueError as exc:
+                raise ValueError(f"Invalid candidate UCI move: {move}") from exc
+        return list(dict.fromkeys(value))
+
+
+class MaiaPositionAnalysisRequest(MaiaRequestConfig):
+    fen: str
 
     @field_validator("fen")
     @classmethod
@@ -23,6 +40,25 @@ class MaiaMovesRequest(BaseModel):
         except ValueError as exc:
             raise ValueError("Invalid FEN") from exc
         return value
+
+
+class MaiaMoveReviewRequest(MaiaRequestConfig):
+    fen_before: str
+    played_move: str = Field(pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
+
+    @field_validator("fen_before")
+    @classmethod
+    def validate_fen(cls, value: str) -> str:
+        try:
+            chess.Board(value)
+        except ValueError as exc:
+            raise ValueError("Invalid FEN") from exc
+        return value
+
+
+# Deprecated compatibility request. Product code uses the two explicit contracts above.
+class MaiaMovesRequest(MaiaPositionAnalysisRequest):
+    played_move: str | None = Field(default=None, pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
 
 
 class HumanWdl(BaseModel):
@@ -35,6 +71,41 @@ class MaiaCandidate(BaseModel):
     uci: str = Field(pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
     san: str
     probability: float = Field(ge=0, le=1)
+    policy_rank: int = Field(ge=1)
+    wdl: HumanWdl | None = None
+
+
+class MaiaMoveReviewResponse(BaseModel):
+    kind: Literal["move-review"] = "move-review"
+    fen_before: str
+    played_move: str
+    model: MaiaModelName
+    target_elo: int
+    self_elo: int
+    opponent_elo: int
+    candidates: list[MaiaCandidate]
+    candidate_probability_mass: float = Field(ge=0, le=1.000001)
+    played_move_probability: float = Field(ge=0, le=1)
+    played_move_rank: int = Field(ge=1)
+    expected_human_move: str | None = None
+    played_move_wdl: HumanWdl | None = None
+    model_prediction: Literal[True] = True
+
+
+class MaiaPositionAnalysisResponse(BaseModel):
+    kind: Literal["position-analysis"] = "position-analysis"
+    fen: str
+    side_to_move: Literal["white", "black"]
+    model: MaiaModelName
+    target_elo: int
+    self_elo: int
+    opponent_elo: int
+    candidates: list[MaiaCandidate]
+    evaluated_candidates: list[MaiaCandidate]
+    candidate_probability_mass: float = Field(ge=0, le=1.000001)
+    root_wdl: HumanWdl
+    expected_human_move: str | None = None
+    model_prediction: Literal[True] = True
 
 
 class MaiaMovesResponse(BaseModel):
@@ -48,6 +119,11 @@ class MaiaMovesResponse(BaseModel):
     expected_human_move: str | None = None
     human_wdl: HumanWdl | None = None
     model_prediction: Literal[True] = True
+
+
+class MaiaModelSetupResponse(BaseModel):
+    model: MaiaModelName
+    status: MaiaModelState
 
 
 def to_camel(value: str) -> str:
@@ -131,6 +207,8 @@ class CoachHumanCandidate(CoachModel):
     uci: str
     san: str
     probability: float = Field(ge=0, le=1)
+    policy_rank: int = Field(ge=1)
+    wdl: "CoachHumanWdl | None" = None
 
 
 class CoachHumanWdl(CoachModel):
@@ -146,6 +224,7 @@ class CoachHumanDifficulty(CoachModel):
 
 
 class CoachHumanFacts(CoachModel):
+    version: Literal["human-v2"]
     model: str
     target_elo: int
     self_elo: int
@@ -153,8 +232,9 @@ class CoachHumanFacts(CoachModel):
     candidates: list[CoachHumanCandidate]
     candidate_probability_mass: float = Field(ge=0, le=1.000001)
     played_move_probability: float = Field(ge=0, le=1)
+    played_move_rank: int = Field(ge=1)
     expected_human_move: str | None = None
-    human_wdl: CoachHumanWdl | None = None
+    played_move_wdl: CoachHumanWdl | None = None
     model_prediction: Literal[True]
     find_difficulty: CoachHumanDifficulty
 
@@ -522,7 +602,8 @@ class CoachHealth(CoachModel):
     openai_compatible: Literal["configured", "not-configured"]
 
 
-class HealthResponse(BaseModel):
+class HealthResponse(CoachModel):
     status: Literal["ok"] = "ok"
     maia: Literal["available", "not-installed", "error"]
+    maia_models: dict[str, MaiaModelState]
     coach: CoachHealth

@@ -5,8 +5,9 @@ import { useParams, usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
+import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
-import { BoardQualityBadge, EvaluationGraph } from "@chess-review/ui";
+import { BoardHumanDifficultyBadge, BoardQualityBadge, EvaluationGraph } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
 import { ReviewRuntimeProvider } from "./review-runtime";
 import { BoardFlipButton } from "./review/board-flip-button";
@@ -19,7 +20,7 @@ import { useReviewHuman } from "../hooks/use-review-human";
 import { useReviewPlayback } from "../hooks/use-review-playback";
 import { useReviewRecord } from "../hooks/use-review-record";
 import { loadAppSettings } from "../lib/app-settings";
-import { analysisLensArrows, candidateRankAtSquare, humanCandidateAtSquare } from "../lib/board-analysis-arrows";
+import { analysisModeArrows, candidateRankAtSquare, humanCandidateAtSquare } from "../lib/board-analysis-arrows";
 import { boardMoveHintStyles, pieceMatchesTurn } from "../lib/board-move-hints";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { orderPlayersForBoard } from "../lib/player-identity";
@@ -79,12 +80,45 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     goToPly: state.goToPly,
   });
   const pausePlayback = playback.pause;
-  const humanPlayedMove = state.branch ? undefined : state.game?.plies[state.currentPly]?.uci;
+  const branchPositionFen = state.branch ? state.positionFen : null;
+  const canonicalPositionResult = state.branch ? null : state.analysis?.moves[state.currentPly]?.stockfish ?? null;
+  const candidateResult = continuationResult ?? canonicalPositionResult;
+  const reviewedAnalysis = state.branch || state.currentPly === 0
+    ? null
+    : state.analysis?.moves[state.currentPly - 1] ?? null;
+  const reviewedMoveTarget = reviewedAnalysis
+    ? { ply: reviewedAnalysis.ply, fenBefore: reviewedAnalysis.fenBefore, uci: reviewedAnalysis.uci }
+    : null;
+  const positionStockfishCandidateMoves = useMemo(
+    () => candidateResult?.lines.flatMap((line) => line.pv[0] ? [line.pv[0]] : []) ?? [],
+    [candidateResult],
+  );
+  const moveStockfishCandidateMoves = useMemo(
+    () => reviewedAnalysis?.stockfish.lines.flatMap((line) => line.pv[0] ? [line.pv[0]] : []) ?? [],
+    [reviewedAnalysis],
+  );
   const humanRuntime = useReviewHuman({
     positionFen: state.positionFen,
-    ...(humanPlayedMove === undefined ? {} : { playedMove: humanPlayedMove }),
+    reviewedMove: reviewedMoveTarget,
+    persistedHuman: reviewedAnalysis?.human,
+    moveStockfishCandidateMoves,
+    positionStockfishCandidateMoves,
     initialTargetElo: settings.humanTargetElo,
+    initialModel: settings.humanModel,
   });
+  const matchingStoredHuman = reviewedAnalysis?.human
+    && matchesHumanAnalysisIdentity(reviewedAnalysis.human, humanRuntime.model, humanRuntime.targetElo)
+    ? reviewedAnalysis.human
+    : null;
+  const liveHuman = useMemo(() => {
+    if (!reviewedAnalysis || !humanRuntime.moveReview) return null;
+    try {
+      return buildHumanAnalysis(reviewedAnalysis, humanRuntime.moveReview);
+    } catch {
+      return null;
+    }
+  }, [humanRuntime.moveReview, reviewedAnalysis]);
+  const currentHuman = matchingStoredHuman ?? liveHuman;
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const legalDestinations = useMemo(
     () => selectedSquare ? legalBoardDestinations(state.positionFen, selectedSquare) : [],
@@ -94,18 +128,28 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     () => boardMoveHintStyles(selectedSquare, legalDestinations),
     [legalDestinations, selectedSquare],
   );
-  const branchPositionFen = state.branch ? state.positionFen : null;
-  const canonicalPositionResult = state.branch ? null : state.analysis?.moves[state.currentPly]?.stockfish ?? null;
 
   useEffect(() => {
     setSelectedSquare(null);
   }, [state.positionFen]);
 
   useEffect(() => {
-    if (loadState !== "ready" || !record || humanRuntime.lens !== "objective" || analysisRuntime.continuationResult) return;
+    if (!state.analysis) return;
+    const before = state.analysis;
+    const updated = useReviewStore.getState().invalidateHumanAnalysis(humanRuntime.model, humanRuntime.targetElo);
+    if (updated && updated !== before) persistEnrichedAnalysis(updated);
+  }, [humanRuntime.model, humanRuntime.targetElo, persistEnrichedAnalysis, state.analysis]);
+
+  useEffect(() => {
+    if (!reviewedAnalysis || !liveHuman || matchingStoredHuman) return;
+    persistEnrichedAnalysis(useReviewStore.getState().setMoveHuman(reviewedAnalysis.ply, liveHuman));
+  }, [liveHuman, matchingStoredHuman, persistEnrichedAnalysis, reviewedAnalysis]);
+
+  useEffect(() => {
+    if (loadState !== "ready" || !record || humanRuntime.mode === "maia" || analysisRuntime.continuationResult) return;
     if (!branchPositionFen && canonicalPositionResult) return;
     void analysisRuntime.analyzeContinuations();
-  }, [analysisRuntime.analyzeContinuations, analysisRuntime.continuationResult, branchPositionFen, canonicalPositionResult, humanRuntime.lens, loadState, record]);
+  }, [analysisRuntime.analyzeContinuations, analysisRuntime.continuationResult, branchPositionFen, canonicalPositionResult, humanRuntime.mode, loadState, record]);
 
   useEffect(() => {
     function navigate(event: KeyboardEvent) {
@@ -158,12 +202,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     { href: `${root}/moves`, label: "Moves" },
     { href: `${root}/coach`, label: "Coach" },
   ];
-  const candidateResult = continuationResult ?? positionResult;
   const selectedBranchMove = state.branch ? selectedBranchNode(state.branch).move : null;
-  const boardArrows = analysisLensArrows({
-    lens: humanRuntime.lens,
+  const boardArrows = analysisModeArrows({
+    mode: humanRuntime.mode,
     stockfish: candidateResult,
-    human: humanRuntime.result,
+    human: humanRuntime.positionAnalysis,
     lineCount: continuationLines,
     ...(selectedBranchMove?.uci === undefined ? {} : { selectedUci: selectedBranchMove.uci }),
   });
@@ -238,20 +281,26 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     continuationResult,
     continuationState,
     continuationError,
-    analysisLens: humanRuntime.lens,
-    setAnalysisLens: humanRuntime.setLens,
+    analysisMode: humanRuntime.mode,
+    setAnalysisMode: humanRuntime.setMode,
     humanTargetElo: humanRuntime.targetElo,
     setHumanTargetElo: humanRuntime.setTargetElo,
-    humanPositionResult: humanRuntime.result,
+    humanModel: humanRuntime.model,
+    setHumanModel: humanRuntime.setModel,
+    humanModelState: humanRuntime.modelState,
+    humanModelSetupState: humanRuntime.setupState,
+    humanMoveReview: humanRuntime.moveReview,
+    currentHuman,
+    humanPositionResult: humanRuntime.positionAnalysis,
     humanPositionState: humanRuntime.requestState,
     humanPositionError: humanRuntime.error,
     humanServiceState: humanRuntime.serviceState,
-    humanPlayedMove,
     analyzeFullGame,
     cancelFullGame,
     analyzePosition,
     analyzeContinuations,
     analyzeHumanPosition: humanRuntime.analyze,
+    setupHumanModel: humanRuntime.setupModel,
     refreshHumanService: humanRuntime.refreshService,
     navigateToPly,
     playContinuation: (rank: number, result: StockfishMoveAnalysis | null = candidateResult) => {
@@ -297,7 +346,12 @@ export function ReviewShell({ children }: { children: ReactNode }) {
               <div className="board-toolbar"><BoardFlipButton onFlip={flipBoard} /></div>
               <PlayerStrip player={orderedPlayers.top} />
               <div className="board-stage">
-                <EvaluationBar score={displayedScore} orientation={state.orientation} />
+                <EvaluationBar
+                  mode={humanRuntime.mode}
+                  stockfish={displayedScore}
+                  maia={humanRuntime.positionAnalysis}
+                  orientation={state.orientation}
+                />
                 <div className="board-wrap">
                   <Chessboard options={{
                     position: state.positionFen,
@@ -340,15 +394,15 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                         return;
                       }
                       setSelectedSquare(null);
-                      if (humanRuntime.lens === "objective") {
+                      if (humanRuntime.mode !== "maia") {
                         const rank = candidateRankAtSquare(candidateResult, square, continuationLines);
                         if (rank !== null) {
                           runtime.playContinuation(rank, candidateResult);
                           return;
                         }
                       }
-                      if (humanRuntime.lens === "human") {
-                        const candidate = humanCandidateAtSquare(humanRuntime.result, square, continuationLines);
+                      if (humanRuntime.mode !== "stockfish") {
+                        const candidate = humanCandidateAtSquare(humanRuntime.positionAnalysis, square, continuationLines);
                         if (candidate) runtime.playHumanCandidate(candidate.uci, candidate.probability);
                       }
                     },
@@ -358,7 +412,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                     darkSquareNotationStyle: { color: "#f4eadb" },
                     boardStyle: { borderRadius: "5px", boxShadow: "0 20px 54px rgba(60, 74, 84, .16)" },
                   }} />
-                  {currentAnalysis && !state.branch && <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />}
+                  {currentAnalysis && !state.branch && humanRuntime.mode !== "maia" && <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />}
+                  {currentAnalysis && currentHuman && !state.branch && humanRuntime.mode !== "stockfish" && <BoardHumanDifficultyBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} difficulty={currentHuman.findDifficulty.label} />}
                 </div>
               </div>
               <PlayerStrip player={orderedPlayers.bottom} />

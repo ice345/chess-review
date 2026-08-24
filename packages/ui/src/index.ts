@@ -1,4 +1,6 @@
 export * from "./board-quality-badge";
+export * from "./board-human-difficulty-badge";
 export * from "./blue-bishop-mark";
 export * from "./evaluation-graph";
+export * from "./human-difficulty-mark";
 export * from "./quality-icon";
