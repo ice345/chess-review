@@ -5,6 +5,7 @@ import type { SearchOptions } from "./browser-engine";
 import { BrowserStockfishPool, type StockfishSearcher } from "./game-review";
 
 const game = parsePgn("1. e4 e5 2. Nf3 Nc6");
+const checkmateGame = parsePgn("1. f3 e5 2. g4 Qh4# 0-1");
 
 class FakeSearcher implements StockfishSearcher {
   static active = 0;
@@ -26,6 +27,29 @@ class FakeSearcher implements StockfishSearcher {
       ...(played ? { searchMoves: [played] } : {}),
       bestMove: pvMove,
       lines: [{ rank: 1, score: { kind: "cp", cp: 20 }, depth: options.depth, pv: [pvMove] }],
+      depth: options.depth,
+    };
+  }
+
+  terminate(): void {}
+}
+
+class CheckmateSearcher implements StockfishSearcher {
+  static searchedFens: string[] = [];
+
+  async search(fen: string, options: SearchOptions): Promise<StockfishMoveAnalysis> {
+    CheckmateSearcher.searchedFens.push(fen);
+    if (fen === checkmateGame.finalFen) throw new Error("A no-legal-move terminal position must not be searched.");
+    const ply = checkmateGame.plies.find((candidate) => candidate.fenBefore === fen);
+    const move = options.searchMoves?.[0] ?? ply?.uci ?? "a2a3";
+    const score = ply?.ply === checkmateGame.plies.length
+      ? { kind: "mate" as const, mateIn: -1 }
+      : { kind: "cp" as const, cp: 20 };
+    return {
+      fen,
+      score,
+      bestMove: move,
+      lines: [{ rank: 1, score, depth: options.depth, pv: [move] }],
       depth: options.depth,
     };
   }
@@ -62,5 +86,26 @@ describe("BrowserStockfishPool", () => {
     await expect(pool.analyzeGame(game, { depth: 10, signal: controller.signal })).rejects.toMatchObject({
       name: "AbortError",
     });
+  });
+
+  it("completes a checkmate game without requiring a PV from its terminal position", async () => {
+    CheckmateSearcher.searchedFens = [];
+    const progress: string[] = [];
+    const pool = new BrowserStockfishPool(1, () => new CheckmateSearcher());
+
+    const result = await pool.analyzeGame(checkmateGame, {
+      depth: 10,
+      multiPv: 3,
+      onProgress: ({ stage, completed, total }) => progress.push(`${stage}:${completed}/${total}`),
+    });
+
+    expect(result.positionAnalyses).toHaveLength(checkmateGame.plies.length + 1);
+    expect(result.positionAnalyses.at(-1)).toMatchObject({
+      fen: checkmateGame.finalFen,
+      score: { kind: "mate", mateIn: -1 },
+      lines: [],
+    });
+    expect(CheckmateSearcher.searchedFens).not.toContain(checkmateGame.finalFen);
+    expect(progress).toContain(`positions:${checkmateGame.plies.length + 1}/${checkmateGame.plies.length + 1}`);
   });
 });

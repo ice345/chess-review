@@ -35,45 +35,93 @@ function drawBadge(context: CanvasRenderingContext2D, move: MoveAnalysis, x: num
   context.scale(size / 32, size / 32);
   context.lineCap = "round";
   context.lineJoin = "round";
-  context.strokeStyle = meta.wash;
-  context.lineWidth = 7;
-  context.beginPath();
-  context.moveTo(4, 21);
-  context.bezierCurveTo(8, 9, 18, 4, 28, 9);
-  context.stroke();
   context.strokeStyle = meta.ink;
-  context.lineWidth = 1.5;
-  context.beginPath();
+  context.fillStyle = meta.wash;
+  context.lineWidth = 1.7;
+
+  const circle = (radius: number, fill = meta.wash) => {
+    context.beginPath();
+    context.arc(16, 16, radius, 0, Math.PI * 2);
+    context.fillStyle = fill;
+    context.fill();
+    context.stroke();
+  };
+  const roundedSquare = () => {
+    context.beginPath();
+    context.roundRect(3.5, 3.5, 25, 25, 6);
+    context.fillStyle = meta.wash;
+    context.fill();
+    context.stroke();
+  };
+  const shape = (path: Path2D) => {
+    context.fillStyle = meta.wash;
+    context.fill(path);
+    context.stroke(path);
+  };
+  const text = (value: string, fontSize: number, yPosition = 16) => {
+    context.fillStyle = meta.ink;
+    context.font = `800 ${fontSize}px system-ui`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(value, 16, yPosition);
+  };
+
   switch (meta.motif) {
-    case "twin-glints":
-      context.moveTo(5, 23); context.bezierCurveTo(10, 22, 14, 17, 16, 11);
-      context.moveTo(21, 5); context.lineTo(22, 8); context.lineTo(25, 9); context.moveTo(21, 5); context.lineTo(20, 8); context.lineTo(18, 9);
+    case "diamond-double":
+      shape(new Path2D("M16 2.5 29.5 16 16 29.5 2.5 16Z"));
+      text("!!", 8.6, 16.2);
+      context.fillStyle = meta.ink;
+      context.fill(new Path2D("m25.5 3 .65 1.85L28 5.5l-1.85.65L25.5 8l-.65-1.85L23 5.5l1.85-.65Z"));
       break;
-    case "feather-rise":
-      context.moveTo(7, 25); context.bezierCurveTo(13, 21, 17, 13, 23, 5); context.bezierCurveTo(24, 12, 21, 18, 14, 22);
+    case "diamond-single":
+      shape(new Path2D("M16 4 28 16 16 28 4 16Z"));
+      text("!", 11, 16.7);
       break;
-    case "check": context.moveTo(6, 17); context.lineTo(12, 23); context.lineTo(26, 8); break;
-    case "open-arc": context.moveTo(6, 22); context.bezierCurveTo(8, 10, 17, 5, 26, 10); break;
-    case "dot-check": context.arc(7, 21, 1.5, 0, Math.PI * 2); context.moveTo(11, 18); context.lineTo(15, 22); context.lineTo(25, 11); break;
-    case "book":
-      context.moveTo(5, 9); context.bezierCurveTo(10, 7, 13, 9, 16, 12); context.lineTo(16, 26); context.bezierCurveTo(13, 23, 10, 22, 5, 24); context.closePath();
-      context.moveTo(27, 9); context.bezierCurveTo(22, 7, 19, 9, 16, 12); context.lineTo(16, 26); context.bezierCurveTo(19, 23, 22, 22, 27, 24); context.closePath();
+    case "circle-solid-check":
+      circle(13.2, meta.ink);
+      context.strokeStyle = "#fff";
+      context.lineWidth = 3;
+      context.stroke(new Path2D("M9 16.5 13.4 20.9 23.5 10.8"));
       break;
-    case "warm-brush": context.moveTo(6, 23); context.lineTo(25, 8); break;
-    case "single-path": context.moveTo(5, 16); context.lineTo(26, 16); context.moveTo(21, 11); context.lineTo(26, 16); context.lineTo(21, 21); break;
-    case "ripple": context.moveTo(5, 22); context.bezierCurveTo(10, 19, 14, 19, 19, 22); context.moveTo(8, 26); context.bezierCurveTo(12, 24, 15, 24, 19, 26); break;
-    case "interrupted": context.moveTo(8, 9); context.bezierCurveTo(12, 5, 21, 6, 22, 12); context.bezierCurveTo(22, 16, 18, 17, 16, 19); context.moveTo(16, 26); context.lineTo(16.1, 26); break;
-    case "broken-pair": context.moveTo(5, 9); context.bezierCurveTo(8, 6, 13, 7, 13, 11); context.moveTo(19, 8); context.bezierCurveTo(23, 6, 27, 8, 26, 12); context.moveTo(8, 24); context.lineTo(11, 22); context.moveTo(21, 24); context.lineTo(25, 21); break;
-    case "cross": context.moveTo(7, 8); context.lineTo(24, 25); context.moveTo(24, 7); context.lineTo(8, 24); break;
-    case "falling": context.moveTo(6, 8); context.bezierCurveTo(13, 10, 18, 15, 24, 25); context.moveTo(18, 23); context.lineTo(24, 25); context.lineTo(23, 19); break;
-    case "fractured": context.moveTo(8, 7); context.lineTo(8, 25); context.moveTo(4, 13); context.lineTo(13, 13); context.moveTo(20, 7); context.bezierCurveTo(25, 8, 27, 13, 23, 17); context.lineTo(20, 19); break;
+    case "circle-double-check":
+      circle(13);
+      context.lineWidth = 2;
+      context.stroke(new Path2D("M7.8 16.5 11 19.7 17.3 13.4M14 18.2l2.6 2.6 7.4-8"));
+      break;
+    case "circle-check":
+      circle(12.5);
+      context.lineWidth = 2;
+      context.stroke(new Path2D("M9.2 16.7 13.4 20.8 22.8 10.8"));
+      break;
+    case "square-book":
+      roundedSquare();
+      context.lineWidth = 1.45;
+      context.stroke(new Path2D("M7.5 10c3.4-1.2 6-.2 8.5 2.1V24c-2.5-2.2-5.1-3.1-8.5-1.9Zm17 0c-3.4-1.2-6-.2-8.5 2.1V24c2.5-2.2 5.1-3.1 8.5-1.9ZM16 12.1V24"));
+      break;
+    case "square-interesting": roundedSquare(); text("!?", 8.5, 16.2); break;
+    case "square-forced": roundedSquare(); context.lineWidth = 2; context.stroke(new Path2D("M8 16h15m-5-5 5 5-5 5")); break;
+    case "ring-inaccuracy":
+      circle(12.8);
+      context.setLineDash([2, 2.4]);
+      context.lineWidth = 1;
+      context.beginPath(); context.arc(16, 16, 9.8, 0, Math.PI * 2); context.stroke();
+      context.setLineDash([]);
+      text("?!", 8, 16.2);
+      break;
+    case "square-mistake": roundedSquare(); text("?", 12, 16.8); break;
+    case "octagon-blunder": shape(new Path2D("m10 3 12 0 7 7 0 12-7 7H10l-7-7V10Z")); text("??", 8.2, 16.2); break;
+    case "circle-miss":
+      circle(12.7);
+      context.lineWidth = 2.4;
+      context.stroke(new Path2D("M10.5 10.5 21.5 21.5m0-11-11 11"));
+      break;
+    case "diamond-missed-win":
+      shape(new Path2D("M16 4 28 16 16 28 4 16Z"));
+      context.lineWidth = 2;
+      context.stroke(new Path2D("M9 9.5c4.2 1.8 7.4 5.2 12.2 11.8m-5.8-1.1 5.8 1.1-1.2-5.8"));
+      break;
+    case "octagon-missed-mate": shape(new Path2D("m10 3 12 0 7 7 0 12-7 7H10l-7-7V10Z")); text("#?", 7.5, 16.2); break;
   }
-  context.stroke();
-  context.fillStyle = meta.ink;
-  context.font = "800 9px system-ui";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  if (meta.symbol) context.fillText(meta.symbol, 16, 18);
   context.restore();
 }
 
@@ -128,6 +176,7 @@ function drawBoard(
   size: number,
   orientation: "white" | "black",
 ) {
+  context.save();
   const board = boardPieces(fen);
   const square = size / 8;
   for (let displayRank = 0; displayRank < 8; displayRank += 1) {
@@ -151,6 +200,7 @@ function drawBoard(
       context.fillText(glyph, px + square / 2, py + square * 0.53);
     }
   }
+  context.restore();
 }
 
 function background(context: CanvasRenderingContext2D, title: string, subtitle: string) {
@@ -235,34 +285,34 @@ export async function renderGameReviewCard(analysis: GameAnalysisV1): Promise<Bl
   const black = analysis.game.headers.Black ?? "Black";
   background(context, `${white} — ${black}`, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : "Objective game review");
 
-  roundedRect(context, 40, 90, 530, 210, 18, "#fffdf8");
-  roundedRect(context, 590, 90, 570, 210, 18, "#fffdf8");
+  roundedRect(context, 40, 115, 530, 205, 18, "#fffdf8");
+  roundedRect(context, 590, 115, 570, 205, 18, "#fffdf8");
   context.fillStyle = "#71848d";
   context.font = "700 14px system-ui";
-  context.fillText("WHITE ACCURACY", 70, 130);
-  context.fillText("BLACK ACCURACY", 620, 130);
+  context.fillText("WHITE ACCURACY", 70, 150);
+  context.fillText("BLACK ACCURACY", 620, 150);
   context.fillStyle = "#4f7385";
   context.font = "900 70px system-ui";
-  context.fillText(analysis.white.accuracy?.toFixed(1) ?? "—", 70, 215);
-  context.fillText(analysis.black.accuracy?.toFixed(1) ?? "—", 620, 215);
+  context.fillText(analysis.white.accuracy?.toFixed(1) ?? "—", 70, 225);
+  context.fillText(analysis.black.accuracy?.toFixed(1) ?? "—", 620, 225);
 
   context.fillStyle = "#71848d";
   context.font = "600 12px system-ui";
   const phases = ["opening", "middlegame", "endgame"] as const;
   phases.forEach((phase, index) => {
-    const y = 270 + index * 25;
+    const y = 260 + index * 22;
     context.fillText(`${phase.toUpperCase()}  ${analysis.white.phaseAccuracy[phase]?.toFixed(1) ?? "—"}`, 70, y);
     context.fillText(`${phase.toUpperCase()}  ${analysis.black.phaseAccuracy[phase]?.toFixed(1) ?? "—"}`, 620, y);
   });
 
-  roundedRect(context, 40, 330, 1120, 270, 18, "#fffdf8");
+  roundedRect(context, 40, 340, 1120, 250, 18, "#fffdf8");
   context.fillStyle = "#354f5a";
   context.font = "800 16px system-ui";
-  context.fillText("STOCKFISH EVALUATION", 70, 370);
+  context.fillText("STOCKFISH EVALUATION", 70, 378);
   const graphX = 75;
-  const graphY = 405;
+  const graphY = 410;
   const graphWidth = 1040;
-  const graphHeight = 145;
+  const graphHeight = 135;
   context.strokeStyle = "#bfcac9";
   context.beginPath();
   context.moveTo(graphX, graphY + graphHeight / 2);
@@ -279,6 +329,13 @@ export async function renderGameReviewCard(analysis: GameAnalysisV1): Promise<Bl
     else context.lineTo(x, y);
   });
   context.stroke();
+  for (const critical of analysis.criticalMoments) {
+    const move = analysis.moves[critical.ply - 1];
+    if (!move) continue;
+    const markerX = graphX + (move.ply / Math.max(1, analysis.moves.length)) * graphWidth;
+    const markerY = graphY + graphHeight / 2 - (graphValue(move.evaluationAfter) / 6) * (graphHeight / 2);
+    drawBadge(context, move, markerX - 10, markerY - 10, 20);
+  }
   context.fillStyle = "#71848d";
   context.font = "500 12px system-ui";
   context.fillText(`${analysis.moves.length} plies · ${analysis.criticalMoments.length} critical moments · ${analysis.algorithmVersion}`, 70, 635);

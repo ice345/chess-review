@@ -7,7 +7,7 @@ import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
-import { BoardHumanDifficultyBadge, BoardQualityBadge, EvaluationGraph } from "@chess-review/ui";
+import { BoardQualityBadge, EvaluationGraph, QUALITY_META } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
 import { ReviewRuntimeProvider } from "./review-runtime";
 import { BoardFlipButton } from "./review/board-flip-button";
@@ -15,12 +15,20 @@ import { EvaluationBar } from "./review/evaluation-bar";
 import { MoveTransport } from "./review/move-transport";
 import { PlayerStrip } from "./review/player-strip";
 import { usePlayerIdentities } from "../hooks/use-player-identities";
+import { useBranchMoveQuality } from "../hooks/use-branch-move-quality";
 import { useReviewAnalysis } from "../hooks/use-review-analysis";
+import { useReviewCoach } from "../hooks/use-review-coach";
 import { useReviewHuman } from "../hooks/use-review-human";
 import { useReviewPlayback } from "../hooks/use-review-playback";
 import { useReviewRecord } from "../hooks/use-review-record";
 import { loadAppSettings } from "../lib/app-settings";
-import { analysisModeArrows, candidateRankAtSquare, humanCandidateAtSquare } from "../lib/board-analysis-arrows";
+import {
+  analysisModeArrows,
+  matchingHumanCandidate,
+  matchingStockfishCandidate,
+  type HumanCandidateIdentity,
+  type StockfishCandidateIdentity,
+} from "../lib/board-analysis-arrows";
 import { boardMoveHintStyles, pieceMatchesTurn } from "../lib/board-move-hints";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { orderPlayersForBoard } from "../lib/player-identity";
@@ -64,6 +72,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     analyzeContinuations,
     persistEnrichedAnalysis,
   } = analysisRuntime;
+  const branchQualityRuntime = useBranchMoveQuality(reviewDepth, reviewMultiPv);
+  const coachRuntime = useReviewCoach(settings, persistEnrichedAnalysis);
   const { record, setRecord, loadState, loadError } = useReviewRecord({
     gameId,
     settings,
@@ -190,6 +200,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   const currentMove = state.currentPly === 0 ? null : state.game?.plies[state.currentPly - 1] ?? null;
   const currentAnalysis = state.currentPly === 0 ? null : state.analysis?.moves[state.currentPly - 1] ?? null;
+  const selectedBranch = state.branch ? selectedBranchNode(state.branch) : null;
+  const selectedBranchQuality = selectedBranch?.moveQuality;
   const positionResult = canonicalPositionResult;
   const displayedResult = engineResult ?? continuationResult ?? positionResult;
   const displayedScore = displayedResult?.score
@@ -200,9 +212,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const primary = [
     { href: root, label: "Review" },
     { href: `${root}/moves`, label: "Moves" },
-    { href: `${root}/coach`, label: "Coach" },
+    { href: `${root}/coach`, label: "Study" },
   ];
-  const selectedBranchMove = state.branch ? selectedBranchNode(state.branch).move : null;
+  const selectedBranchMove = selectedBranch?.move ?? null;
   const boardArrows = analysisModeArrows({
     mode: humanRuntime.mode,
     stockfish: candidateResult,
@@ -295,6 +307,13 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     humanPositionState: humanRuntime.requestState,
     humanPositionError: humanRuntime.error,
     humanServiceState: humanRuntime.serviceState,
+    coachProvider: coachRuntime.provider,
+    coachLanguage: coachRuntime.language,
+    coachModel: coachRuntime.selectedModel,
+    coachServiceState: coachRuntime.serviceState,
+    coachHealth: coachRuntime.health,
+    coachTask: coachRuntime.task,
+    coachNotice: coachRuntime.notice,
     analyzeFullGame,
     cancelFullGame,
     analyzePosition,
@@ -302,20 +321,25 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     analyzeHumanPosition: humanRuntime.analyze,
     setupHumanModel: humanRuntime.setupModel,
     refreshHumanService: humanRuntime.refreshService,
+    generateMoveCoach: coachRuntime.generateMove,
+    generateGameCoach: coachRuntime.generateGame,
+    retryBranchMoveQuality: branchQualityRuntime.retry,
     navigateToPly,
-    playContinuation: (rank: number, result: StockfishMoveAnalysis | null = candidateResult) => {
-      const line = result?.lines.find((candidate) => candidate.rank === rank);
+    playContinuation: (identity: StockfishCandidateIdentity, result: StockfishMoveAnalysis | null = candidateResult) => {
+      const line = matchingStockfishCandidate(result, identity);
       if (!line) return;
       try {
         playback.pause();
-        state.startEngineLine(rank, replayUciLine(state.positionFen, line.pv));
+        state.startEngineLine(identity.rank, replayUciLine(identity.fen, line.pv));
       } catch (error) {
         analysisRuntime.reportContinuationError(error);
       }
     },
-    playHumanCandidate: (uci: string, probability: number) => {
+    playHumanCandidate: (identity: HumanCandidateIdentity) => {
+      const candidate = matchingHumanCandidate(humanRuntime.positionAnalysis, identity);
+      if (!candidate || state.positionFen !== identity.fen) return;
       playback.pause();
-      state.playHumanCandidate(uci, humanRuntime.targetElo, probability);
+      state.playHumanCandidate(candidate.uci, identity.targetElo, candidate.probability);
     },
     persistEnrichedAnalysis,
   };
@@ -327,14 +351,14 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         <div className="review-titlebar">
           <div><span className="kicker">{record.kind === "pgn" ? "Game review" : "Position study"}</span><strong>{record.title}</strong><small>{record.subtitle}</small></div>
           <nav className="review-nav" aria-label="Review sections">
-            {primary.map((item) => <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={item.href} key={item.href}>{item.label}</Link>)}
+            {primary.map((item) => <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={item.href} key={item.href}>{item.label}{item.label === "Study" && coachRuntime.task?.status === "running" ? <small>Generating…</small> : null}</Link>)}
           </nav>
           <div className="review-actions">
             <details key={`export-${pathname}`}><summary>Export</summary><div className="action-menu">
-              <button disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json"))}>Canonical JSON</button>
-              <button disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn"))}>Annotated PGN</button>
-              <button disabled={!currentAnalysis} onClick={() => void exportPositionPng()}>Position PNG</button>
-              <button disabled={!state.analysis} onClick={() => void exportReviewPng()}>Review PNG</button>
+              <button type="button" disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json"))}>Canonical JSON</button>
+              <button type="button" disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn"))}>Annotated PGN</button>
+              <button type="button" disabled={!currentAnalysis} onClick={() => void exportPositionPng()}>Position PNG</button>
+              <button type="button" disabled={!state.analysis} onClick={() => void exportReviewPng()}>Review PNG</button>
             </div></details>
             <details key={`more-${pathname}`}><summary>More</summary><div className="action-menu"><Link href={`${root}/engine`}>Engine Lab</Link><Link href="/settings">Settings</Link></div></details>
           </div>
@@ -394,17 +418,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                         return;
                       }
                       setSelectedSquare(null);
-                      if (humanRuntime.mode !== "maia") {
-                        const rank = candidateRankAtSquare(candidateResult, square, continuationLines);
-                        if (rank !== null) {
-                          runtime.playContinuation(rank, candidateResult);
-                          return;
-                        }
-                      }
-                      if (humanRuntime.mode !== "stockfish") {
-                        const candidate = humanCandidateAtSquare(humanRuntime.positionAnalysis, square, continuationLines);
-                        if (candidate) runtime.playHumanCandidate(candidate.uci, candidate.probability);
-                      }
+                      // Candidate arrows are visual hints. A destination square is
+                      // not a move identity (for example f2f3 and g1f3), so exact
+                      // Stockfish/Maia branches are entered from candidate rows.
                     },
                     lightSquareStyle: { backgroundColor: "#f2e5cf" },
                     darkSquareStyle: { backgroundColor: "#91aeb6" },
@@ -412,8 +428,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                     darkSquareNotationStyle: { color: "#f4eadb" },
                     boardStyle: { borderRadius: "5px", boxShadow: "0 20px 54px rgba(60, 74, 84, .16)" },
                   }} />
-                  {currentAnalysis && !state.branch && humanRuntime.mode !== "maia" && <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />}
-                  {currentAnalysis && currentHuman && !state.branch && humanRuntime.mode !== "stockfish" && <BoardHumanDifficultyBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} difficulty={currentHuman.findDifficulty.label} />}
+                  {state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
+                    ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={state.orientation} classification={selectedBranchQuality.classification} />
+                    : currentAnalysis && !state.branch
+                      ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />
+                      : null}
                 </div>
               </div>
               <PlayerStrip player={orderedPlayers.bottom} />
@@ -422,9 +441,17 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                 <div className="move-status">
                   <span>
                     <strong>{state.branch ? `Analysis variation · ${selectedBranchMove?.san ?? "root"}` : currentMove ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}` : "Starting position"}</strong>
-                    <small>{state.branch ? `${state.branch.selectedIndex} / ${state.branch.activePath.length - 1} branch ply` : `${state.currentPly} / ${totalPlies} ply`}</small>
+                    <small>{state.branch
+                      ? selectedBranchQuality?.state === "complete"
+                        ? `${QUALITY_META[selectedBranchQuality.classification].label} · Accuracy ${selectedBranchQuality.accuracy.toFixed(1)}`
+                        : selectedBranchQuality?.state === "running"
+                          ? "Analyzing this move’s objective quality…"
+                          : selectedBranchQuality?.state === "error"
+                            ? "Move Quality analysis failed"
+                            : `${state.branch.selectedIndex} / ${state.branch.activePath.length - 1} branch ply`
+                      : `${state.currentPly} / ${totalPlies} ply`}</small>
                   </span>
-                  {state.branch && <button className="return-to-game" onClick={() => { playback.pause(); state.returnToGame(); }}>Return to game <kbd>Esc</kbd></button>}
+                  {state.branch && <button type="button" className="return-to-game" onClick={() => { playback.pause(); state.returnToGame(); }}>Return to game <kbd>Esc</kbd></button>}
                 </div>
                 <MoveTransport
                   isPlaying={playback.isPlaying}

@@ -42,6 +42,7 @@ export function MoveTransport({
     <div className="move-transport" aria-label="Move navigation">
       {controls.map((control) => (
         <button
+          type="button"
           key={control.icon}
           aria-label={control.label}
           title={control.label}

@@ -1,142 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import {
-  buildDeterministicGameCoach,
-  buildDeterministicMoveCoach,
-  buildGameCoachFacts,
-  buildMoveCoachFacts,
-} from "@chess-review/analysis";
 import type {
-  CoachExplanation,
-  CoachLanguage,
   GameAnalysisV1,
-  GameCoachSummary,
   MoveAnalysis,
 } from "@chess-review/shared";
-import { QUALITY_META } from "@chess-review/ui";
-import {
-  explainCoachMove,
-  summarizeCoachGame,
-  type CoachRequestProvider,
-  type LocalAiHealth,
-} from "../lib/local-ai";
-import { loadAppSettings } from "../lib/app-settings";
-import { useLocalAiHealth } from "../lib/use-local-ai-health";
-
-function scoreLabel(score: MoveAnalysis["evaluationBefore"]): string {
-  if (score.kind === "mate") return score.mateIn > 0 ? `M${score.mateIn}` : `−M${Math.abs(score.mateIn)}`;
-  const pawns = score.cp / 100;
-  return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(2)}`;
-}
-
-function providerReady(health: LocalAiHealth | null, provider: CoachRequestProvider, model: string): boolean {
-  if (!health) return false;
-  return provider === "ollama"
-    ? health.coach.ollama === "available" && (health.coach.ollamaModels ?? []).includes(model || health.coach.configuredModel)
-    : health.coach.openaiCompatible === "configured";
-}
-
-function serviceText(
-  state: "checking" | "online" | "offline",
-  health: LocalAiHealth | null,
-  provider: CoachRequestProvider,
-  model: string,
-): string {
-  if (state === "checking") return "Checking the optional coach service…";
-  if (state === "offline") return "Coach offline · start pnpm dev for local generation. Grounded summaries remain available.";
-  if (provider === "ollama") {
-    if (health?.coach.ollama === "available" && !(health.coach.ollamaModels ?? []).includes(model || health.coach.configuredModel)) {
-      return `${model || health.coach.configuredModel} is not installed. Choose an installed model in Settings.`;
-    }
-    return health?.coach.ollama === "available"
-      ? "Ollama is available. Generation stays on this machine."
-      : "Ollama is offline; deterministic fallback remains available.";
-  }
-  return health?.coach.openaiCompatible === "configured"
-    ? "OpenAI-compatible Responses provider is configured server-side."
-    : "OpenAI-compatible provider is not configured; deterministic fallback remains available.";
-}
+import { coachProviderReady, coachServiceText } from "../hooks/use-review-coach";
+import { useReviewRuntime } from "./review-runtime";
 
 export function CoachPanel({
   analysis,
   move,
-  onMoveUpdate,
-  onGameUpdate,
   onSelectPly,
 }: {
   analysis: GameAnalysisV1;
   move: MoveAnalysis | null;
-  onMoveUpdate: (coach: CoachExplanation) => void;
-  onGameUpdate: (summary: GameCoachSummary) => void;
   onSelectPly: (ply: number) => void;
 }) {
-  const localAi = useLocalAiHealth();
-  const serviceState = localAi.state;
-  const health = localAi.health;
-  const [provider, setProvider] = useState<CoachRequestProvider>("ollama");
-  const [ollamaModel, setOllamaModel] = useState("gemma4:12b-it-qat");
-  const [openAiModel] = useState("");
-  const [language, setLanguage] = useState<CoachLanguage>("zh-CN");
-  const [running, setRunning] = useState<"move" | "game" | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    const settings = loadAppSettings();
-    setProvider(settings.coachProvider);
-    setLanguage(settings.coachLanguage);
-    setOllamaModel(settings.coachModel);
-  }, []);
-
-  const selectedModel = provider === "ollama" ? ollamaModel : openAiModel;
+  const runtime = useReviewRuntime();
+  const provider = runtime.coachProvider;
+  const language = runtime.coachLanguage;
+  const selectedModel = runtime.coachModel;
+  const serviceState = runtime.coachServiceState;
+  const health = runtime.coachHealth;
+  const notice = runtime.coachNotice;
+  const running = runtime.coachTask?.status === "running" ? runtime.coachTask.kind : null;
   const zh = language === "zh-CN";
-
-  async function generateMove() {
-    if (!move || running) return;
-    setRunning("move");
-    setNotice(null);
-    const facts = buildMoveCoachFacts(analysis, move.ply);
-    try {
-      const currentHealth = health ?? await localAi.refresh();
-      if (!providerReady(currentHealth, provider, selectedModel)) throw new Error(serviceText(serviceState, currentHealth, provider, selectedModel));
-      const result = await explainCoachMove(facts, {
-        provider,
-        ...(selectedModel.trim() === "" ? {} : { model: selectedModel }),
-        language,
-      });
-      onMoveUpdate(result);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "Coach provider unavailable.";
-      onMoveUpdate(buildDeterministicMoveCoach(facts, language, reason));
-      setNotice(zh ? `已使用确定性中文回退：${reason}` : `Deterministic fallback used: ${reason}`);
-    } finally {
-      setRunning(null);
-    }
-  }
-
-  async function generateGame() {
-    if (running) return;
-    setRunning("game");
-    setNotice(null);
-    const facts = buildGameCoachFacts(analysis);
-    try {
-      const currentHealth = health ?? await localAi.refresh();
-      if (!providerReady(currentHealth, provider, selectedModel)) throw new Error(serviceText(serviceState, currentHealth, provider, selectedModel));
-      const result = await summarizeCoachGame(facts, {
-        provider,
-        ...(selectedModel.trim() === "" ? {} : { model: selectedModel }),
-        language,
-      });
-      onGameUpdate(result);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : "Coach provider unavailable.";
-      onGameUpdate(buildDeterministicGameCoach(facts, language, reason));
-      setNotice(zh ? `已使用确定性中文回退：${reason}` : `Deterministic fallback used: ${reason}`);
-    } finally {
-      setRunning(null);
-    }
-  }
+  const humanProvenance = move?.human
+    ? ` + ${move.human.model.replace("maia3-", "Maia-3 ").toUpperCase()} @ ${move.human.targetElo}`
+    : "";
+  const provenance = `Grounded by ${analysis.engine.stockfishVersion} depth ${analysis.engine.depth}${humanProvenance}`;
 
   const coach = move?.coach?.source.language === language ? move.coach : undefined;
   const gameCoach = analysis.coachSummary?.source.language === language ? analysis.coachSummary : undefined;
@@ -153,42 +46,24 @@ export function CoachPanel({
     <div className="coach-tab">
       <div className="coach-heading">
         <span>{zh ? "生成状态" : "Generation status"}</span>
-        <span className={`service-dot ${providerReady(health, provider, selectedModel) ? "available" : serviceState === "offline" ? "offline" : "not-installed"}`} />
+        <span className={`service-dot ${coachProviderReady(health, provider, selectedModel) ? "available" : serviceState === "offline" ? "offline" : "not-installed"}`} />
       </div>
-      <p className="service-message">{serviceText(serviceState, health, provider, selectedModel)}</p>
+      <p className="service-message">{coachServiceText(serviceState, health, provider, selectedModel)}</p>
 
       <div className="coach-configuration-summary">
         <span>{provider === "ollama" ? "Local Ollama" : "OpenAI-compatible"} · {language === "zh-CN" ? "简体中文" : "English"}</span>
         <Link href="/settings">{zh ? "前往设置" : "Configure in Settings"}</Link>
       </div>
       <div className="coach-actions">
-        <button className="primary" disabled={!move || running !== null} onClick={() => void generateMove()}>
-          {running === "move" ? (zh ? "正在生成着法讲解…" : "Generating move review…") : move ? (zh ? `讲解 ${move.san}` : `Explain ${move.san}`) : (zh ? "请选择已复盘着法" : "Select a reviewed move")}
+        <button type="button" className="primary" disabled={running !== null} onClick={() => void runtime.generateGameCoach()}>
+          {running === "game" ? (zh ? "正在生成整盘学习计划…" : "Generating whole-game study…") : (zh ? "生成整盘学习计划" : "Build whole-game study")}
         </button>
-        <button className="secondary" disabled={running !== null} onClick={() => void generateGame()}>
-          {running === "game" ? (zh ? "正在生成整盘复盘…" : "Generating game review…") : (zh ? "整盘总结与训练建议" : "Game summary & training")}
+        <button type="button" className="secondary" disabled={!move || running !== null} onClick={() => move && void runtime.generateMoveCoach(move.ply)}>
+          {running === "move" ? (zh ? "正在生成着法讲解…" : "Generating move review…") : move ? (zh ? `讲解 ${move.san}` : `Explain ${move.san}`) : (zh ? "请选择已复盘着法" : "Select a reviewed move")}
         </button>
       </div>
       {notice && <p className="coach-notice">{notice}</p>}
-
-      {move && (
-        <div className="coach-fact-boundaries">
-          <section>
-            <div className="eyebrow">OBJECTIVE · STOCKFISH</div>
-            <strong>{QUALITY_META[move.classification].label}</strong>
-            <span>White POV {scoreLabel(move.evaluationBefore)} → {scoreLabel(move.playedMoveScore)}</span>
-            <small>Accuracy {move.accuracy.toFixed(1)} · canonical facts</small>
-          </section>
-          <section>
-            <div className="eyebrow">HUMAN · MAIA</div>
-            {move.human ? (
-              <><strong>{(move.human.playedMoveProbability * 100).toFixed(1)}%</strong><span>{move.human.findDifficulty.label.replaceAll("-", " ")} · Policy rank #{move.human.playedMoveRank}</span><small>{move.human.model} @ {move.human.targetElo} · same persisted move facts</small></>
-            ) : (
-              <><strong>Not requested</strong><span>No human claim added</span></>
-            )}
-          </section>
-        </div>
-      )}
+      <p className="coach-provenance">{provenance}</p>
 
       {coach && (
         <article className="coach-result">
@@ -210,7 +85,8 @@ export function CoachPanel({
             </section>
           ))}
           <details className="coach-grounding">
-            <summary>{zh ? "事实约束报告" : "Grounding report"}</summary>
+            <summary>{zh ? "为什么可以相信这段讲解？" : "Why this explanation?"}</summary>
+            <span>{provenance}</span>
             <span>Facts v{coach.grounding.factsVersion} · {coach.grounding.validatedLineCount} validated lines</span>
             <span>{coach.grounding.removedMoveMentions.length} ungrounded move mentions removed</span>
             <span>{coach.grounding.removedUnsupportedClaims.length} unsupported claims removed</span>
@@ -230,7 +106,7 @@ export function CoachPanel({
           </div>
           {gameCoach.criticalMoments.length > 0 && (
             <section className="coach-critical"><strong>{zh ? "关键节点" : "Critical moments"}</strong>{gameCoach.criticalMoments.map((moment) => (
-              <button key={moment.ply} onClick={() => onSelectPly(moment.ply)}><span>{zh ? `第 ${moment.ply} 半回合` : `Ply ${moment.ply}`}</span><small>{moment.insight}</small></button>
+              <button type="button" key={moment.ply} onClick={() => onSelectPly(moment.ply)}><span>{zh ? `第 ${moment.ply} 半回合` : `Ply ${moment.ply}`}</span><small>{moment.insight}</small></button>
             ))}</section>
           )}
           <section className="training-list"><strong>{zh ? "训练建议" : "Training recommendations"}</strong>{gameCoach.trainingRecommendations.map((item) => (

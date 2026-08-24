@@ -91,7 +91,7 @@ export function ReviewOverview({
           const move = analysis.moves[critical.ply - 1];
           if (!move) return null;
           return (
-            <button key={critical.ply} onClick={() => onSelectPly(critical.ply)}>
+            <button type="button" key={critical.ply} onClick={() => onSelectPly(critical.ply)}>
               <QualityIcon classification={critical.classification} size={25} />
               <span>{Math.ceil(critical.ply / 2)}{move.color === "white" ? "." : "…"} {move.san}</span>
               <strong>−{critical.winPercentSwing.toFixed(1)}%</strong>
@@ -126,7 +126,7 @@ export function ReviewMoves({
     <div className="review-move-list">
       {moves.length === 0 && <p className="quiet-empty">No moves match this filter.</p>}
       {moves.map((move) => (
-        <button className={move.ply === currentPly ? "active" : ""} key={move.ply} onClick={() => onSelectPly(move.ply)}>
+        <button type="button" className={move.ply === currentPly ? "active" : ""} key={move.ply} onClick={() => onSelectPly(move.ply)}>
           <span className="move-number">{Math.ceil(move.ply / 2)}{move.color === "white" ? "." : "…"}</span>
           <QualityIcon classification={move.classification} size={24} />
           <strong>{move.san}</strong>

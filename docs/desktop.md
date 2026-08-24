@@ -10,10 +10,27 @@ not embed or start an SSR server.
 - The first shell imports the project-owned `BlueBishopMark` from
   `@chess-review/ui` and parses a selected PGN through
   `@chess-review/chess-core`; it contains no duplicated chess rules.
-- Rust owns only native application startup. The initial capability grants the
-  main window Tauri core defaults and no shell, filesystem or network plugin.
-- Bundling is intentionally disabled until platform icons, signing and release
-  targets are implemented and tested.
+- Rust owns native application startup, PGN integration and owned-process
+  lifecycle. The frontend capability grants only Tauri core defaults; shell
+  execution remains private to the Rust host.
+- The native PGN boundary is now implemented in Rust. A system dialog accepts
+  one UTF-8 `.pgn` file up to 10 MiB, reads it in the command layer and returns
+  text to the shared TypeScript parser. File-association launches are buffered
+  until React is listening; macOS uses `RunEvent::Opened`, while Windows/Linux
+  startup arguments and later single-instance arguments use the same reader.
+- The desktop host probes loopback Ollama `/api/tags` on startup. It reuses an
+  existing API without taking ownership, otherwise discovers the installed
+  executable and starts only `ollama serve`. The UI reports every installed
+  model and shows an explicit `ollama pull <model>` setup command when the
+  configured model is missing; it never runs a pull automatically.
+- `services/local-ai` is frozen as a platform-native, self-contained PyInstaller
+  sidecar for release builds. The host first probes loopback `/health`, reuses a
+  pre-existing service without ownership, or starts the packaged executable and
+  retains its child handle. The sidecar includes the Maia runtime but no Maia or
+  Ollama model checkpoints; those downloads remain explicit user actions.
+- The project-owned Blue Bishop SVG generates the platform icon set. macOS uses
+  a platform override that enables local `.app` and `.dmg` bundles
+  while the base configuration stays bundle-disabled for unverified targets.
 
 Run the browser-hosted desktop frontend with `pnpm --filter
 @chess-review/desktop dev`. Run the native development window with `pnpm
@@ -21,20 +38,42 @@ Run the browser-hosted desktop frontend with `pnpm --filter
 the root `pnpm build`; `cargo check --manifest-path
 apps/desktop/src-tauri/Cargo.toml` validates the Rust host.
 
+On macOS, `pnpm --filter @chess-review/desktop tauri:build:macos` creates a
+local application and disk image from the arm64 host toolchain. The
+command uses Tauri's CI-safe DMG path so packaging does not require Finder
+automation permission. This is a reproducible local bundle check, not a
+Developer ID-signed, notarized or universal release.
+
+Windows NSIS and Linux deb/AppImage platform configurations now exist alongside
+the macOS override. `.github/workflows/desktop-artifacts.yml` defines native
+GitHub-hosted runners and uploads the unsigned outputs on manual runs or
+`desktop-v*` tags. Those target checkboxes remain open until the workflow has
+actually completed on the corresponding operating systems.
+
 ## Native lifecycle boundary
 
-The accepted process design remains:
+The implemented Ollama lifecycle and accepted sidecar design are:
 
 ```text
 Tauri host
-  -> own a packaged local-ai sidecar only when it starts that sidecar
   -> probe an existing Ollama API before locating an executable
   -> start only `ollama serve`, never `ollama run`
   -> ask before any model download
-  -> stop only child processes owned by this app
+  -> stop the Ollama child only when this app started it
+  -> probe and reuse an existing local-ai API without ownership
+  -> otherwise start and own the packaged local-ai sidecar
+  -> stop only the sidecar child created by this app
 ```
 
-Sidecar packaging, Ollama lifecycle, native open-file events, bundle icons,
-signing and release artifacts remain unchecked Phase 6 work. The HTML file input
-in the foundation shell is a local frontend import, not a claim of native file
-association support.
+The loopback restriction prevents the desktop manager from treating a remote
+Ollama host as an executable it may own. Exit cleanup takes only the stored
+child handle; manual validation confirmed that an existing `ollama serve`
+process survives application shutdown.
+
+The macOS package was validated against the real packaged `/health` response;
+closing its Tauri host stopped the owned sidecar and left the pre-existing
+Ollama process running. Completed Windows/Linux runner builds, signing,
+notarization, universal binaries and published release artifacts remain
+unchecked Phase 6 work. The HTML file input
+remains only as the browser-hosted desktop-preview fallback; packaged builds use
+the native dialog and registered file association.

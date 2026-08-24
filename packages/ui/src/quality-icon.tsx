@@ -1,20 +1,20 @@
 import type { MoveClassification } from "@chess-review/shared";
 
 export type QualityMotif =
-  | "twin-glints"
-  | "feather-rise"
-  | "check"
-  | "open-arc"
-  | "dot-check"
-  | "book"
-  | "warm-brush"
-  | "single-path"
-  | "ripple"
-  | "interrupted"
-  | "broken-pair"
-  | "cross"
-  | "falling"
-  | "fractured";
+  | "diamond-double"
+  | "diamond-single"
+  | "circle-solid-check"
+  | "circle-double-check"
+  | "circle-check"
+  | "square-book"
+  | "square-interesting"
+  | "square-forced"
+  | "ring-inaccuracy"
+  | "square-mistake"
+  | "octagon-blunder"
+  | "circle-miss"
+  | "diamond-missed-win"
+  | "octagon-missed-mate";
 
 export interface QualityMeta {
   ink: string;
@@ -25,20 +25,20 @@ export interface QualityMeta {
 }
 
 export const QUALITY_META: Record<MoveClassification, QualityMeta> = {
-  brilliant: { ink: "#4d93a6", wash: "#dceef2", symbol: "!!", motif: "twin-glints", label: "Brilliant" },
-  great: { ink: "#7188b6", wash: "#e5e7f2", symbol: "!", motif: "feather-rise", label: "Great" },
-  best: { ink: "#568d82", wash: "#deece7", symbol: "✓", motif: "check", label: "Best" },
-  excellent: { ink: "#789b87", wash: "#e5eee5", symbol: "+", motif: "open-arc", label: "Excellent" },
-  good: { ink: "#8b9f8a", wash: "#edf0e6", symbol: "·✓", motif: "dot-check", label: "Good" },
-  book: { ink: "#887ba2", wash: "#ece7f0", symbol: "", motif: "book", label: "Book" },
-  interesting: { ink: "#a58658", wash: "#f1e6d3", symbol: "!?", motif: "warm-brush", label: "Interesting" },
-  forced: { ink: "#71838c", wash: "#e5ebeb", symbol: "→", motif: "single-path", label: "Forced" },
-  inaccuracy: { ink: "#ae9349", wash: "#f3e9c9", symbol: "?!", motif: "ripple", label: "Inaccuracy" },
-  mistake: { ink: "#b8755d", wash: "#f1ddd4", symbol: "?", motif: "interrupted", label: "Mistake" },
-  blunder: { ink: "#a95567", wash: "#f0dbe1", symbol: "??", motif: "broken-pair", label: "Blunder" },
-  miss: { ink: "#9e5768", wash: "#efdce2", symbol: "×", motif: "cross", label: "Miss" },
-  missed_win: { ink: "#a15f73", wash: "#efdee5", symbol: "↘", motif: "falling", label: "Missed win" },
-  missed_mate: { ink: "#87495f", wash: "#ead6de", symbol: "#?", motif: "fractured", label: "Missed mate" },
+  brilliant: { ink: "#2f7f93", wash: "#d9eef2", symbol: "!!", motif: "diamond-double", label: "Brilliant" },
+  great: { ink: "#647ba9", wash: "#e2e7f2", symbol: "!", motif: "diamond-single", label: "Critical" },
+  best: { ink: "#3f7f73", wash: "#dceae5", symbol: "✓", motif: "circle-solid-check", label: "Best" },
+  excellent: { ink: "#668c75", wash: "#e4ece3", symbol: "✓✓", motif: "circle-double-check", label: "Excellent" },
+  good: { ink: "#788c72", wash: "#ebefe5", symbol: "✓", motif: "circle-check", label: "Good" },
+  book: { ink: "#786c92", wash: "#eae5ef", symbol: "", motif: "square-book", label: "Book" },
+  interesting: { ink: "#9c7a42", wash: "#f2e6cb", symbol: "!?", motif: "square-interesting", label: "Interesting" },
+  forced: { ink: "#647985", wash: "#e5ebec", symbol: "→", motif: "square-forced", label: "Forced" },
+  inaccuracy: { ink: "#a18739", wash: "#f4e8be", symbol: "?!", motif: "ring-inaccuracy", label: "Inaccuracy" },
+  mistake: { ink: "#b26e4d", wash: "#f2ddd2", symbol: "?", motif: "square-mistake", label: "Mistake" },
+  blunder: { ink: "#a34e5b", wash: "#f0d9de", symbol: "??", motif: "octagon-blunder", label: "Blunder" },
+  miss: { ink: "#985263", wash: "#eedce1", symbol: "×", motif: "circle-miss", label: "Miss" },
+  missed_win: { ink: "#95566a", wash: "#eddfe5", symbol: "↘", motif: "diamond-missed-win", label: "Missed win" },
+  missed_mate: { ink: "#7f4459", wash: "#e8d6de", symbol: "#?", motif: "octagon-missed-mate", label: "Missed mate" },
 };
 
 export interface QualityIconProps {
@@ -47,53 +47,65 @@ export interface QualityIconProps {
   title?: string;
 }
 
-function Motif({ motif, ink }: { motif: QualityMotif; ink: string }) {
-  const props = { fill: "none", stroke: ink, strokeWidth: 1.45, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+const textStyle = {
+  fontFamily: "ui-rounded, system-ui, sans-serif",
+  fontWeight: 800,
+  textAnchor: "middle" as const,
+};
+
+function Diamond({ ink, wash, inset = false }: { ink: string; wash: string; inset?: boolean }) {
+  return <path d={inset ? "M16 4 28 16 16 28 4 16Z" : "M16 2.5 29.5 16 16 29.5 2.5 16Z"} fill={wash} stroke={ink} strokeWidth="1.6" strokeLinejoin="round" />;
+}
+
+function RoundedSquare({ ink, wash }: { ink: string; wash: string }) {
+  return <rect x="3.5" y="3.5" width="25" height="25" rx="6" fill={wash} stroke={ink} strokeWidth="1.6" />;
+}
+
+function Octagon({ ink, wash }: { ink: string; wash: string }) {
+  return <path d="m10 3 12 0 7 7 0 12-7 7H10l-7-7V10Z" fill={wash} stroke={ink} strokeWidth="1.7" strokeLinejoin="round" />;
+}
+
+function Motif({ motif, ink, wash }: { motif: QualityMotif; ink: string; wash: string }) {
+  const stroke = { fill: "none", stroke: ink, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (motif) {
-    case "twin-glints":
-      return <><path {...props} d="M5 23c5-1 9-5 11-12" /><path {...props} d="m21 5 .7 2.3L24 8l-2.3.7L21 11l-.7-2.3L18 8l2.3-.7zM27 12l.5 1.5L29 14l-1.5.5L27 16l-.5-1.5L25 14l1.5-.5z" /></>;
-    case "feather-rise":
-      return <><path {...props} d="M7 25C13 21 17 13 23 5c1 7-2 13-9 17" /><path {...props} d="m14 18 6-2M17 13l5-2" /></>;
-    case "check":
-      return <path {...props} strokeWidth="2" d="m6 17 6 6L26 8" />;
-    case "open-arc":
-      return <><path {...props} d="M6 22C8 10 17 5 26 10" /><path {...props} d="m20 21 4-4" /></>;
-    case "dot-check":
-      return <><circle cx="7" cy="21" r="1.7" fill={ink} /><path {...props} d="m11 18 4 4 10-11" /></>;
-    case "book":
-      return <><path {...props} d="M5 9c5-2 8 0 11 3v14c-3-3-6-4-11-2zM27 9c-5-2-8 0-11 3v14c3-3 6-4 11-2z" /><path {...props} d="M16 12v14" /></>;
-    case "warm-brush":
-      return <><path {...props} strokeWidth="4" opacity=".45" d="M6 23 25 8" /><path {...props} d="M10 8c4 2 7 2 11 0" /></>;
-    case "single-path":
-      return <><path {...props} strokeWidth="1.9" d="M5 16h20" /><path {...props} d="m21 11 5 5-5 5" /></>;
-    case "ripple":
-      return <><path {...props} d="M5 22c5-3 9-3 14 0M8 26c4-2 7-2 11 0" /><path {...props} d="M21 6c4 2 4 7 1 10" /></>;
-    case "interrupted":
-      return <><path {...props} strokeWidth="2" d="M8 9c4-4 13-3 14 3 .5 4-4 5-6 7" /><path {...props} d="M16 26h.1" /></>;
-    case "broken-pair":
-      return <><path {...props} strokeWidth="2" d="M5 9c3-3 8-2 8 2 0 3-3 4-4 6M19 8c4-2 8 0 7 4-.5 2-3 3-4 5" /><path {...props} d="m8 24 3-2M21 24l4-3" /></>;
-    case "cross":
-      return <><path {...props} strokeWidth="2" d="M7 8 24 25M24 7 8 24" /><path {...props} opacity=".45" d="m5 18 3 1M23 13l4-1" /></>;
-    case "falling":
-      return <><path {...props} d="M6 8c7 2 12 7 18 17" /><path {...props} d="m18 23 6 2-1-6" /><circle cx="8" cy="8" r="1.5" fill={ink} opacity=".55" /></>;
-    case "fractured":
-      return <><path {...props} strokeWidth="2" d="M8 7v18M4 13h9M20 7c5 1 7 6 3 10l-3 2" /><path {...props} d="m17 24 3-3 3 4" /></>;
+    case "diamond-double":
+      return <><Diamond ink={ink} wash={wash} /><text {...textStyle} x="15.5" y="19.2" fontSize="8.6" fill={ink}>!!</text><path d="m25.5 3 .65 1.85L28 5.5l-1.85.65L25.5 8l-.65-1.85L23 5.5l1.85-.65Z" fill={ink} /></>;
+    case "diamond-single":
+      return <><Diamond ink={ink} wash={wash} inset /><text {...textStyle} x="16" y="20.2" fontSize="11" fill={ink}>!</text><path d="m25.5 5 .5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5Z" fill={ink} /></>;
+    case "circle-solid-check":
+      return <><circle cx="16" cy="16" r="13.2" fill={ink} /><path d="m9 16.5 4.4 4.4L23.5 10.8" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></>;
+    case "circle-double-check":
+      return <><circle cx="16" cy="16" r="13" fill={wash} stroke={ink} strokeWidth="1.7" /><circle cx="16" cy="16" r="9.8" fill="none" stroke={ink} strokeWidth=".8" opacity=".42" /><path {...stroke} d="m7.8 16.5 3.2 3.2 6.3-6.3M14 18.2l2.6 2.6 7.4-8" /></>;
+    case "circle-check":
+      return <><circle cx="16" cy="16" r="12.5" fill={wash} stroke={ink} strokeWidth="1.6" /><path {...stroke} d="m9.2 16.7 4.2 4.1 9.4-10" /></>;
+    case "square-book":
+      return <><RoundedSquare ink={ink} wash={wash} /><path {...stroke} strokeWidth="1.45" d="M7.5 10c3.4-1.2 6-.2 8.5 2.1V24c-2.5-2.2-5.1-3.1-8.5-1.9Zm17 0c-3.4-1.2-6-.2-8.5 2.1V24c2.5-2.2 5.1-3.1 8.5-1.9ZM16 12.1V24" /></>;
+    case "square-interesting":
+      return <><RoundedSquare ink={ink} wash={wash} /><text {...textStyle} x="16" y="19.5" fontSize="8.5" fill={ink}>!?</text></>;
+    case "square-forced":
+      return <><RoundedSquare ink={ink} wash={wash} /><path {...stroke} d="M8 16h15m-5-5 5 5-5 5" /></>;
+    case "ring-inaccuracy":
+      return <><circle cx="16" cy="16" r="12.8" fill={wash} stroke={ink} strokeWidth="1.7" /><circle cx="16" cy="16" r="9.8" fill="none" stroke={ink} strokeWidth="1" strokeDasharray="2 2.4" opacity=".55" /><text {...textStyle} x="16" y="19.2" fontSize="8" fill={ink}>?!</text></>;
+    case "square-mistake":
+      return <><RoundedSquare ink={ink} wash={wash} /><text {...textStyle} x="16" y="20.5" fontSize="12" fill={ink}>?</text></>;
+    case "octagon-blunder":
+      return <><Octagon ink={ink} wash={wash} /><text {...textStyle} x="16" y="19.2" fontSize="8.2" fill={ink}>??</text></>;
+    case "circle-miss":
+      return <><circle cx="16" cy="16" r="12.7" fill={wash} stroke={ink} strokeWidth="1.7" /><path {...stroke} strokeWidth="2.4" d="m10.5 10.5 11 11m0-11-11 11" /></>;
+    case "diamond-missed-win":
+      return <><Diamond ink={ink} wash={wash} inset /><path {...stroke} d="M9 9.5c4.2 1.8 7.4 5.2 12.2 11.8m-5.8-1.1 5.8 1.1-1.2-5.8" /></>;
+    case "octagon-missed-mate":
+      return <><Octagon ink={ink} wash={wash} /><text {...textStyle} x="16" y="19.2" fontSize="7.5" fill={ink}>#?</text></>;
   }
 }
 
-/** Project-owned Feather Annotation icon: open wash, asymmetric ink and a distinct silhouette. */
+/** Project-owned Move Quality Annotation System V3, rendered as inline SVG. */
 export function QualityIcon({ classification, size = 28, title }: QualityIconProps) {
   const meta = QUALITY_META[classification];
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" role="img" aria-label={title ?? meta.label}>
       <title>{title ?? meta.label}</title>
-      <path d="M4 21C8 9 18 4 28 9" fill="none" stroke={meta.wash} strokeWidth="8" strokeLinecap="round" opacity=".78" />
-      <Motif motif={meta.motif} ink={meta.ink} />
-      {meta.symbol && (
-        <text x="16" y="19.5" textAnchor="middle" fontSize="8.7" fontWeight="760" fill={meta.ink} fontFamily="ui-rounded, system-ui, sans-serif">
-          {meta.symbol}
-        </text>
-      )}
+      <Motif motif={meta.motif} ink={meta.ink} wash={meta.wash} />
     </svg>
   );
 }

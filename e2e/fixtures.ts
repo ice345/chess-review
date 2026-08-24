@@ -13,12 +13,21 @@ export const SAMPLE_PGN = `[Event "Phase 5.1 E2E"]
 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5
 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 *`;
 
+export const SHORT_ANALYSIS_PGN = `[Event "Live Stockfish E2E"]
+[White "Ada"]
+[Black "Mikhail"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 *`;
+
 const DEPTH = 10;
 const MULTI_PV = 3;
 
 function positionResult(fen: string, canonicalUci: string | undefined, index: number): StockfishMoveAnalysis {
   const fixtureAlternatives: Record<number, string[]> = {
-    0: ["d2d4", "g1f3"],
+    // f2f3 and g1f3 deliberately share a destination while remaining
+    // different legal candidate identities.
+    0: ["f2f3", "g1f3"],
     1: ["c7c5", "e7e6"],
     2: ["b1c3", "d2d4"],
   };
@@ -132,6 +141,12 @@ export async function seedReview(page: Page, options: { visualLabels?: boolean }
   return fixture;
 }
 
+export async function seedUnanalyzedReview(page: Page, pgn = SHORT_ANALYSIS_PGN) {
+  const record = await buildReviewRecord("pgn", pgn);
+  await writeStores(page, { "review-records": [[record.id, record]] });
+  return record;
+}
+
 export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<void> {
   const account: PlatformAccount = {
     id: "chesscom:hikaru",
@@ -183,7 +198,11 @@ export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<
   });
 }
 
-export async function mockLocalAi(page: Page, state: "available" | "offline" = "available"): Promise<{ requests: Array<{ path: string; body: Record<string, unknown> }> }> {
+export async function mockLocalAi(
+  page: Page,
+  state: "available" | "offline" = "available",
+  options: { positionCandidates?: string[]; responseDelayMs?: number } = {},
+): Promise<{ requests: Array<{ path: string; body: Record<string, unknown> }> }> {
   const requests: Array<{ path: string; body: Record<string, unknown> }> = [];
   await page.route(/http:\/\/(?:127\.0\.0\.1|localhost):8000\/.*/, async (route) => {
     if (state === "offline") return route.abort("connectionrefused");
@@ -193,10 +212,11 @@ export async function mockLocalAi(page: Page, state: "available" | "offline" = "
       status: "ok",
       maia: "available",
       maiaModels: { "maia3-5m": "cached", "maia3-23m": "cached", "maia3-79m": "not-cached" },
-      coach: { ollama: "available", ollamaModel: "available", configuredModel: "fixture", ollamaModels: ["fixture"], openaiCompatible: "not-configured" },
+      coach: { ollama: "available", ollamaModel: "available", configuredModel: "fixture", ollamaModels: ["fixture", "gemma4:12b-it-qat"], openaiCompatible: "not-configured" },
     } });
     const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
-    if (url.pathname.startsWith("/maia/")) requests.push({ path: url.pathname, body });
+    if (url.pathname.startsWith("/maia/") || url.pathname.startsWith("/coach/")) requests.push({ path: url.pathname, body });
+    if (options.responseDelayMs) await new Promise((resolve) => setTimeout(resolve, options.responseDelayMs));
     if (url.pathname.endsWith("/download")) return route.fulfill({ status: 200, headers, json: { model: url.pathname.split("/")[3], status: "cached" } });
     if (url.pathname === "/maia/move-review") {
       const played = String(body.played_move);
@@ -229,7 +249,7 @@ export async function mockLocalAi(page: Page, state: "available" | "offline" = "
       } });
     }
     if (url.pathname === "/maia/position-analysis") {
-      const supplied = Array.isArray(body.candidate_moves) ? body.candidate_moves.map(String) : [];
+      const supplied = options.positionCandidates ?? (Array.isArray(body.candidate_moves) ? body.candidate_moves.map(String) : []);
       const probabilities = [.41, .27, .11, .07, .04];
       const candidates = supplied.slice(0, 5).map((uci, index) => ({
         uci,

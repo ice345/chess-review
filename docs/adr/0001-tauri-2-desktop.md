@@ -40,7 +40,10 @@ Tauri starts
 
 Owned child processes may be stopped during application shutdown. Pre-existing Ollama or local services must never be terminated by Open Chess Review.
 
-The local-ai Python packaging strategy will be validated in Phase 6. Candidate approaches include a platform-specific self-contained sidecar binary or a bundled runtime with a narrow launcher. A development shell script is not an acceptable release architecture.
+The local-ai Python service is packaged per platform as a self-contained
+PyInstaller sidecar. Tauri's `externalBin` target-triple convention keeps the
+sidecar architecture aligned with each native build. A development shell script
+is not used as the release architecture.
 
 ## Consequences
 
@@ -54,6 +57,6 @@ The local-ai Python packaging strategy will be validated in Phase 6. Candidate a
 
 Phase 6 opened on 2026-08-24 with a static Vite/React frontend and minimal Tauri
 Rust host under `apps/desktop`. The shell imports `@chess-review/ui` and
-`@chess-review/chess-core` directly. No native lifecycle permission or sidecar
-plugin is enabled yet; those remain separate reviewed milestones. See
+`@chess-review/chess-core` directly. Native PGN integration, managed Ollama and
+the packaged local-ai sidecar lifecycle are now implemented. See
 [`../desktop.md`](../desktop.md).

@@ -61,7 +61,7 @@
 - [x] import-to-review navigation and persisted review IDs
 - [x] normal-document Review workspace with a prominent board and full-width timeline
 - [x] persistent board across review sub-routes
-- [x] Review / Moves / Coach route separation with Human Lens inside Review
+- [x] Review / Moves / Study route separation with Human Lens inside Review
 - [x] advanced Engine Lab separation
 - [x] simplified export controls
 - [x] compact critical moments
@@ -142,7 +142,7 @@ alone do not complete an item.
 
 ### Milestone G — visual identity
 
-- [x] watercolor annotation-seal quality icon refinement
+- [x] initial original move-quality icon refinement (later replaced by the geometric V3 system)
 - [x] original Blue Bishop logo, app mark and favicon
 - [x] final board/review visual polish and coherent export language
 
@@ -200,7 +200,7 @@ checkboxes.
 
 ### Milestone D — visual and stylesheet completion
 
-- [x] Feather Annotation Move Quality V2 with a distinct motif for every classification
+- [x] distinct objective motif groundwork across every classification (later replaced by V3)
 - [x] quieter Human Find Difficulty mark family
 - [x] shared icon semantics across board, lists, summary, graph and PNG export
 - [x] 14-label visual fixture at 20/24/28/36 px on paper and board backgrounds
@@ -220,25 +220,87 @@ Phase 5.2 closed on 2026-08-24 after the contract, persistence, Coach, CSS and
 visual audits passed. The repair gate is complete, so work may continue on the
 remaining Phase 6 desktop items without inheriting the ambiguous Maia semantics.
 
+## Phase 5.3 — interaction semantics, Study boundary and Move Quality V3
+
+Phase 5.3 is a focused repair gate over the shipped Phase 5.2 workspace. It does
+not change Accuracy, Divider, WinPercent, White-POV score handling, objective
+classification or Human Find Difficulty.
+
+### Milestone A — exact interaction identity
+
+- [x] remove destination-square Stockfish/Maia candidate lookup
+- [x] make board arrows visual hints rather than ambiguous branch controls
+- [x] validate Stockfish rows by root FEN, rank, exact UCI and complete PV
+- [x] validate Maia rows by FEN, model, target Elo and exact UCI
+- [x] mark Compare overlap only for exact full-UCI equality
+- [x] cover shared destinations, differing recommendations, overlapping arrows and Return to Game
+
+### Milestone B — button and asynchronous safety
+
+- [x] explicit `type="button"` for every non-submit TSX button
+- [x] AST regression test rejecting implicit button types
+- [x] one-flight guards for analysis, Maia/model setup, Coach generation, imports and account sync
+- [x] stale Coach request cancellation across ply, provider, model and language changes
+- [x] rapid Stockfish/Maia/Compare and duplicate Coach action coverage
+- [x] real uncached Analyze-game coverage, including no-legal-move checkmate and stalemate endings
+
+### Milestone C — Analyze / Inspect / Learn hierarchy
+
+- [x] Review remains the only Stockfish/Maia/Compare analysis workspace
+- [x] Maia defaults move to Settings with a lightweight Review quick popover
+- [x] visible Coach navigation becomes Study while the stable URL remains unchanged
+- [x] contextual “Explain this move” preserves the persistent board and current ply
+- [x] Study prioritizes whole-game learning and removes duplicated analysis dashboards
+- [x] compact provenance plus on-demand grounding replaces large source fact cards
+- [x] Human route remains removed; primary Review modes stay Stockfish, Maia and Compare
+
+### Milestone D — Move Quality Annotation System V3
+
+- [x] 14 geometric inline-SVG motifs with coherent diamond/circle/square/octagon families
+- [x] specified restrained palettes and 20–28px silhouette readability
+- [x] unchanged `QUALITY_META` and `QualityIcon` consumer API
+- [x] shared V3 representation across board, verdict, Moves, summary, critical moments, timeline and PNG export
+- [x] Human Find Difficulty keeps its separate quiet mark family
+- [x] `/design/quality-icons` updated and reviewed at 20/24/28/36px on all four backgrounds
+
+Phase 5.3 closed on 2026-08-24 after package tests, typecheck, lint, production
+build, Python regression tests, semantic/visual Playwright coverage, both PNG
+exports, both board orientations and the complete V3 fixture were reviewed.
+The terminal-position repair was revalidated with real browser Stockfish runs
+before further Phase 6 work. Further Phase 6 work must start from this
+exact-interaction and Study product boundary.
+
 ## Phase 6 — desktop application
 
 - [x] Tauri 2 application shell
 - [x] shared React/TypeScript packages
-- [ ] macOS build
+- [x] arm64 macOS `.app` and `.dmg` local build (ad-hoc only)
 - [ ] Windows build
 - [ ] Linux build
-- [ ] managed local-ai sidecar
-- [ ] managed Ollama discovery/startup
-- [ ] local model setup workflow with explicit download approval
-- [ ] graceful process ownership and shutdown
-- [ ] native PGN file open/import
+- [x] managed packaged local-ai sidecar
+- [x] managed Ollama discovery/startup
+- [x] local model setup workflow with explicit download approval
+- [x] process ownership and shutdown for Ollama and local-ai
+- [x] native PGN file open/import
+- [x] native Windows/Linux bundle configuration and artifact workflow (runner results pending)
 - [ ] packaged releases and CI artifacts
 
-Phase 6 opened on 2026-08-24 with the independent Vite/React/Tauri shell. Its
-first native release build completed with bundling disabled, and the preview
-imports the project-owned UI mark plus PGN parser from workspace packages. This
-does not yet claim a signed macOS bundle, another operating-system build,
-sidecar lifecycle, native file association or release artifact.
+Phase 6 opened on 2026-08-24 with the independent Vite/React/Tauri shell. The
+preview imports the project-owned UI mark plus PGN parser from workspace
+packages. Its first platform milestone now produces ad-hoc arm64 macOS `.app`
+and `.dmg` bundles using generated Blue Bishop platform icons. This does not yet
+claim signing, notarization, a universal or other operating-system build, or a
+published release artifact. Native PGN association/import, the Ollama ownership
+boundary and a self-contained PyInstaller local-ai sidecar were subsequently
+implemented and validated in the rebuilt macOS app. The sidecar exposes the
+real FastAPI health contract and is stopped with the app, while a pre-existing
+Ollama process remains untouched. Windows/Linux native configurations and an artifact
+matrix are committed but do not count as completed builds before their runners
+pass. During the
+Phase 6 gate, two shared Review-runtime gaps were also closed: Coach generation
+now survives navigation among nested review routes, and user-played temporary
+variations receive runtime-only Stockfish Move Quality through the canonical
+classifier without mutating the imported game or objective cache.
 
 ## Phase 7 — advanced study
 
@@ -253,4 +315,4 @@ sidecar lifecycle, native file association or release artifact.
 - [ ] define mobile capability boundaries
 - [ ] design a local/remote AI strategy
 
-Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phases 5–5.2 do not change Accuracy, Divider, WinPercent, score POV or objective classification semantics.
+Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phases 5–5.3 do not change Accuracy, Divider, WinPercent, score POV or objective classification semantics.

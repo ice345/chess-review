@@ -14,6 +14,9 @@ never edited when a user moves a piece or selects a candidate line.
 - A node may record `user`, ranked `stockfish`, and/or Elo-conditioned `maia`
   source metadata. Source
   metadata describes how a path was selected; it is not a move-quality verdict.
+- A user-played node may separately hold a runtime-only objective Move Quality
+  result. It records the canonical classification evidence and Accuracy for
+  that edge, but never enters `GameAnalysisV1`, game summaries or exports.
 - `activePath` is one root-to-leaf path, while `selectedIndex` identifies the
   displayed node on that path.
 - Children are reused by parent plus UCI move, so a user move and an engine PV
@@ -32,6 +35,7 @@ canonical position at ply N
   -> validate through chess.js in packages/chess-core
   -> append/reuse a tree edge
   -> display the selected node FEN
+  -> classify a user-played edge from its parent FEN with Stockfish
   -> automatically analyze the exact FEN with the active Review source
 ```
 
@@ -45,6 +49,16 @@ strength only. Selecting an arrow or its compact text line projects the validate
 engine PV into the tree. A search result is tagged with its request FEN and is
 discarded from presentation if the board moved before that search completed.
 
+For a user-played edge, Stockfish searches the parent position with the Review
+depth/MultiPV settings. If the played UCI is outside MultiPV, a restricted
+`searchmoves` root search supplies its score. `classifyExploratoryMove()` then
+uses the same classifier, Accuracy function, legal-choice facts and sacrifice
+detector as full-game review. The resulting badge is therefore objective and
+mode-independent: switching to Maia never replaces it with a policy verdict.
+Opening-book and game-phase labels are intentionally absent because a runtime
+branch has no canonical imported-game theory boundary. Moving away cancels the
+in-flight edge search; returning retries or reuses the node's completed result.
+
 Maia candidate arrows use a separate sage family. Selecting one adds only its
 legal move plus target-Elo/probability source evidence. Stockfish and Maia are
 mutually exclusive Review displays; their scores are never blended.
@@ -57,6 +71,6 @@ classifications, exports and cached analysis remain unchanged. Selecting a
 timeline point intentionally exits the branch and establishes a new canonical
 cursor.
 
-The tree is session runtime state in Phase 5.1. If variation persistence is
-added later, it must use its own versioned record rather than extending
-`GameAnalysisV1` with exploratory classifications.
+The tree, including temporary Move Quality evidence, is session runtime state.
+If variation persistence is added later, it must use its own versioned record
+rather than extending `GameAnalysisV1` with exploratory classifications.

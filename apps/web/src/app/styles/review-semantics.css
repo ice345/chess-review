@@ -120,6 +120,17 @@
   grid-template-columns: 1fr 1fr;
 }
 
+.explain-move-action {
+  grid-column: 1 / -1;
+  justify-self: end;
+  padding: 3px 1px;
+  color: #4f7889;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.explain-move-action:hover { color: #294f60; }
+
 .move-verdict {
   min-width: 0;
   padding: 11px 4px;

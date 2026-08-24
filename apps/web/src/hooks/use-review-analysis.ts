@@ -158,7 +158,7 @@ export function useReviewAnalysis({
 
   const analyzePosition = useCallback(async () => {
     if (!engine.current) return;
-    engineAbort.current?.abort();
+    if (engineAbort.current && !engineAbort.current.signal.aborted) return;
     const controller = new AbortController();
     engineAbort.current = controller;
     const review = useReviewStore.getState();
@@ -191,7 +191,7 @@ export function useReviewAnalysis({
 
   const analyzeContinuations = useCallback(async () => {
     if (!continuationEngine.current) return;
-    continuationAbort.current?.abort();
+    if (continuationAbort.current && !continuationAbort.current.signal.aborted) return;
     const controller = new AbortController();
     continuationAbort.current = controller;
     const review = useReviewStore.getState();

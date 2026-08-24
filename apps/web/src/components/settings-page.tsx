@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CoachLanguage } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
 import { DEFAULT_APP_SETTINGS, loadAppSettings, saveAppSettings, type AppSettings } from "../lib/app-settings";
@@ -20,6 +20,7 @@ export function SettingsPage() {
   const [humanSetupState, setHumanSetupState] = useState<"idle" | "running" | "error">("idle");
   const [humanSetupNotice, setHumanSetupNotice] = useState<string | null>(null);
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
+  const setupInFlight = useRef(false);
 
   useEffect(() => {
     setSettings(loadAppSettings());
@@ -34,16 +35,21 @@ export function SettingsPage() {
   }
 
   async function setupHumanModel() {
+    if (setupInFlight.current) return;
+    setupInFlight.current = true;
+    const requestedModel = settings.humanModel;
     setHumanSetupState("running");
     setHumanSetupNotice(null);
     try {
-      await downloadMaiaModel(settings.humanModel);
+      await downloadMaiaModel(requestedModel);
       await localAi.refresh();
       setHumanSetupState("idle");
-      setHumanSetupNotice(`${settings.humanModel} is cached and ready.`);
+      setHumanSetupNotice(`${requestedModel} is cached and ready.`);
     } catch (error) {
       setHumanSetupState("error");
       setHumanSetupNotice(error instanceof Error ? error.message : "Maia model download failed.");
+    } finally {
+      setupInFlight.current = false;
     }
   }
 
@@ -70,7 +76,7 @@ export function SettingsPage() {
             <option value="maia3-79m">Maia-3 79M · Highest accuracy · Heavy</option>
           </select></label>
           <div className="human-model-status"><span><i className={`service-dot ${humanModelReady ? "available" : humanModelState === "not-cached" ? "not-installed" : humanModelState}`} />{settings.humanModel} · {humanModelState}</span>
-            {!humanModelReady && health?.maia === "available" && <button className="secondary" disabled={humanSetupState === "running"} onClick={() => void setupHumanModel()}>{humanSetupState === "running" ? "Downloading…" : "Download model"}</button>}
+            {!humanModelReady && health?.maia === "available" && <button type="button" className="secondary" disabled={humanSetupState === "running"} onClick={() => void setupHumanModel()}>{humanSetupState === "running" ? "Downloading…" : "Download model"}</button>}
           </div>
           {humanSetupNotice && <small role="status">{humanSetupNotice}</small>}
           <small>Changing the selector never downloads or loads a checkpoint. Use Download model explicitly. Elo and model identity are remembered across reviews and never change Stockfish evaluation or Move Quality.</small>
@@ -88,7 +94,7 @@ export function SettingsPage() {
         <section className="settings-card runtime-card">
           <div><span className="kicker">Runtime boundary</span><h2>Local capabilities</h2></div>
           <p>A browser cannot launch native processes. Use <code>pnpm dev</code> for the complete workspace, or <code>pnpm dev:local-ai</code> when the web app is already running. Offline panels reconnect automatically.</p>
-          <button className="secondary" onClick={() => void localAi.refresh()} disabled={checking}>{checking ? "Checking…" : "Check local runtime"}</button>
+          <button type="button" className="secondary" onClick={() => void localAi.refresh()} disabled={checking}>{checking ? "Checking…" : "Check local runtime"}</button>
           {health ? (
             <div className="runtime-status">
               <span><i className={`service-dot ${health.maia}`} />Maia · {health.maia}</span>

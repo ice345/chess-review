@@ -3,16 +3,17 @@
 import { replayUciLine } from "@chess-review/chess-core";
 import type { MaiaModel, StockfishMoveAnalysis } from "@chess-review/shared";
 import { useReviewRuntime } from "../review-runtime";
-import { compareRecommendations, type AnalysisMode } from "../../lib/board-analysis-arrows";
+import {
+  compareRecommendations,
+  humanCandidateIdentity,
+  overlappingCandidateUcis,
+  type AnalysisMode,
+} from "../../lib/board-analysis-arrows";
 import { humanLensServiceCopy } from "../../lib/human-lens-state";
 import { useReviewStore } from "../../store/review-store";
 
 const ELO_OPTIONS = [800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600] as const;
-const MODES: Array<{ value: AnalysisMode; label: string }> = [
-  { value: "stockfish", label: "Stockfish" },
-  { value: "maia", label: "Maia" },
-  { value: "compare", label: "Compare" },
-];
+const MODES: AnalysisMode[] = ["stockfish", "maia", "compare"];
 const MODELS: Array<{ value: MaiaModel; label: string }> = [
   { value: "maia3-5m", label: "Maia-3 5M · Fastest" },
   { value: "maia3-23m", label: "Maia-3 23M · Balanced" },
@@ -40,6 +41,7 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
   const customTarget = !ELO_OPTIONS.some((value) => value === runtime.humanTargetElo);
   const showHuman = runtime.analysisMode !== "stockfish";
   const modelReady = runtime.humanModelState === "active" || runtime.humanModelState === "cached";
+  const overlaps = overlappingCandidateUcis(objective, result, runtime.continuationLines);
 
   return (
     <div className="analysis-lens-panel">
@@ -49,17 +51,59 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
           <strong>Objective truth and human prediction stay separate</strong>
         </div>
         <div className="lens-switch" role="group" aria-label="Analysis source">
-          {MODES.map(({ value, label }) => (
+          {MODES.map((value) => (
             <button
+              type="button"
               aria-pressed={runtime.analysisMode === value}
               className={runtime.analysisMode === value ? "active" : ""}
               key={value}
               onClick={() => runtime.setAnalysisMode(value)}
             >
-              {label}
+              {value === "stockfish" ? "Stockfish" : value === "maia" ? `Maia · ${runtime.humanTargetElo}` : "Compare"}
             </button>
           ))}
         </div>
+        {showHuman && (
+          <details className="human-quick-settings">
+            <summary aria-label="Maia quick settings">Maia settings</summary>
+            <div className="human-lens-controls">
+              <label>
+                <span>Target Elo</span>
+                <select value={runtime.humanTargetElo} onChange={(event) => runtime.setHumanTargetElo(Number(event.target.value))}>
+                  {customTarget && <option value={runtime.humanTargetElo}>{runtime.humanTargetElo} · saved</option>}
+                  {ELO_OPTIONS.map((elo) => <option value={elo} key={elo}>{elo}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Maia model</span>
+                <select value={runtime.humanModel} onChange={(event) => runtime.setHumanModel(event.target.value as MaiaModel)}>
+                  {MODELS.map((model) => <option value={model.value} key={model.value}>{model.label}</option>)}
+                </select>
+              </label>
+              {modelReady ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={runtime.humanPositionState === "running"}
+                  onClick={() => runtime.humanServiceState === "available" ? void runtime.analyzeHumanPosition() : void runtime.refreshHumanService()}
+                >
+                  {runtime.humanPositionState === "running" ? "Running Maia analysis…" : "Refresh Maia analysis"}
+                </button>
+              ) : runtime.humanServiceState === "available" ? (
+                <button
+                  type="button"
+                  className="secondary model-download"
+                  disabled={runtime.humanModelSetupState === "running"}
+                  onClick={() => void runtime.setupHumanModel()}
+                >
+                  {runtime.humanModelSetupState === "running" ? "Downloading model…" : "Download selected model"}
+                </button>
+              ) : (
+                <button type="button" className="secondary" onClick={() => void runtime.refreshHumanService()}>Check Maia service</button>
+              )}
+            </div>
+          </details>
+        )}
       </div>
 
       <div className="lens-legend" aria-label="Analysis source legend">
@@ -69,40 +113,6 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
 
       {showHuman && (
         <div className="human-lens-content">
-          <div className="human-lens-controls">
-            <label>
-              <span>Target Elo</span>
-              <select value={runtime.humanTargetElo} onChange={(event) => runtime.setHumanTargetElo(Number(event.target.value))}>
-                {customTarget && <option value={runtime.humanTargetElo}>{runtime.humanTargetElo} · saved</option>}
-                {ELO_OPTIONS.map((elo) => <option value={elo} key={elo}>{elo}</option>)}
-              </select>
-            </label>
-            <label>
-              <span>Maia model</span>
-              <select value={runtime.humanModel} onChange={(event) => runtime.setHumanModel(event.target.value as MaiaModel)}>
-                {MODELS.map((model) => <option value={model.value} key={model.value}>{model.label}</option>)}
-              </select>
-            </label>
-            {modelReady ? (
-              <button
-                className="secondary"
-                disabled={runtime.humanPositionState === "running"}
-                onClick={() => runtime.humanServiceState === "available" ? void runtime.analyzeHumanPosition() : void runtime.refreshHumanService()}
-              >
-                {runtime.humanPositionState === "running" ? "Running Maia move + position analysis…" : "Refresh Maia analysis"}
-              </button>
-            ) : runtime.humanServiceState === "available" ? (
-              <button
-                className="secondary model-download"
-                disabled={runtime.humanModelSetupState === "running"}
-                onClick={() => void runtime.setupHumanModel()}
-              >
-                {runtime.humanModelSetupState === "running" ? "Downloading model…" : "Download selected model"}
-              </button>
-            ) : (
-              <button className="secondary" onClick={() => void runtime.refreshHumanService()}>Check Maia service</button>
-            )}
-          </div>
           <p className="human-service-state" role="status">
             <i className={"service-dot " + runtime.humanServiceState} />
             {humanLensServiceCopy(runtime.humanServiceState)} · {runtime.humanModel} is {runtime.humanModelState}
@@ -125,18 +135,29 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
                     {comparison.objectiveRankForHuman === undefined ? "Maia's top choice is outside displayed Stockfish candidates" : "Maia's top choice is Stockfish rank #" + comparison.objectiveRankForHuman}
                     {comparison.humanProbabilityForObjective === undefined ? "" : " · Stockfish top choice has " + percentage(comparison.humanProbabilityForObjective) + " Maia probability"}
                   </small>
+                  <small data-testid="compare-arrow-overlap">{overlaps.length} exact UCI arrow overlap{overlaps.length === 1 ? "" : "s"}</small>
                 </div>
               )}
               <div className="human-lens-candidates" aria-label="Maia human candidates">
-                {result.candidates.slice(0, runtime.continuationLines).map((candidate) => (
-                  <button key={candidate.uci} onClick={() => runtime.playHumanCandidate(candidate.uci, candidate.probability)}>
+                {result.candidates.slice(0, runtime.continuationLines).map((candidate) => {
+                  const identity = humanCandidateIdentity(result, candidate);
+                  return (
+                  <button
+                    type="button"
+                    aria-label={`Maia candidate #${candidate.policyRank} ${candidate.uci}`}
+                    data-candidate-uci={candidate.uci}
+                    key={candidate.uci}
+                    onClick={() => runtime.playHumanCandidate(identity)}
+                  >
                     <span>#{candidate.policyRank}</span>
                     <strong>{candidate.san}</strong>
                     <i><b style={{ width: percentage(candidate.probability) }} /></i>
                     <em>{percentage(candidate.probability)}</em>
+                    <code>{candidate.uci}</code>
                     {candidate.wdl && <small>W/D/L {percentage(candidate.wdl.win)} / {percentage(candidate.wdl.draw)} / {percentage(candidate.wdl.loss)}</small>}
                   </button>
-                ))}
+                  );
+                })}
               </div>
               <small className="model-boundary">{runtime.humanModel} @ {runtime.humanTargetElo} predicts human choices and outcomes. It never emits objective centipawns or Move Quality.</small>
             </>

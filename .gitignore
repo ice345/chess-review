@@ -5,6 +5,8 @@ node_modules/
 .next/
 dist/
 target/
+apps/desktop/src-tauri/binaries/
+services/local-ai/build/
 **/src-tauri/gen/schemas/
 coverage/
 playwright-report/

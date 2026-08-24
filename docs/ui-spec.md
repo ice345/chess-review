@@ -7,7 +7,7 @@ The product is route-based rather than a single analysis dashboard:
 - `/` owns PGN/FEN import and recent reviews.
 - `/review/[gameId]` is the objective review.
 - `/review/[gameId]/moves` is the move explorer.
-- `/review/[gameId]/coach` is grounded coaching.
+- `/review/[gameId]/coach` is the Study surface for grounded move lessons and whole-game learning (the URL remains stable).
 - `/review/[gameId]/engine` is the advanced Stockfish lab.
 - `/history` and `/settings` are application utilities.
 
@@ -15,7 +15,7 @@ Import UI is never mounted inside the review workspace. A valid input is normali
 
 ## Persistent review shell
 
-The nested review layout owns the board, evaluation bar, selected ply, orientation, move controls, current verdict and evaluation timeline. Client-side transitions replace only the contextual right panel, so board state persists across Review, Moves, Coach and Engine.
+The nested review layout owns the board, evaluation bar, selected ply, orientation, move controls, current verdict and evaluation timeline. Client-side transitions replace only the contextual right panel, so board state persists across Review, Moves, Study and Engine Lab.
 
 At desktop sizes the review is a normal document, typically about 1.3–1.6 viewports for an ordinary game. The opening spread gives the board roughly 540–610 CSS pixels and places current-position study beside it. The 240–320-pixel plot area sits full-width below. Dense route content extends the document instead of creating a nested scrolling dashboard.
 
@@ -27,11 +27,11 @@ The visual language distinguishes three sources:
 
 - Objective: Stockfish score, MultiPV, classification and Accuracy.
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
-- Coach: generated explanation with source, confidence and grounding details.
+- Study: generated teaching from canonical facts, with concise provenance and grounding details on demand.
 
-The primary review navigation contains Review, Moves and Coach. Engine Lab is deliberately placed under the secondary More menu. Stockfish/Maia/Compare selection, target Elo and Maia model live in Review. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
+The primary review navigation contains Review, Moves and Study. Engine Lab is deliberately placed under the secondary More menu. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
 
-Quality icons come from `packages/ui` and use the original Feather Annotation V2 language across move list, destination-square overlay, charts, summary and PNG exports. Every objective classification has a distinct open watercolor motif and readable non-color symbol; no common enclosed badge shape carries the semantics. Human Find Difficulty uses a quieter separate mark family. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
+Quality icons come from `packages/ui` and use Move Quality Annotation System V3 across the move list, destination-square overlay, charts, summary and PNG exports. Diamonds identify elite/special moves, circles positive and ring states, rounded squares informational/warning states, and octagons severe errors. The schema classification `great` is presented to users as **Critical**, matching its only-good-move meaning without changing the persisted classification key or algorithm. Silhouette and glyph remain readable at 20–28px without relying on color. The destination-square badge always remains the canonical Stockfish Move Quality icon in Stockfish, Maia and Compare modes; changing analysis source never relabels the played move. Human Find Difficulty keeps its quieter, separate mark family in the evidence panel. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
 
 The project identity is the original Blue Bishop: a simplified bishop silhouette whose diagonal cut continues into a restrained feather/wing gesture. The same geometry is used for the generated Next.js favicon, square app mark, header mark and PNG export signature. The bishop remains legible at 16px; there is no literal bird character or third-party chess artwork.
 
@@ -45,9 +45,9 @@ Human, Coach, connected-platform and visual-identity rules stay in their focused
 modules. There is no fallback `globals.css` review layer. A regression test locks
 the key selector owners so new route-specific styles extend the correct module.
 
-Coach move lessons use one decision sequence: What to notice, Your idea, The problem, What happens next, A practical alternative and Remember this. Only slots supported by the response are shown. The short consequence line remains a separate rules-validated UCI/SAN artifact, and objective and Maia source cards remain visually distinct from generated prose.
+Study move lessons use one decision sequence: What to notice, Your idea, The problem, What happens next, A practical alternative and Remember this. Only slots supported by the response are shown. The short consequence line remains a separate rules-validated UCI/SAN artifact. Review owns the detailed Stockfish/Maia presentation; Study shows only a compact provenance line and places detailed evidence behind “Why this explanation?”. The whole-game lesson is the primary Study action. Review exposes a contextual “Explain this move” action that preserves the board and current ply while opening Study.
 
-Continuation line count (1–5) and displayed PV length (6/8/10/12/16) are configured only in Settings. Review has no separate Top Continuations card: compact Stockfish SAN lines support the board arrows when Stockfish is selected. Selecting an arrow endpoint or line creates a rules-validated engine path in the analysis tree. Arrow keys walk that branch and Escape returns to the canonical game.
+Continuation line count (1–5) and displayed PV length (6/8/10/12/16) are configured only in Settings. Review has no separate Top Continuations card: compact Stockfish SAN lines support the board arrows when Stockfish is selected. Arrows are visual hints and are never selected by destination square. An explicit Stockfish row is identified by root FEN, rank, exact UCI and complete PV; an explicit Maia row is identified by FEN, model, target Elo and exact UCI. Selecting a row creates a rules-validated path in the analysis tree. Arrow keys walk that branch and Escape returns to the canonical game.
 
 ## Phase 5.1 workspace contract
 
@@ -72,6 +72,8 @@ Opponent profiles are not fetched during sync or ordinary review.
 Analysis arrows have explicit source semantics. Stockfish arrows are objective
 MultiPV candidates; Maia arrows are policy probabilities at the selected target
 Elo; Compare shows both and uses a distinct dual-source arrow when they overlap.
+Overlap means exact full UCI equality, including promotion—not merely a shared
+destination square. Compare never gives one source priority during selection.
 No synthetic chess score is calculated. The evaluation bar uses Stockfish
 WinPercent in Stockfish mode, exact-position root human-game WDL in Maia mode,
 and a Stockfish bar plus Maia marker in Compare. Recommendation comparison shows

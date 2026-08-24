@@ -3,9 +3,12 @@ import type { StockfishMoveAnalysis } from "@chess-review/shared";
 import type { MaiaPositionAnalysis } from "@chess-review/shared";
 import {
   analysisModeArrows,
-  candidateRankAtSquare,
   compareRecommendations,
-  humanCandidateAtSquare,
+  humanCandidateIdentity,
+  matchingHumanCandidate,
+  matchingStockfishCandidate,
+  overlappingCandidateUcis,
+  stockfishCandidateIdentity,
   stockfishCandidateArrows,
 } from "./board-analysis-arrows";
 
@@ -52,14 +55,32 @@ describe("Stockfish board arrows", () => {
     expect(stockfishCandidateArrows(result, 3, "d2d4")[1]?.color).toContain(".98");
   });
 
-  it("maps an arrow head click back to the engine rank", () => {
-    expect(candidateRankAtSquare(result, "f3", 3)).toBe(3);
-    expect(candidateRankAtSquare(result, "f3", 2)).toBeNull();
+  it("identifies Stockfish rows by root, rank, exact UCI and complete PV", () => {
+    const line = result.lines[2]!;
+    const identity = stockfishCandidateIdentity(result, line)!;
+    expect(matchingStockfishCandidate(result, identity)).toBe(line);
+    expect(matchingStockfishCandidate(result, { ...identity, uci: "f2f3" })).toBeNull();
+    expect(matchingStockfishCandidate(result, { ...identity, pvKey: "g1f3\u0000d7d5" })).toBeNull();
   });
 
   it("uses a separate Maia family without merging objective and human semantics", () => {
     expect(analysisModeArrows({ mode: "maia", stockfish: result, human, lineCount: 3 })[0]?.color).toContain("104, 137, 111");
-    expect(humanCandidateAtSquare(human, "c4", 3)?.uci).toBe("c2c4");
+    const identity = humanCandidateIdentity(human, human.candidates[2]!);
+    expect(matchingHumanCandidate(human, identity)?.uci).toBe("c2c4");
+    expect(matchingHumanCandidate(human, { ...identity, uci: "b1c3" })).toBeNull();
+  });
+
+  it("keeps moves with a shared destination distinct instead of treating the square as identity", () => {
+    const sharedDestination: StockfishMoveAnalysis = {
+      ...result,
+      lines: [
+        { rank: 1, score: result.score, depth: 12, pv: ["f2f3"] },
+        { rank: 2, score: result.score, depth: 12, pv: ["g1f3"] },
+      ],
+    };
+    const identities = sharedDestination.lines.map((line) => stockfishCandidateIdentity(sharedDestination, line));
+    expect(identities.map((identity) => identity?.uci)).toEqual(["f2f3", "g1f3"]);
+    expect(identities[0]).not.toEqual(identities[1]);
   });
 
   it("reports Stockfish/Maia disagreement without creating a combined score", () => {
@@ -83,5 +104,27 @@ describe("Stockfish board arrows", () => {
     expect(arrows).toHaveLength(3);
     expect(arrows[0]?.color).toContain("76, 126, 126");
     expect(arrows[2]?.color).toContain("104, 137, 111");
+    expect(overlappingCandidateUcis(result, human, 2)).toEqual(["e2e4"]);
+  });
+
+  it("marks only exact UCI overlap and has no Stockfish-first destination bias", () => {
+    const sharedDestinationHuman = {
+      ...human,
+      candidates: [
+        { uci: "f2f3", san: "f3", probability: 0.4, policyRank: 1 },
+        { uci: "g1f3", san: "Nf3", probability: 0.3, policyRank: 2 },
+      ],
+    } satisfies MaiaPositionAnalysis;
+    const sharedDestinationStockfish = {
+      ...result,
+      lines: [
+        { rank: 1, score: result.score, depth: 12, pv: ["g1f3"] },
+        { rank: 2, score: result.score, depth: 12, pv: ["d1f3"] },
+      ],
+    } satisfies StockfishMoveAnalysis;
+    const arrows = analysisModeArrows({ mode: "compare", stockfish: sharedDestinationStockfish, human: sharedDestinationHuman, lineCount: 2 });
+    expect(overlappingCandidateUcis(sharedDestinationStockfish, sharedDestinationHuman, 2)).toEqual(["g1f3"]);
+    expect(arrows).toHaveLength(3);
+    expect(arrows.filter((arrow) => arrow.color.includes("76, 126, 126"))).toHaveLength(1);
   });
 });

@@ -1,9 +1,24 @@
 import type { ReplayedUciMove } from "@chess-review/chess-core";
+import type { ClassificationReason, EngineScore, MoveClassification } from "@chess-review/shared";
 
 export type AnalysisBranchSource =
   | { kind: "user" }
   | { kind: "stockfish"; rank: number }
   | { kind: "maia"; targetElo: number; probability: number };
+
+export type AnalysisBranchMoveQuality =
+  | { state: "running"; depth: number; multiPv: number }
+  | { state: "error"; depth: number; multiPv: number; error: string }
+  | {
+      state: "complete";
+      depth: number;
+      multiPv: number;
+      classification: MoveClassification;
+      classificationReason: ClassificationReason;
+      playedMoveScore: EngineScore;
+      playedMoveOutsideMultiPv: boolean;
+      accuracy: number;
+    };
 
 export interface AnalysisBranchNode {
   id: string;
@@ -12,6 +27,8 @@ export interface AnalysisBranchNode {
   move: ReplayedUciMove | null;
   fen: string;
   sources: AnalysisBranchSource[];
+  /** Runtime-only objective verdict for a user-played exploratory move. */
+  moveQuality?: AnalysisBranchMoveQuality;
 }
 
 export interface AnalysisBranchTree {
@@ -166,4 +183,20 @@ export function appendBranchLine(
 export function stepAnalysisBranch(tree: AnalysisBranchTree, delta: number): AnalysisBranchTree {
   const selectedIndex = Math.max(0, Math.min(tree.activePath.length - 1, tree.selectedIndex + delta));
   return selectedIndex === tree.selectedIndex ? tree : { ...tree, selectedIndex };
+}
+
+export function setBranchMoveQuality(
+  tree: AnalysisBranchTree,
+  nodeId: string,
+  moveQuality: AnalysisBranchMoveQuality,
+): AnalysisBranchTree {
+  const node = tree.nodes[nodeId];
+  if (!node?.move) return tree;
+  return {
+    ...tree,
+    nodes: {
+      ...tree.nodes,
+      [nodeId]: { ...node, moveQuality },
+    },
+  };
 }

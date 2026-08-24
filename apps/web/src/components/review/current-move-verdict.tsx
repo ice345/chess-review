@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { MoveAnalysis } from "@chess-review/shared";
 import {
   HUMAN_DIFFICULTY_META,
@@ -71,6 +72,13 @@ export function CurrentMoveVerdict({ move }: { move: MoveAnalysis }) {
           )}
         </div>
       )}
+      <Link
+        className="explain-move-action"
+        href={`/review/${runtime.gameId}/coach`}
+        aria-label={`Explain this move: ${move.san}`}
+      >
+        Explain this move <span aria-hidden="true">→</span>
+      </Link>
     </section>
   );
 }

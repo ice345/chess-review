@@ -14,6 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.4,<9"]
 maia = ["maia3 @ git+https://github.com/CSSLab/maia3.git@1e13597"]
+bundle = ["pyinstaller>=6.16,<7"]
 
 [build-system]
 requires = ["hatchling>=1.27"]

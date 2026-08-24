@@ -22,7 +22,9 @@ import {
   appendBranchMove,
   createAnalysisBranch,
   selectedBranchNode,
+  setBranchMoveQuality,
   stepAnalysisBranch,
+  type AnalysisBranchMoveQuality,
   type AnalysisBranchTree,
 } from "../lib/analysis-branch";
 
@@ -45,6 +47,7 @@ interface ReviewState {
   playAnalysisMove: (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
   playHumanCandidate: (uci: string, targetElo: number, probability: number) => boolean;
   stepBranch: (delta: number) => void;
+  setBranchMoveQuality: (nodeId: string, quality: AnalysisBranchMoveQuality) => void;
   returnToGame: () => void;
   setMoveHuman: (ply: number, human: HumanAnalysis) => GameAnalysisV1 | null;
   invalidateHumanAnalysis: (model: MaiaModel, targetElo: number) => GameAnalysisV1 | null;
@@ -140,6 +143,12 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (!branch) return;
     const updated = stepAnalysisBranch(branch, delta);
     set({ branch: updated, positionFen: selectedBranchNode(updated).fen });
+  },
+  setBranchMoveQuality: (nodeId, quality) => {
+    const branch = get().branch;
+    if (!branch) return;
+    const updated = setBranchMoveQuality(branch, nodeId, quality);
+    if (updated !== branch) set({ branch: updated });
   },
   returnToGame: () => {
     const branch = get().branch;

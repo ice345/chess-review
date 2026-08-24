@@ -59,6 +59,26 @@ button, a, label { -webkit-tap-highlight-color: transparent; }
 .source-boundaries .human { background: #789e80; }
 .source-boundaries .coach { background: #c58d91; }
 
+.native-services {
+  width: min(620px, 100%);
+  margin-top: 24px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 14px;
+  border: 1px solid rgba(96, 132, 141, .24);
+  border-radius: 12px;
+  background: rgba(250, 250, 246, .58);
+}
+.native-services div { display: grid; gap: 2px; }
+.native-services div span, .native-services small { color: #72878e; font-size: 9px; letter-spacing: .06em; }
+.native-services strong { color: #3e6372; font-size: 12px; }
+.native-services p { grid-column: 1 / -1; margin: 3px 0 0; color: #5f7780; font-size: 11px; line-height: 1.45; }
+.native-services small { align-self: center; }
+.native-services button { padding: 6px 9px; border: 1px solid #b7cbcd; border-radius: 8px; color: #456a78; background: rgba(255, 253, 248, .68); font-size: 9px; cursor: pointer; }
+.native-services button:disabled { cursor: wait; opacity: .55; }
+.native-services code { grid-column: 1 / -1; padding-top: 3px; color: #8a6339; font-size: 10px; }
+
 .desktop-import {
   padding: 34px;
   border: 1px solid rgba(102, 137, 145, .28);
@@ -70,7 +90,7 @@ button, a, label { -webkit-tap-highlight-color: transparent; }
 .desktop-import h2 { margin: 10px 0 12px; font: 500 30px/1.05 Georgia, "Times New Roman", serif; }
 .desktop-import > p { margin: 0 0 25px; color: #647b84; font-size: 13px; line-height: 1.65; }
 .file-button, .example-button { width: 100%; min-height: 44px; display: grid; place-items: center; border-radius: 10px; cursor: pointer; font-weight: 700; }
-.file-button { color: #fbf7ef; background: #406579; }
+.file-button { color: #fbf7ef; border: 0; background: #406579; }
 .file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .example-button { margin-top: 9px; color: #406579; border: 1px solid #b8cccf; background: transparent; }
 .file-button:hover, .example-button:hover { transform: translateY(-1px); }

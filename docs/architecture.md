@@ -14,16 +14,16 @@ Stockfish is canonical for evaluation, mate, best move, candidate lines and obje
 ## Repository boundaries
 
 - `apps/web`: Next.js route shell, import/history/settings UX and browser orchestration.
-- `apps/desktop`: reserved for a future Vite + React + Tauri 2 shell; it will reuse shared packages rather than copy chess logic.
+- `apps/desktop`: Vite + React + Tauri 2 shell; it reuses shared packages and owns native file/process integration rather than chess semantics.
 - `packages/chess-core`: PGN/FEN normalization and deterministic chess primitives.
 - `packages/analysis`: score semantics, WinPercent, Accuracy, Divider, classification and evidence.
 - `packages/stockfish`: UCI parsing, browser worker transport and deterministic cache keys.
 - `packages/openings`: EPD index and backward position recognition.
 - `packages/shared`: versioned schemas shared by analysis, services, UI and export.
-- `packages/ui`: reusable presentation primitives, original Feather Annotation quality icons, quieter Human Find Difficulty marks and the Blue Bishop project mark.
+- `packages/ui`: reusable presentation primitives, geometric Move Quality Annotation System V3, quieter Human Find Difficulty marks and the Blue Bishop project mark.
 - `services/local-ai`: optional Maia and provider-neutral grounded coaching.
 
-No package below `apps/web` imports React except `packages/ui`. Neither web nor future desktop code may reconstruct canonical chess algorithms.
+No package below the application layer imports React except `packages/ui`. Neither web nor desktop code may reconstruct canonical chess algorithms.
 
 ## Route information architecture
 
@@ -76,6 +76,18 @@ bar and adds a Maia marker. Only rules-validated candidate moves may enter the
 analysis tree. No blended chess score is calculated, and human output never
 changes objective Move Quality or canonical move facts.
 
+Candidate arrows are presentation-only. Stockfish candidate actions validate the
+root FEN, rank, full first-move UCI and complete PV identity before replay; Maia
+candidate actions validate FEN, model, target Elo and full UCI. Exact-UCI overlap
+gets a dual-source arrow in Compare, while moves that merely share a destination
+remain distinct. This removes both destination guessing and source-order bias.
+
+The visible `/coach` navigation label is Study. It consumes the same canonical
+facts but does not duplicate Review's engine/model dashboards: whole-game learning
+is primary, move lessons follow a fixed teaching sequence, and detailed grounding
+is disclosed on demand. Review's contextual explanation action changes only the
+nested route, preserving the selected ply and persistent board.
+
 Connected-platform providers normalize only account and game-import metadata. Chess.com uses the public Published Data API and produces an explicitly unverified username link. Lichess uses a public OAuth client with Authorization Code + PKCE (`S256`); tokens are encrypted into server-only HttpOnly cookies and are never stored in IndexedDB or exposed to the React bundle. Both providers page full history through persistent browser checkpoints, process requests serially and preserve the checkpoint on pause, failure or rate limit. See `docs/connected-platforms.md`.
 
 ## Analysis flow
@@ -103,7 +115,10 @@ The web application always supports Browser Core: PGN/FEN, Stockfish WASM, openi
 
 For local development, the project-level development orchestrator may start and own the Next.js process, FastAPI service and—only when no existing API is available—`ollama serve`. The launcher starts Browser Core before probing optional AI services, and an optional Ollama/FastAPI startup failure never tears down a healthy web process. `pnpm dev:local-ai` starts or reuses only the optional native services when Next.js is already running. The launcher tracks ownership and stops only children that it created. The installed Ollama catalog is discovered through `/api/tags` (the API equivalent of `ollama ls`), exposed to Settings for explicit user selection, and never downloaded automatically. Maia and Coach clients poll health while offline and reconnect without a page refresh.
 
-The future desktop application may own native sidecars. Development process orchestration is not the production desktop packaging architecture.
+The desktop host owns only processes it starts: a target-triple PyInstaller
+local-ai sidecar and, when no existing API is healthy, `ollama serve`.
+Development process orchestration is not the production desktop packaging
+architecture.
 
 ## Local AI
 
@@ -129,7 +144,10 @@ React and Tauri 2. Its foundation already imports `packages/ui` and
 remains optimized for the web and is not forced into a Tauri SSR runtime. See
 [`desktop.md`](desktop.md).
 
-Tauri will eventually manage a packaged local-ai sidecar, Ollama discovery/startup, model setup with explicit approval, process ownership and native file-open integration across macOS, Windows and Linux. See `docs/adr/0001-tauri-2-desktop.md`.
+Tauri manages a packaged local-ai sidecar, Ollama discovery/startup, model setup
+with explicit approval, process ownership and native PGN file-open integration.
+The arm64 macOS package is verified; Windows and Linux configurations await
+their native runner results. See `docs/adr/0001-tauri-2-desktop.md`.
 
 ## Engineering verification
 
@@ -137,13 +155,14 @@ Critical browser workflows use deterministic Playwright fixtures backed by the
 real parser, analysis assembler and IndexedDB contracts. The local-ai boundary is
 mocked so CI never depends on Maia, Ollama or a cloud provider. Representative
 visual baselines cover the principal workspace states and the complete Move
-Quality V2 icon fixture. GitHub Actions
+Quality Annotation System V3 fixture. GitHub Actions
 runs cached TypeScript, Python, build and browser-workflow jobs; see
 [`testing.md`](testing.md).
 
 ## Current implementation status
 
-Phases 0–5.2 are complete. Phase 6 is active: the independent Vite/React/Tauri 2
-shell and its first shared-package imports are implemented and verified. Native
-sidecar ownership, Ollama lifecycle, platform bundles, file-open integration and
-release artifacts remain deliberately unchecked.
+Phases 0–5.3 are complete. Phase 6 is active: the independent Vite/React/Tauri 2
+shell, shared-package imports, native PGN integration, managed Ollama, packaged
+local-ai ownership and an ad-hoc arm64 macOS `.app`/`.dmg` build are implemented
+and verified. Windows/Linux and universal macOS bundles, signing, notarization
+and published release artifacts remain deliberately unchecked.

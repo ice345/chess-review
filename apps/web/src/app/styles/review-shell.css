@@ -43,9 +43,18 @@
 
 .review-nav a {
   padding: 9px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 8px;
   color: #77868c;
   font-size: 11px;
+}
+
+.review-nav a small {
+  color: #8a6a35;
+  font-size: 7px;
+  letter-spacing: .02em;
 }
 
 .review-nav a.active {

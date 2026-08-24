@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExternalPlatform, SyncedGame } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
 import { listSyncedGames, markSyncedGameAnalyzed } from "../lib/platform-library";
@@ -23,6 +23,7 @@ export function HistoryPage() {
   const [query, setQuery] = useState("");
   const [working, setWorking] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
+  const preparing = useRef<string | null>(null);
 
   useEffect(() => {
     void Promise.all([listReviewRecords(), listSyncedGames()]).then(([nextRecords, nextGames]) => {
@@ -56,6 +57,8 @@ export function HistoryPage() {
   useEffect(() => setVisibleCount(LIBRARY_PAGE_SIZE), [analysisState, provider, query, result, timeClass]);
 
   async function review(game: SyncedGame) {
+    if (preparing.current) return;
+    preparing.current = game.id;
     setWorking(game.id);
     try {
       const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game));
@@ -63,6 +66,7 @@ export function HistoryPage() {
       window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(`/review/${record.id}`);
     } finally {
+      preparing.current = null;
       setWorking(null);
     }
   }
@@ -89,14 +93,14 @@ export function HistoryPage() {
             <span className="record-kind">{entry.game.external.provider === "chesscom" ? "CHESS.COM" : "LICHESS"}</span>
             <span><strong>{entry.game.white.username} vs {entry.game.black.username}</strong><small>{entry.game.timeClass ?? "game"} · waiting for review</small></span>
             <time>{new Date(entry.game.playedAt).toLocaleDateString()}</time>
-            <button className="text-button" disabled={working !== null} onClick={() => void review(entry.game)}>{working === entry.game.id ? "Preparing…" : "Analyze →"}</button>
+            <button type="button" className="text-button" disabled={working !== null} onClick={() => void review(entry.game)}>{working === entry.game.id ? "Preparing…" : "Analyze →"}</button>
           </article> : <Link href={entry.record.kind === "pgn" ? `/review/${entry.record.id}` : `/review/${entry.record.id}/engine`} key={entry.record.id}>
             <span className="record-kind">{entry.record.external?.provider === "chesscom" ? "CHESS.COM" : entry.record.external?.provider === "lichess" ? "LICHESS" : entry.record.kind.toUpperCase()}</span>
             <span><strong>{entry.record.title}</strong><small>{entry.record.subtitle}</small></span>
             <time>{new Date(entry.record.updatedAt).toLocaleDateString()}</time>
             <em>Open →</em>
           </Link>)}
-          {visibleCount < libraryEntries.length && <button className="secondary library-load-more" onClick={() => setVisibleCount((count) => count + LIBRARY_PAGE_SIZE)}>Load {Math.min(LIBRARY_PAGE_SIZE, libraryEntries.length - visibleCount)} more · {visibleCount} of {libraryEntries.length}</button>}
+          {visibleCount < libraryEntries.length && <button type="button" className="secondary library-load-more" onClick={() => setVisibleCount((count) => count + LIBRARY_PAGE_SIZE)}>Load {Math.min(LIBRARY_PAGE_SIZE, libraryEntries.length - visibleCount)} more · {visibleCount} of {libraryEntries.length}</button>}
         </>}
       </section>
     </main>

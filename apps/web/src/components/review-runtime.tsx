@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type Dispatch, type SetStateAction } from "react";
 import type {
+  CoachLanguage,
   GameAnalysisV1,
   HumanAnalysis,
   MaiaModel,
@@ -12,8 +13,15 @@ import type {
 import type { GameReviewProgress } from "@chess-review/stockfish";
 import type { ReviewRecord } from "../lib/review-library";
 import type { LocalAiHealth, MaiaModelState } from "../lib/local-ai";
-import type { AnalysisMode } from "../lib/board-analysis-arrows";
+import type { CoachRequestProvider } from "../lib/local-ai";
+import type {
+  AnalysisMode,
+  HumanCandidateIdentity,
+  StockfishCandidateIdentity,
+} from "../lib/board-analysis-arrows";
 import type { MaiaServiceState } from "../lib/human-lens-state";
+import type { LocalAiConnectionState } from "../lib/use-local-ai-health";
+import type { ReviewCoachTask } from "../hooks/use-review-coach";
 
 export type ReviewRunState = "idle" | "running" | "complete" | "cached" | "error";
 
@@ -49,6 +57,13 @@ export interface ReviewRuntimeValue {
   humanPositionState: "idle" | "running" | "error";
   humanPositionError: string | null;
   humanServiceState: MaiaServiceState;
+  coachProvider: CoachRequestProvider;
+  coachLanguage: CoachLanguage;
+  coachModel: string;
+  coachServiceState: LocalAiConnectionState;
+  coachHealth: LocalAiHealth | null;
+  coachTask: ReviewCoachTask | null;
+  coachNotice: string | null;
   analyzeFullGame: () => Promise<void>;
   cancelFullGame: () => void;
   analyzePosition: () => Promise<void>;
@@ -56,9 +71,12 @@ export interface ReviewRuntimeValue {
   analyzeHumanPosition: () => Promise<void>;
   setupHumanModel: () => Promise<void>;
   refreshHumanService: () => Promise<LocalAiHealth | null>;
+  generateMoveCoach: (ply: number) => Promise<void>;
+  generateGameCoach: () => Promise<void>;
+  retryBranchMoveQuality: () => void;
   navigateToPly: (ply: number) => void;
-  playContinuation: (rank: number, result?: StockfishMoveAnalysis | null) => void;
-  playHumanCandidate: (uci: string, probability: number) => void;
+  playContinuation: (identity: StockfishCandidateIdentity, result?: StockfishMoveAnalysis | null) => void;
+  playHumanCandidate: (identity: HumanCandidateIdentity) => void;
   persistEnrichedAnalysis: (analysis: GameAnalysisV1 | null) => void;
 }
 

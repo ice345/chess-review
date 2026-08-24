@@ -46,6 +46,20 @@ export function ConnectedAccounts({
   const [notice, setNotice] = useState<string | null>(null);
   const [lichessConfigured, setLichessConfigured] = useState<boolean | null>(null);
   const controllers = useRef(new Map<string, AbortController>());
+  const activeAction = useRef<string | null>(null);
+
+  function beginAction(key: string): boolean {
+    if (activeAction.current) return false;
+    activeAction.current = key;
+    setWorking(key);
+    return true;
+  }
+
+  function finishAction(key: string) {
+    if (activeAction.current !== key) return;
+    activeAction.current = null;
+    setWorking(null);
+  }
 
   async function load() {
     const [storedAccounts, storedStates] = await Promise.all([listPlatformAccounts(), listPlatformSyncStates()]);
@@ -83,7 +97,7 @@ export function ConnectedAccounts({
   }, []);
 
   async function linkChessCom() {
-    setWorking("chesscom");
+    if (!beginAction("chesscom")) return;
     setNotice(null);
     try {
       const account = await chessComProvider.link(username);
@@ -94,7 +108,17 @@ export function ConnectedAccounts({
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to link Chess.com.");
     } finally {
-      setWorking(null);
+      finishAction("chesscom");
+    }
+  }
+
+  async function linkLichess() {
+    if (!beginAction("lichess")) return;
+    try {
+      await lichessProvider.link();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to connect Lichess.");
+      finishAction("lichess");
     }
   }
 
@@ -104,6 +128,7 @@ export function ConnectedAccounts({
   }
 
   async function sync(account: PlatformAccount, requestedMode: PlatformSyncMode, resume = false) {
+    if (controllers.current.has(account.id) || !beginAction(account.id)) return;
     const prior = syncStates[account.id];
     const mode = resume ? prior?.mode ?? requestedMode : requestedMode;
     let cursor = resume ? prior?.cursor : undefined;
@@ -116,7 +141,6 @@ export function ConnectedAccounts({
     let newestImported: SyncedGame[] = [];
     const controller = new AbortController();
     controllers.current.set(account.id, controller);
-    setWorking(account.id);
     setNotice(null);
 
     const stateFor = (status: PlatformSyncState["status"], extra: Partial<PlatformSyncState> = {}): PlatformSyncState => ({
@@ -133,8 +157,8 @@ export function ConnectedAccounts({
       ...extra,
     });
 
-    await persistState(stateFor("syncing"));
     try {
+      await persistState(stateFor("syncing"));
       while (true) {
         const result = await providerFor(currentAccount).sync({
           account: currentAccount,
@@ -182,7 +206,7 @@ export function ConnectedAccounts({
       }
     } finally {
       controllers.current.delete(account.id);
-      setWorking(null);
+      finishAction(account.id);
     }
   }
 
@@ -191,7 +215,7 @@ export function ConnectedAccounts({
   }
 
   async function disconnect(account: PlatformAccount) {
-    setWorking(account.id);
+    if (!beginAction(account.id)) return;
     try {
       await providerFor(account).disconnect(account);
       await removePlatformAccount(account.id);
@@ -200,7 +224,7 @@ export function ConnectedAccounts({
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to disconnect account.");
     } finally {
-      setWorking(null);
+      finishAction(account.id);
     }
   }
 
@@ -213,11 +237,11 @@ export function ConnectedAccounts({
       {!compact && <div className="account-link-grid">
         <div className="account-link-card chesscom-link" id="chesscom-link">
           <div><strong>Chess.com</strong><small>Public username · ownership unverified</small></div>
-          <div><input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" /><button className="secondary" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button></div>
+          <div><input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" /><button type="button" className="secondary" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button></div>
         </div>
         <div className="account-link-card lichess-link" id="lichess-link">
           <div><strong>Lichess</strong><small>OAuth 2 · PKCE · verified session</small></div>
-          <button className="secondary" disabled={working !== null || lichessConfigured !== true} onClick={() => void lichessProvider.link()}>{lichessConfigured === false ? "Configure OAuth in .env.local" : "Connect Lichess"}</button>
+          <button type="button" className="secondary" disabled={working !== null || lichessConfigured !== true} onClick={() => void linkLichess()}>{lichessConfigured === false ? "Configure OAuth in .env.local" : "Connect Lichess"}</button>
         </div>
       </div>}
       {accounts.length === 0 && compact && <div className="compact-account-empty"><span>No chess identity connected.</span><Link href="/settings#connected-accounts">Connect in Settings →</Link></div>}
@@ -241,12 +265,12 @@ export function ConnectedAccounts({
             {syncState?.error && syncState.status !== "complete" && <em>{syncState.error}</em>}
           </div>
           <div className="account-sync-actions">
-            {isSyncing ? <button className="text-button" onClick={() => pause(account)}>Pause</button> : resumable(syncState) ? (
-              <button className="text-button" disabled={working !== null} onClick={() => void sync(account, syncState?.mode ?? "incremental", true)}>Resume</button>
-            ) : <button className="text-button" disabled={working !== null} onClick={() => void sync(account, "incremental")}>Sync newest</button>}
-            {!compact && <button className="text-button" disabled={working !== null} onClick={() => void sync(account, "full-history")}>Import full history</button>}
+            {isSyncing ? <button type="button" className="text-button" onClick={() => pause(account)}>Pause</button> : resumable(syncState) ? (
+              <button type="button" className="text-button" disabled={working !== null} onClick={() => void sync(account, syncState?.mode ?? "incremental", true)}>Resume</button>
+            ) : <button type="button" className="text-button" disabled={working !== null} onClick={() => void sync(account, "incremental")}>Sync newest</button>}
+            {!compact && <button type="button" className="text-button" disabled={working !== null} onClick={() => void sync(account, "full-history")}>Import full history</button>}
           </div>
-          {!compact && <button className="text-button disconnect" disabled={working !== null} onClick={() => void disconnect(account)}>Disconnect</button>}
+          {!compact && <button type="button" className="text-button disconnect" disabled={working !== null} onClick={() => void disconnect(account)}>Disconnect</button>}
         </article>;
       })}</div>}
       {compact && <Link className="manage-accounts" href="/settings#connected-accounts">Manage connections and full history →</Link>}

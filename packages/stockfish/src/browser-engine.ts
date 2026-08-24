@@ -1,4 +1,5 @@
 import { normalizeToWhitePov } from "@chess-review/analysis";
+import { noLegalMoveTerminalStatus } from "@chess-review/chess-core";
 import type { EngineLine, PlayerColor, StockfishMoveAnalysis } from "@chess-review/shared";
 import { engineCacheKey, LruCache } from "./cache";
 import { parseBestMove, parseUciInfo } from "./protocol";
@@ -77,6 +78,19 @@ export class BrowserStockfish {
     const key = engineCacheKey(fen, STOCKFISH_VERSION, options.depth, multiPv, searchMoves);
     const cached = this.cache.get(key);
     if (cached) return cached;
+    const terminal = noLegalMoveTerminalStatus(fen);
+    if (terminal) {
+      const result: StockfishMoveAnalysis = {
+        fen,
+        score: terminal.kind === "stalemate"
+          ? { kind: "cp", cp: 0 }
+          : { kind: "mate", mateIn: terminal.sideToMove === "white" ? -1 : 1 },
+        lines: [],
+        depth: options.depth,
+      };
+      this.cache.set(key, result);
+      return result;
+    }
     if (options.signal?.aborted) throw abortError();
     const onInitializationAbort = (): void => {
       this.rejectReady?.(abortError());

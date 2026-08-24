@@ -6,6 +6,7 @@ import {
   appendBranchMove,
   createAnalysisBranch,
   selectedBranchNode,
+  setBranchMoveQuality,
   stepAnalysisBranch,
 } from "./analysis-branch";
 
@@ -52,5 +53,42 @@ describe("analysis branch tree", () => {
     const root = createAnalysisBranch(0, INITIAL_FEN);
     const wrongPosition = replayUciLine(INITIAL_FEN, ["e2e4", "e7e5"])[1];
     expect(() => wrongPosition && appendBranchMove(root, wrongPosition)).toThrow(/does not start/);
+  });
+
+  it("attaches a runtime Move Quality verdict without changing the canonical root", () => {
+    const root = createAnalysisBranch(4, INITIAL_FEN);
+    const move = playLegalBoardMove(INITIAL_FEN, { from: "d2", to: "d4" });
+    const branch = appendBranchMove(root, move);
+    const node = selectedBranchNode(branch);
+    const classified = setBranchMoveQuality(branch, node.id, {
+      state: "complete",
+      depth: 10,
+      multiPv: 3,
+      classification: "best",
+      classificationReason: {
+        precedenceRule: "engine-top-choice",
+        isEngineBest: true,
+        engineRank: 1,
+        centipawnLoss: 0,
+        winPercentBefore: 50,
+        winPercentAfter: 50,
+        winPercentLoss: 0,
+        legalMoveCount: 20,
+        isForced: false,
+        isBook: false,
+        isCheckmate: false,
+        isObviousRecapture: false,
+        isTrivialCheckEscape: false,
+        playedMoveOutsideMultiPv: false,
+        exclusions: [],
+      },
+      playedMoveScore: { kind: "cp", cp: 20 },
+      playedMoveOutsideMultiPv: false,
+      accuracy: 100,
+    });
+
+    expect(root.nodes.root?.childIds).toEqual([]);
+    expect(selectedBranchNode(classified).moveQuality).toMatchObject({ state: "complete", classification: "best" });
+    expect(classified.rootFen).toBe(root.rootFen);
   });
 });

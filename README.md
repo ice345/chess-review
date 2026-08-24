@@ -9,7 +9,7 @@ Open Chess Review is an open-source chess game review and coaching workspace. It
 - Imports PGN games and explicit FEN positions.
 - Runs Stockfish 18 WASM in the browser for evaluation, MultiPV, classifications, Accuracy, phases, openings, critical moments, and legal analysis variations.
 - Reviews with Stockfish, Maia or Compare mode while keeping objective Move Quality separate from Elo-conditioned human probability, WDL and Find Difficulty.
-- Produces on-demand coaching from structured facts and validated engine lines, with deterministic copy when the language provider is unavailable.
+- Turns structured facts and validated engine lines into contextual move lessons and a whole-game Study plan, with deterministic copy when the language provider is unavailable.
 - Syncs complete public Chess.com archives and authorized Lichess game history into a local IndexedDB library with resumable checkpoints.
 - Exports annotated PGN, canonical JSON, position PNGs, and game-review PNGs.
 
@@ -36,7 +36,7 @@ The pnpm workspace keeps those boundaries explicit:
 | `packages/stockfish` | Stockfish transport, UCI parsing, cache identity and worker integration |
 | `packages/openings` | Lichess opening data and position-based recognition |
 | `packages/shared` | Versioned schemas shared across browser, analysis and service boundaries |
-| `packages/ui` | Original Blue Bishop identity, Feather Annotation move-quality marks and quieter human-difficulty marks |
+| `packages/ui` | Original Blue Bishop identity, geometric Move Quality Annotation System V3 and quieter human-difficulty marks |
 | `services/local-ai` | Optional FastAPI Maia and provider-neutral grounded Coach adapters |
 | `apps/desktop` | Phase 6 Vite/React/Tauri 2 native shell; it imports shared packages and owns no analysis semantics |
 
@@ -53,6 +53,8 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 `pnpm dev` is the normal full-development entry point. It reuses healthy services, starts only missing executables, and stops only processes it owns. Ollama is started with `ollama serve`; no Ollama or Maia model is downloaded automatically. Maia-3 5M/23M/79M setup is an explicit Settings/Review action. `pnpm dev:check` reports runtime availability without starting anything.
 
 The web product remains fully usable when local-ai is offline. In that state Stockfish continues in the browser, Maia controls show an explicit offline state, and Coach requests use deterministic canonical copy.
+
+The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **More → Engine Lab** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
 
 ## Setup
 

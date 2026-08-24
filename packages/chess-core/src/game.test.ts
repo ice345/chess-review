@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fenToEpd, legalBoardDestinations, parsePgn, playLegalBoardMove, replayUciLine } from "./game";
+import { fenToEpd, legalBoardDestinations, noLegalMoveTerminalStatus, parsePgn, playLegalBoardMove, replayUciLine } from "./game";
 
 describe("parsePgn", () => {
   it("normalizes SAN, UCI, colors, and before/after positions", () => {
@@ -21,6 +21,15 @@ describe("parsePgn", () => {
 describe("fenToEpd", () => {
   it("drops clocks while preserving position metadata", () => {
     expect(fenToEpd("8/8/8/8/8/8/K6k/8 w - - 12 42")).toBe("8/8/8/8/8/8/K6k/8 w - -");
+  });
+});
+
+describe("noLegalMoveTerminalStatus", () => {
+  it("distinguishes checkmate and stalemate from positions that still have legal moves", () => {
+    const mate = parsePgn("1. f3 e5 2. g4 Qh4# 0-1");
+    expect(noLegalMoveTerminalStatus(mate.finalFen)).toEqual({ kind: "checkmate", sideToMove: "white" });
+    expect(noLegalMoveTerminalStatus("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")).toEqual({ kind: "stalemate", sideToMove: "black" });
+    expect(noLegalMoveTerminalStatus(mate.initialFen)).toBeNull();
   });
 });
 

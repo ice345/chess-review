@@ -45,6 +45,11 @@ export interface LegalBoardDestination {
   promotion?: PieceSymbol;
 }
 
+export interface NoLegalMoveTerminalStatus {
+  kind: "checkmate" | "stalemate";
+  sideToMove: PlayerColor;
+}
+
 export function parsePgn(pgn: string): NormalizedGame {
   const parsed = new Chess();
   parsed.loadPgn(pgn, { strict: false });
@@ -91,6 +96,20 @@ export function normalizeFen(fen: string): string {
 export function fenToEpd(fen: string): string {
   const normalized = normalizeFen(fen);
   return normalized.split(" ").slice(0, 4).join(" ");
+}
+
+/** Identify terminal positions whose side to move has no legal move.
+ *
+ * Stockfish correctly returns `bestmove (none)` for these positions, so full-
+ * game orchestration must not require a principal variation from them.
+ */
+export function noLegalMoveTerminalStatus(fen: string): NoLegalMoveTerminalStatus | null {
+  const chess = new Chess(fen);
+  if (chess.moves().length > 0) return null;
+  return {
+    kind: chess.isCheckmate() ? "checkmate" : "stalemate",
+    sideToMove: chess.turn() === "w" ? "white" : "black",
+  };
 }
 
 /** Replay a deterministic engine line through the rules layer.

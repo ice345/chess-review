@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parsePgn, type NormalizedGame } from "@chess-review/chess-core";
 import type { EngineLine, EngineScore, StockfishMoveAnalysis } from "@chess-review/shared";
-import { buildGameAnalysis, OBJECTIVE_ALGORITHM_VERSION } from "./game-analysis";
+import { buildGameAnalysis, classifyExploratoryMove, OBJECTIVE_ALGORITHM_VERSION } from "./game-analysis";
 
 function engineAnalysis(
   fen: string,
@@ -42,6 +42,55 @@ function positionSequence(game: NormalizedGame): StockfishMoveAnalysis[] {
 }
 
 describe("GameAnalysisV1 assembler", () => {
+  it("reuses the canonical classifier for temporary analysis-board moves", () => {
+    const game = parsePgn("1. e4");
+    const move = game.plies[0]!;
+    const root = engineAnalysis(game.initialFen, { kind: "cp", cp: 60 }, [
+      { move: "d2d4", score: { kind: "cp", cp: 60 } },
+      { move: move.uci, score: { kind: "cp", cp: 18 } },
+    ]);
+    const after = engineAnalysis(game.finalFen, { kind: "cp", cp: 20 });
+    const canonical = buildGameAnalysis({
+      game,
+      positionAnalyses: [root, after],
+      stockfishVersion: "18",
+      depth: 15,
+      multiPv: 2,
+      createdAt: "2026-08-22T14:00:00.000Z",
+    }).moves[0]!;
+
+    const exploratory = classifyExploratoryMove({ move, rootAnalysis: root });
+
+    expect(exploratory).toEqual({
+      classification: canonical.classification,
+      classificationReason: canonical.classificationReason,
+      playedMoveScore: canonical.playedMoveScore,
+      playedMoveOutsideMultiPv: canonical.playedMoveOutsideMultiPv,
+      accuracy: canonical.accuracy,
+    });
+  });
+
+  it("requires matching restricted evidence for an exploratory move outside MultiPV", () => {
+    const game = parsePgn("1. e4");
+    const move = game.plies[0]!;
+    const root = engineAnalysis(game.initialFen, { kind: "cp", cp: 80 }, [
+      { move: "d2d4", score: { kind: "cp", cp: 80 } },
+    ]);
+    const restricted = {
+      ...engineAnalysis(game.initialFen, { kind: "cp", cp: -180 }, [
+        { move: move.uci, score: { kind: "cp", cp: -180 } },
+      ]),
+      searchMoves: [move.uci],
+    };
+
+    expect(classifyExploratoryMove({ move, rootAnalysis: root, playedMoveAnalysis: restricted })).toMatchObject({
+      classification: "blunder",
+      playedMoveOutsideMultiPv: true,
+      classificationReason: { playedMoveOutsideMultiPv: true },
+    });
+    expect(() => classifyExploratoryMove({ move, rootAnalysis: root })).toThrow(/no root or restricted/);
+  });
+
   it("assembles deterministic canonical move, player, and critical-moment data", () => {
     const game = parsePgn("1. e4 e5 2. Nf3 Nc6");
     const result = buildGameAnalysis({

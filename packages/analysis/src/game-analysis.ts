@@ -1,7 +1,9 @@
 import { Chess } from "chess.js";
-import type { NormalizedGame, NormalizedPly } from "@chess-review/chess-core";
+import type { NormalizedGame, NormalizedPly, ReplayedUciMove } from "@chess-review/chess-core";
 import type {
+  ClassificationReason,
   CriticalMoment,
+  EngineScore,
   GameAnalysisV1,
   GameDivision,
   MoveAnalysis,
@@ -47,6 +49,21 @@ export interface BuildGameAnalysisInput {
   createdAt: string;
 }
 
+export interface ClassifyExploratoryMoveInput {
+  move: ReplayedUciMove;
+  rootAnalysis: StockfishMoveAnalysis;
+  playedMoveAnalysis?: StockfishMoveAnalysis;
+  previousMove?: ReplayedUciMove;
+}
+
+export interface ExploratoryMoveClassification {
+  classification: MoveClassification;
+  classificationReason: ClassificationReason;
+  playedMoveScore: EngineScore;
+  playedMoveOutsideMultiPv: boolean;
+  accuracy: number;
+}
+
 function assertPositionSequence(game: NormalizedGame, analyses: StockfishMoveAnalysis[]): void {
   if (analyses.length !== game.plies.length + 1) {
     throw new Error(`Expected ${game.plies.length + 1} position analyses, received ${analyses.length}.`);
@@ -68,6 +85,86 @@ function immediateRecapture(game: NormalizedGame, index: number): boolean {
 
 function trivialCheckEscape(ply: NormalizedPly): boolean {
   return new Chess(ply.fenBefore).inCheck() && ply.legalMoveCountBefore <= 2;
+}
+
+function replayedMoveIsCapture(move: ReplayedUciMove): boolean {
+  const chess = new Chess(move.fenBefore);
+  return chess.move({
+    from: move.uci.slice(0, 2),
+    to: move.uci.slice(2, 4),
+    ...(move.uci[4] === undefined ? {} : { promotion: move.uci[4] }),
+  })?.isCapture() ?? false;
+}
+
+/**
+ * Classifies one temporary analysis-board move with the same objective
+ * classifier used by full-game review. The result deliberately omits phase,
+ * opening-book and game-summary semantics: an exploratory branch is runtime
+ * state, not a mutation of the imported game.
+ */
+export function classifyExploratoryMove(input: ClassifyExploratoryMoveInput): ExploratoryMoveClassification {
+  const { move, rootAnalysis, playedMoveAnalysis } = input;
+  if (rootAnalysis.fen !== move.fenBefore) {
+    throw new Error("Exploratory move root analysis does not match fenBefore.");
+  }
+  if (playedMoveAnalysis && playedMoveAnalysis.fen !== move.fenBefore) {
+    throw new Error("Exploratory restricted analysis does not match fenBefore.");
+  }
+
+  const rootLine = rootAnalysis.lines.find((line) => line.pv[0] === move.uci);
+  const playedMoveOutsideMultiPv = rootLine === undefined;
+  const playedMoveScore = rootLine?.score ?? playedMoveAnalysis?.score;
+  const playedLine = rootLine ?? playedMoveAnalysis?.lines[0];
+  if (!playedMoveScore || !playedLine) {
+    throw new Error(`Exploratory move ${move.uci} has no root or restricted Stockfish score.`);
+  }
+  if (playedMoveOutsideMultiPv && !playedMoveAnalysis?.searchMoves?.includes(move.uci)) {
+    throw new Error(`Exploratory move ${move.uci} is outside MultiPV and has no matching restricted search.`);
+  }
+
+  const before = new Chess(move.fenBefore);
+  const color: PlayerColor = before.turn() === "w" ? "white" : "black";
+  const legalMoveCount = before.moves().length;
+  const previousMove = input.previousMove;
+  const isObviousRecapture = previousMove !== undefined
+    && replayedMoveIsCapture(previousMove)
+    && replayedMoveIsCapture(move)
+    && previousMove.uci.slice(2, 4) === move.uci.slice(2, 4);
+  const sacrifice = detectSacrifice({
+    fenBefore: move.fenBefore,
+    fenAfter: move.fenAfter,
+    uci: move.uci,
+    color,
+    scoreBefore: rootAnalysis.score,
+    playedMoveScore,
+    playedLine,
+  });
+  const result = classifyMove({
+    color,
+    scoreBefore: rootAnalysis.score,
+    scoreAfter: playedMoveScore,
+    ...(rootLine === undefined ? {} : { playedMoveRank: rootLine.rank }),
+    ...(rootAnalysis.lines[1]?.score === undefined ? {} : { secondBestScore: rootAnalysis.lines[1].score }),
+    legalMoveCount,
+    // Temporary branches do not have canonical opening-theory provenance.
+    isBook: false,
+    isCheckmate: new Chess(move.fenAfter).isCheckmate(),
+    isObviousRecapture,
+    isTrivialCheckEscape: before.inCheck() && legalMoveCount <= 2,
+    playedMoveOutsideMultiPv,
+    ...(sacrifice === undefined ? {} : { sacrifice }),
+  });
+
+  return {
+    classification: result.classification,
+    classificationReason: result.reason,
+    playedMoveScore,
+    playedMoveOutsideMultiPv,
+    accuracy: moveAccuracyFromWinPercents(
+      result.reason.winPercentBefore,
+      result.reason.winPercentAfter,
+    ),
+  };
 }
 
 function emptyCounts(): Record<MoveClassification, number> {

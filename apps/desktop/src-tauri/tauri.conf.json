@@ -27,6 +27,19 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "fileAssociations": [
+      {
+        "name": "Portable Game Notation",
+        "ext": ["pgn"],
+        "mimeType": "application/x-chess-pgn",
+        "role": "Viewer",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "org.openchessreview.pgn",
+          "conformsTo": ["public.text"]
+        }
+      }
+    ]
   }
 }

@@ -64,6 +64,7 @@ export function useReviewHuman({
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
   const activeRequest = useRef<AbortController | null>(null);
+  const setupInFlight = useRef(false);
   const serviceState: MaiaServiceState = localAi.state === "checking"
     ? "checking"
     : localAi.health?.maia ?? "offline";
@@ -108,23 +109,8 @@ export function useReviewHuman({
   }, []);
 
   const analyze = useCallback(async () => {
-    const currentHealth = localAi.health ?? await localAi.refresh();
-    const currentModelState = currentHealth?.maiaModels?.[model];
-    if (currentHealth?.maia !== "available") {
-      setRequestState("error");
-      setError(currentHealth?.maia === "not-installed"
-        ? "The local runtime is online, but Maia-3 is not installed. Browser Stockfish remains available."
-        : "Maia is unavailable. Browser Stockfish review remains available.");
-      return;
-    }
-    if (currentModelState !== "active" && currentModelState !== "cached") {
-      setRequestState("error");
-      setError(model + " is not cached. Download it explicitly before analysis.");
-      return;
-    }
-
+    if (activeRequest.current) return;
     const requestGeneration = ++generation.current;
-    activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
     const requestFen = positionFen;
@@ -134,6 +120,22 @@ export function useReviewHuman({
     setRequestState("running");
     setError(null);
     try {
+      const currentHealth = localAi.health ?? await localAi.refresh();
+      if (controller.signal.aborted || generation.current !== requestGeneration) return;
+      const currentModelState = currentHealth?.maiaModels?.[requestModel];
+      if (currentHealth?.maia !== "available") {
+        setRequestState("error");
+        setError(currentHealth?.maia === "not-installed"
+          ? "The local runtime is online, but Maia-3 is not installed. Browser Stockfish remains available."
+          : "Maia is unavailable. Browser Stockfish review remains available.");
+        return;
+      }
+      if (currentModelState !== "active" && currentModelState !== "cached") {
+        setRequestState("error");
+        setError(requestModel + " is not cached. Download it explicitly before analysis.");
+        return;
+      }
+
       if (requestMove && !reviewedMoveComplete) {
         const response = await reviewMaiaMove({
           fenBefore: requestMove.fenBefore,
@@ -183,15 +185,20 @@ export function useReviewHuman({
   }, [localAi, model, moveStockfishCandidateMoves, positionFen, positionStockfishCandidateMoves, reviewedMove, reviewedMoveComplete, targetElo]);
 
   const setupModel = useCallback(async () => {
+    if (setupInFlight.current) return;
+    setupInFlight.current = true;
+    const requestedModel = model;
     setSetupState("running");
     setError(null);
     try {
-      await downloadMaiaModel(model);
+      await downloadMaiaModel(requestedModel);
       await localAi.refresh();
       setSetupState("idle");
     } catch (setupError) {
       setSetupState("error");
-      setError(setupError instanceof Error ? setupError.message : "Unable to download " + model + ".");
+      setError(setupError instanceof Error ? setupError.message : "Unable to download " + requestedModel + ".");
+    } finally {
+      setupInFlight.current = false;
     }
   }, [localAi, model]);
 

@@ -14,6 +14,8 @@ uv run --extra maia uvicorn chess_review_local_ai.main:app --host 127.0.0.1 --po
 
 The provider imports Maia lazily and uses CPU without AMP by default. It never downloads a checkpoint during analysis. `/health` reports `available`, `not-installed` or `error` plus `maiaModels` state for all three tiers. Selecting a tier changes settings only; an uncached tier returns a structured `409 maia-model-not-cached` setup state. The user must explicitly call `/maia/models/{model}/download` through the Settings or Review download action. The service keeps at most one resident Maia network and releases the previous network before allocating a different tier.
 
+In Review, candidate arrows are visual guidance only. A branch is selected from an explicit Maia candidate row whose identity includes the root FEN, model, target Elo and full UCI move; destination-square clicks never guess between candidates that share a landing square. Compare mode marks overlap only when Stockfish and Maia recommend the same full UCI move.
+
 Product code calls `/maia/move-review` and `/maia/position-analysis`. `/maia/moves` remains a deprecated compatibility adapter and must not be used to infer whether a response describes the played move or the displayed position.
 
 At the repository root, `pnpm dev` manages web plus optional local services. If Next.js is already running, `pnpm dev:local-ai` starts or reuses only FastAPI/Ollama. A browser cannot start native processes itself; while offline the Human UI polls `/health` every five seconds and on window focus, then reconnects automatically.
@@ -51,7 +53,9 @@ the bar while adding a Maia marker.
 There is no separate Human Lab route. Target Elo, candidate mass, played-move
 probability and Stockfish/Maia comparison live directly in Review when Maia or
 Compare is selected. Objective Move Quality and Human Find Difficulty appear as
-separate verdicts; one never changes the other. When Maia is offline, Browser
+separate verdicts; one never changes the other. The board destination badge
+always remains the objective Stockfish Move Quality icon in Stockfish, Maia and
+Compare modes; Maia difficulty stays in its separate evidence surface. When Maia is offline, Browser
 Stockfish remains available immediately;
 five-second health polling reconnects without a page refresh.
 

@@ -15,7 +15,7 @@ const BACKGROUNDS = [
 export default function QualityIconFixturePage() {
   return (
     <main className="quality-fixture-page">
-      <header><span>LOCAL VISUAL FIXTURE</span><h1>Feather Annotation · Move Quality V2</h1><p>Every objective classification at 20, 24, 28 and 36 px across the product surfaces.</p></header>
+      <header><span>LOCAL VISUAL FIXTURE</span><h1>Move Quality · Annotation System V3</h1><p>Four geometric families keep every objective classification legible at 20, 24, 28 and 36 px.</p></header>
       <div className="quality-fixture-grid">
         {CLASSIFICATIONS.map((classification) => (
           <section key={classification}>

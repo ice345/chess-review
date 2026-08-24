@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "./app-header";
 import { ConnectedAccounts } from "./connected-accounts";
 import {
@@ -35,6 +35,7 @@ export function HomeWorkspace() {
   const [syncedGames, setSyncedGames] = useState<SyncedGame[]>([]);
   const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
+  const saving = useRef(false);
 
   function refreshLibrary() {
     void listReviewRecords().then((records) => setRecent(records.slice(0, 3))).catch(() => undefined);
@@ -44,7 +45,8 @@ export function HomeWorkspace() {
   useEffect(() => { refreshLibrary(); }, []);
 
   async function openReview(value = input) {
-    if (status === "saving") return;
+    if (saving.current) return;
+    saving.current = true;
     setStatus("saving");
     setError(null);
     try {
@@ -52,6 +54,7 @@ export function HomeWorkspace() {
       if (record.kind === "pgn") window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(record.kind === "pgn" ? `/review/${record.id}` : `/review/${record.id}/engine`);
     } catch (requestError) {
+      saving.current = false;
       setError(requestError instanceof Error ? requestError.message : "Unable to import this chess record.");
       setStatus("idle");
     }
@@ -64,6 +67,8 @@ export function HomeWorkspace() {
   }
 
   async function openSyncedGame(game: SyncedGame) {
+    if (saving.current) return;
+    saving.current = true;
     setStatus("saving");
     setError(null);
     try {
@@ -72,6 +77,7 @@ export function HomeWorkspace() {
       window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(`/review/${record.id}`);
     } catch (requestError) {
+      saving.current = false;
       setError(requestError instanceof Error ? requestError.message : "Unable to open synced game.");
       setStatus("idle");
     }
@@ -139,7 +145,7 @@ export function HomeWorkspace() {
           <span className={`platform-label ${game.external.provider}`}>{game.external.provider === "chesscom" ? "Chess.com" : "Lichess"}</span>
           <strong>{game.white.username} <i>vs</i> {game.black.username}</strong>
           <small>{game.timeClass ?? "game"} · {new Date(game.playedAt).toLocaleDateString()}</small>
-          {game.analyzed && game.analysisId ? <Link href={`/review/${game.analysisId}`}>Open review →</Link> : <button className="text-button" disabled={status === "saving"} onClick={() => void openSyncedGame(game)}>Analyze this game →</button>}
+          {game.analyzed && game.analysisId ? <Link href={`/review/${game.analysisId}`}>Open review →</Link> : <button type="button" className="text-button" disabled={status === "saving"} onClick={() => void openSyncedGame(game)}>Analyze this game →</button>}
         </article>)}</div>
       </section>}
 

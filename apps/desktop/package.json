@@ -8,11 +8,16 @@
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "sidecar:build": "node ../../scripts/build-local-ai-sidecar.mjs",
+    "tauri:build:macos": "pnpm sidecar:build && CI=true tauri build --config src-tauri/tauri.sidecar.conf.json --bundles app,dmg --no-sign",
+    "tauri:build:windows": "pnpm sidecar:build && tauri build --config src-tauri/tauri.sidecar.conf.json --bundles nsis",
+    "tauri:build:linux": "pnpm sidecar:build && tauri build --config src-tauri/tauri.sidecar.conf.json --bundles deb,appimage",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@chess-review/chess-core": "workspace:*",
     "@chess-review/ui": "workspace:*",
+    "@tauri-apps/api": "2.11.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

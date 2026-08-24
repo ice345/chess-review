@@ -13,7 +13,7 @@ async function dragChessPiece(page: import("@playwright/test").Page, fromSquare:
   await page.mouse.up();
 }
 
-test("representative Phase 5.2 workspace states", async ({ page }) => {
+test("representative Phase 5.3 workspace states", async ({ page }) => {
   await mockLocalAi(page, "available");
   const { record } = await seedReview(page, { visualLabels: true });
   await seedConnectedLibrary(page, 84);
@@ -49,6 +49,8 @@ test("representative Phase 5.2 workspace states", async ({ page }) => {
   await page.getByRole("button", { name: "Go to ply 2, Blunder" }).click();
   await page.getByRole("button", { name: "讲解 e5" }).click();
   await expect(page.getByText(/已使用确定性中文回退/)).toBeVisible();
+  await page.getByRole("button", { name: "生成整盘学习计划" }).click();
+  await expect(page.locator(".game-coach-result")).toContainText("训练建议");
   await expect(page).toHaveScreenshot("coach-grounded-fallback-1728.png");
 
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -59,5 +61,5 @@ test("representative Phase 5.2 workspace states", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/design/quality-icons");
   await expect(page.locator(".quality-fixture-grid > section")).toHaveCount(14);
-  await expect(page).toHaveScreenshot("quality-icons-v2-1440.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("quality-icons-v3-1440.png", { fullPage: true });
 });

@@ -15,6 +15,8 @@ Each line contains rank, White-POV score, depth, optional nodes and UCI PV. Brow
 
 Full-game browser review first evaluates every position with a pool capped at two workers. If the played move is absent from a root MultiPV result, a second root search restricted with UCI `searchmoves` obtains that move's score. The resulting-position score is never substituted for the played-move root score.
 
+A checkmate or stalemate position has no legal move, so UCI correctly returns `bestmove (none)` without a principal variation. Full-game orchestration does not search such terminal nodes as ordinary candidate positions. It records an empty terminal PV list and carries forward the preceding Stockfish root score for the actual played move; this preserves the canonical White-POV mate/draw result without inventing a continuation. For a standalone terminal query or zero-ply game with no preceding Stockfish root, the rules layer supplies `0 cp` for stalemate or a signed `mateIn: ±1` terminal sentinel that preserves the winner in the existing score schema.
+
 ## Dependency order
 
 ```text

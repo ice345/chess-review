@@ -1,4 +1,4 @@
-import type { NormalizedGame } from "@chess-review/chess-core";
+import { noLegalMoveTerminalStatus, type NormalizedGame } from "@chess-review/chess-core";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
 import { BrowserStockfish, type SearchOptions } from "./browser-engine";
 
@@ -54,19 +54,36 @@ export class BrowserStockfishPool {
   async analyzeGame(game: NormalizedGame, options: GameReviewOptions): Promise<GameReviewResult> {
     const multiPv = options.multiPv ?? 3;
     const fens = [game.initialFen, ...game.plies.map((ply) => ply.fenAfter)];
+    const indexedPositions = fens.map((fen, index) => ({
+      fen,
+      index,
+      terminal: noLegalMoveTerminalStatus(fen),
+    }));
+    const terminalPositions = indexedPositions.flatMap((position) => (
+      position.terminal ? [{ ...position, terminal: position.terminal }] : []
+    ));
+    const searchablePositions = indexedPositions.filter((position) => position.terminal === null);
 
     try {
-      const positionAnalyses = await this.runJobs(
-        fens,
-        (worker, fen) =>
-          worker.search(fen, {
+      const searched = await this.runJobs(
+        searchablePositions,
+        (worker, position) =>
+          worker.search(position.fen, {
             depth: options.depth,
             multiPv,
             ...(options.signal === undefined ? {} : { signal: options.signal }),
           }),
-        (completed) => options.onProgress?.({ stage: "positions", completed, total: fens.length }),
+        (completed) => options.onProgress?.({
+          stage: "positions",
+          completed: completed + terminalPositions.length,
+          total: fens.length,
+        }),
         options.signal,
       );
+      const positionAnalyses: Array<StockfishMoveAnalysis | undefined> = new Array(fens.length);
+      searchablePositions.forEach((position, index) => {
+        positionAnalyses[position.index] = searched[index];
+      });
 
       const missing = game.plies.flatMap((ply, index) =>
         positionAnalyses[index]?.lines.some((line) => line.pv[0] === ply.uci)
@@ -88,10 +105,30 @@ export class BrowserStockfishPool {
         options.signal,
       );
 
-      return {
-        positionAnalyses,
-        playedMoveAnalyses: new Map(missing.map((item, index) => [item.ply, restricted[index]!])),
-      };
+      const playedMoveAnalyses = new Map(missing.map((item, index) => [item.ply, restricted[index]!]));
+      for (const terminalPosition of terminalPositions) {
+        const precedingMove = game.plies[terminalPosition.index - 1];
+        const precedingRoot = positionAnalyses[terminalPosition.index - 1];
+        const playedLine = precedingMove
+          ? precedingRoot?.lines.find((line) => line.pv[0] === precedingMove.uci)
+            ?? playedMoveAnalyses.get(precedingMove.ply)?.lines[0]
+          : undefined;
+        const score = playedLine?.score
+          ?? (terminalPosition.terminal.kind === "stalemate"
+            ? { kind: "cp" as const, cp: 0 }
+            : { kind: "mate" as const, mateIn: terminalPosition.terminal.sideToMove === "white" ? -1 : 1 });
+        positionAnalyses[terminalPosition.index] = {
+          fen: terminalPosition.fen,
+          score,
+          lines: [],
+          depth: options.depth,
+        };
+      }
+      const completedPositions = positionAnalyses.map((analysis, index) => {
+        if (!analysis) throw new Error(`Missing Stockfish position analysis at index ${index}.`);
+        return analysis;
+      });
+      return { positionAnalyses: completedPositions, playedMoveAnalyses };
     } catch (error) {
       if (options.signal?.aborted) this.terminate();
       throw error;
