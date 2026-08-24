@@ -81,10 +81,93 @@
 - [x] synced-game library and source/status/time-control/result filters
 - [x] optional sequential newest-1/3/5 objective analysis policy, off by default
 
+## Phase 5.1 — analysis workspace refinement
+
+Phase 5.1 is a product-completion gate between the connected web product and the
+desktop shell. Checkboxes describe shipped, tested behavior; architecture notes
+alone do not complete an item.
+
+### Milestone A — workspace architecture
+
+- [x] document the immutable canonical-game / interactive-analysis boundary
+- [x] split ReviewShell engine and presentation responsibilities
+- [x] reuse canonical `winPercentFromScore()` in the evaluation bar with regression tests
+- [x] disable the Next.js development Route Info indicator through supported configuration
+
+### Milestone B — board workspace
+
+- [x] player strips with orientation-aware top/bottom identity
+- [x] icon-only accessible board flip outside the board
+- [x] orientation-aware evaluation-bar presentation without changing White POV truth
+- [x] board-width First / Previous / Play-Pause / Next / Last transport
+- [x] autoplay with end-of-game and variation pause behavior
+- [x] board/timeline primary column and contextual secondary column
+- [x] manual desktop visual validation at 1440×900, 1728×1117 and 1920×1080
+
+### Milestone C — Stockfish interactive analysis
+
+- [x] selectable Stockfish MultiPV arrows with compact supporting text
+- [x] real branch tree rooted at an explicit canonical ply
+- [x] rules-validated user moves from any historical position
+- [x] branch continuation and reliable Return to Game
+- [x] branch-position Stockfish analysis without canonical classification mutation
+- [x] deterministic branch/store regression tests
+
+### Milestone D — Human Lens
+
+- [x] persisted preferred Maia target Elo
+- [x] mutually exclusive Stockfish / Maia analysis selection in Review
+- [x] Maia probability arrows with explicit model-prediction semantics
+- [x] Stockfish/Maia recommendation disagreement as first-class evidence
+- [x] Maia target Elo and candidate evidence merged into Review; Human Lab removed
+- [x] offline Maia behavior validated
+
+### Milestone E — connected library
+
+- [x] account cards with avatar and useful rating/profile information
+- [x] Chess.com complete archive import with checkpoints
+- [x] Lichess complete history import with rate-limit-aware checkpoints
+- [x] persistent progress plus cancel/resume for both providers
+- [x] simplified connected identity on Home
+- [x] paginated or virtualized Library suitable for thousands of games
+- [x] no automatic bulk Stockfish, Maia or Coach analysis
+
+### Milestone F — grounded Coach refinement
+
+- [x] broader deterministic position-understanding facts
+- [x] validated short future-consequence line in move teaching
+- [x] structured notice / idea / problem / consequence / alternative / takeaway presentation
+- [x] practical human alternative only when supported by Stockfish and Maia
+- [x] existing schema, legality, unsupported-claim and grounding safeguards preserved
+
+### Milestone G — visual identity
+
+- [x] watercolor annotation-seal quality icon refinement
+- [x] original Blue Bishop logo, app mark and favicon
+- [x] final board/review visual polish and coherent export language
+
+### Milestone H — engineering quality
+
+- [x] decompose global CSS while preserving design tokens
+- [x] bounded priority policy for interactive and background analysis jobs
+- [x] deterministic Playwright workflow coverage
+- [x] representative visual-regression screenshots
+- [x] dependency-cached GitHub Actions CI without live external services
+- [x] root README with architecture, modes, integrations and development workflow
+- [x] complete TypeScript, Python, E2E, build and manual visual validation
+- [x] final Phase 5.1 workflow audit before Phase 6 begins
+
+Phase 5.1 closed on 2026-08-24 after frozen dependency installation, complete
+TypeScript typecheck/lint/package tests, 18 local-ai tests, five deterministic
+Playwright workflow/visual tests, a production Next.js build, diff/whitespace
+audit, and manual review of the seven committed workspace screenshots. The gate
+did not change canonical Accuracy, Divider, WinPercent, White-POV or move-quality
+classification semantics.
+
 ## Phase 6 — desktop application
 
-- [ ] Tauri 2 application shell
-- [ ] shared React/TypeScript packages
+- [x] Tauri 2 application shell
+- [x] shared React/TypeScript packages
 - [ ] macOS build
 - [ ] Windows build
 - [ ] Linux build
@@ -95,13 +178,18 @@
 - [ ] native PGN file open/import
 - [ ] packaged releases and CI artifacts
 
+Phase 6 opened on 2026-08-24 with the independent Vite/React/Tauri shell. Its
+first native release build completed with bundling disabled, and the preview
+imports the project-owned UI mark plus PGN parser from workspace packages. This
+does not yet claim a signed macOS bundle, another operating-system build,
+sidecar lifecycle, native file association or release artifact.
+
 ## Phase 7 — advanced study
 
 - [ ] multi-game trends
 - [ ] opening repertoire analysis
 - [ ] recurring weakness detection
 - [ ] training queue
-- [ ] optional Lc0 second opinion
 
 ## Phase 8 — mobile companion exploration
 

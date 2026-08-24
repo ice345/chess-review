@@ -4,6 +4,7 @@ import { recognizeOpening } from "@chess-review/openings";
 import type { SyncedGame } from "@chess-review/shared";
 import { BrowserStockfishPool, STOCKFISH_VERSION } from "@chess-review/stockfish";
 import { getCachedAnalysis, putCachedAnalysis } from "./analysis-cache";
+import { analysisScheduler } from "./analysis-scheduler";
 import { markSyncedGameAnalyzed } from "./platform-library";
 import { buildReviewRecordFromSyncedGame, saveReviewRecord } from "./review-library";
 
@@ -21,11 +22,14 @@ export async function autoAnalyzeSyncedGames(
     const game = parsePgn(syncedGame.pgn);
     const cached = await getCachedAnalysis(game, options).catch(() => null);
     if (!cached) {
-      const pool = new BrowserStockfishPool();
+      const pool = new BrowserStockfishPool(1);
       try {
         const division = divideGame(game);
         const opening = recognizeOpening(game) ?? undefined;
-        const engineFacts = await pool.analyzeGame(game, options);
+        const engineFacts = await analysisScheduler.run(
+          "background-game",
+          () => pool.analyzeGame(game, options),
+        );
         const analysis = buildGameAnalysis({
           game,
           ...engineFacts,

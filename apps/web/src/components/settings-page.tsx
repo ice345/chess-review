@@ -13,6 +13,8 @@ export function SettingsPage() {
   const localAi = useLocalAiHealth();
   const health = localAi.health;
   const checking = localAi.state === "checking";
+  const ollamaModels = health?.coach.ollamaModels ?? [];
+  const selectedModelInstalled = ollamaModels.includes(settings.coachModel);
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,13 +41,22 @@ export function SettingsPage() {
           <label>Continuation lines<select value={settings.continuationLines} onChange={(event) => update({ ...settings, continuationLines: Number(event.target.value) as AppSettings["continuationLines"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>Moves shown per line<select value={settings.continuationLength} onChange={(event) => update({ ...settings, continuationLength: Number(event.target.value) as AppSettings["continuationLength"] })}>{[6, 8, 10, 12, 16].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>After account sync<select value={settings.autoAnalyzeImported} onChange={(event) => update({ ...settings, autoAnalyzeImported: Number(event.target.value) as AppSettings["autoAnalyzeImported"] })}><option value={0}>Off · choose each game</option><option value={1}>Analyze newest 1</option><option value={3}>Analyze newest 3</option><option value={5}>Analyze newest 5</option></select></label>
-          <small>Depth and MultiPV affect deterministic cache identity. Displayed continuation length does not rerun Stockfish. Automatic account analysis is off by default and runs sequentially.</small>
+          <small>Depth and MultiPV affect deterministic cache identity. Displayed continuation length does not rerun Stockfish. Automatic account analysis is off by default; the optional newest 1/3/5 policy runs once after a completed sync, sequentially, and never starts Maia or Coach.</small>
+        </section>
+        <section className="settings-card">
+          <div><span className="kicker">Human defaults</span><h2>Maia prediction</h2></div>
+          <label>Preferred target Elo<input type="number" min={400} max={3000} step={50} value={settings.humanTargetElo} onChange={(event) => update({ ...settings, humanTargetElo: Math.max(400, Math.min(3000, Number(event.target.value))) })} /></label>
+          <small>This Elo conditions Maia's move-probability model. It is remembered across reviews and never changes Stockfish evaluation or move quality.</small>
         </section>
         <section className="settings-card">
           <div><span className="kicker">Coach defaults</span><h2>Explanation layer</h2></div>
           <label>Provider<select value={settings.coachProvider} onChange={(event) => update({ ...settings, coachProvider: event.target.value as CoachRequestProvider })}><option value="ollama">Ollama · local</option><option value="openai-compatible">OpenAI-compatible</option></select></label>
           <label>Language<select value={settings.coachLanguage} onChange={(event) => update({ ...settings, coachLanguage: event.target.value as CoachLanguage })}><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
-          <label>Local model<input value={settings.coachModel} onChange={(event) => update({ ...settings, coachModel: event.target.value })} /></label>
+          <label>Local model<select value={settings.coachModel} onChange={(event) => update({ ...settings, coachModel: event.target.value })}>
+            {!selectedModelInstalled && <option value={settings.coachModel}>{settings.coachModel} · not detected</option>}
+            {ollamaModels.map((model) => <option value={model} key={model}>{model}</option>)}
+          </select></label>
+          <small>{ollamaModels.length > 0 ? `${ollamaModels.length} installed Ollama model${ollamaModels.length === 1 ? "" : "s"} detected. The selected model is passed explicitly to every request.` : "Start Ollama and check the local runtime to discover installed models."}</small>
         </section>
         <section className="settings-card runtime-card">
           <div><span className="kicker">Runtime boundary</span><h2>Local capabilities</h2></div>
@@ -55,11 +66,12 @@ export function SettingsPage() {
             <div className="runtime-status">
               <span><i className={`service-dot ${health.maia}`} />Maia · {health.maia}</span>
               <span><i className={`service-dot ${health.coach.ollama}`} />Ollama · {health.coach.ollama}</span>
-              <span><i className={`service-dot ${health.coach.ollamaModel}`} />{health.coach.configuredModel} · {health.coach.ollamaModel}</span>
+              <span><i className={`service-dot ${selectedModelInstalled ? "available" : "not-installed"}`} />Selected model · {selectedModelInstalled ? "available" : "missing"}</span>
+              <span>{ollamaModels.length} installed model{ollamaModels.length === 1 ? "" : "s"} discovered</span>
             </div>
           ) : !checking && <p className="service-message">Local AI is not connected. Browser review remains available.</p>}
-          {health?.coach.ollamaModel === "missing" && (
-            <div className="model-setup"><strong>Model setup requires approval</strong><span>Run this yourself when ready:</span><code>ollama pull {health.coach.configuredModel}</code></div>
+          {health?.coach.ollama === "available" && !selectedModelInstalled && (
+            <div className="model-setup"><strong>Model setup requires approval</strong><span>Run this yourself when ready:</span><code>ollama pull {settings.coachModel}</code></div>
           )}
         </section>
       </div>

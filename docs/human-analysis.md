@@ -20,9 +20,33 @@ The adapter asks Maia for all legal move policies internally, even though it onl
 
 Human WDL and the UCI-compatible centipawn field emitted by Maia are not Stockfish evaluation. UI labels must say “Maia model prediction” rather than implying an observed population frequency.
 
+## Review analysis selector
+
+Review exposes two mutually exclusive analysis sources without merging their facts:
+
+- **Stockfish** shows ranked MultiPV arrows in the objective blue family.
+- **Maia** shows ranked candidate-policy arrows in a separate sage family,
+  conditioned on the selected target Elo.
+
+The preferred target Elo is stored in application settings and reused across
+reviews. Current-position Maia output is runtime-only, tagged by FEN and target
+Elo, and never becomes `GameAnalysisV1` move truth. If the canonical game has a
+next move, Review can show its exact Maia probability as a model prediction. A
+branch position has no invented “played move” probability.
+
+Selecting a Maia candidate creates a legal analysis-tree edge with Maia target
+Elo and probability as source evidence. It does not attach an objective label.
+The first Stockfish and Maia recommendations are compared explicitly as agreement
+or disagreement; no blended score is calculated.
+
+There is no separate Human Lab route. Target Elo, candidate mass, played-move
+probability and Stockfish/Maia comparison live directly in Review when Maia is
+selected. When Maia is offline, users can switch back to Stockfish immediately;
+five-second health polling reconnects without a page refresh.
+
 ## Human Find Difficulty
 
-Human Find Difficulty is a deterministic, separate experimental heuristic with labels Natural, Findable, Hard, Very Hard and Exceptional. It is not official Elo and is never fed back into objective classification.
+Human Find Difficulty remains a deterministic analysis-package heuristic with labels Natural, Findable, Hard, Very Hard and Exceptional. It is not official Elo and is never fed back into objective classification. The current Review selector presents raw Maia probabilities instead of a separate difficulty lab.
 
 Its probability baseline is:
 

@@ -165,6 +165,60 @@ class CoachMaterialFacts(CoachModel):
     balance_cp: int
 
 
+class CoachPieceSquareFacts(CoachModel):
+    color: Literal["white", "black"]
+    piece: Literal["pawn", "knight", "bishop", "rook", "queen"]
+    square: str = Field(pattern=r"^[a-h][1-8]$")
+
+
+class CoachSidePositionFacts(CoachModel):
+    in_check: bool
+    castled: bool
+    pawn_shield_count: int = Field(ge=0, le=3)
+    undeveloped_minor_squares: list[str]
+    doubled_pawn_files: list[str]
+    isolated_pawn_files: list[str]
+    passed_pawn_squares: list[str]
+
+
+class CoachCenterFacts(CoachModel):
+    white_occupied: list[str]
+    black_occupied: list[str]
+    contested: list[str]
+
+
+class CoachPositionUnderstanding(CoachModel):
+    side_to_move: Literal["white", "black"]
+    legal_move_count: int = Field(ge=0)
+    checks: list[str]
+    captures: list[str]
+    forcing_candidates: list[str]
+    attacked_undefended_pieces: list[CoachPieceSquareFacts]
+    center: CoachCenterFacts
+    open_files: list[str]
+    white_semi_open_files: list[str]
+    black_semi_open_files: list[str]
+    white: CoachSidePositionFacts
+    black: CoachSidePositionFacts
+
+
+class CoachFutureConsequenceFacts(CoachModel):
+    start: Literal["after"]
+    moves: list[str] = Field(min_length=1, max_length=4)
+    opponent_best_response: str | None = None
+
+
+class CoachPracticalAlternativeFacts(CoachModel):
+    uci: str
+    san: str
+    stockfish_rank: int = Field(ge=2)
+    score: CoachEngineScore
+    maia_probability: float = Field(ge=0, le=1)
+    objective_best_uci: str
+    objective_best_maia_probability: float | None = Field(default=None, ge=0, le=1)
+    win_percent_cost: float = Field(ge=0, le=4.000001)
+
+
 class CoachMovePosition(CoachModel):
     fen_before: str
     fen_after: str
@@ -196,6 +250,10 @@ class CoachBoardFacts(CoachModel):
     is_capture: bool
     gives_check: bool
     motifs: list[str]
+    position_before: CoachPositionUnderstanding
+    position_after: CoachPositionUnderstanding
+    future_consequence: CoachFutureConsequenceFacts | None = None
+    practical_alternative: CoachPracticalAlternativeFacts | None = None
 
 
 class CoachPhaseAccuracy(CoachModel):
@@ -229,6 +287,32 @@ class CoachMoveFacts(CoachModel):
         supplied = " ".join(self.position.fen_after.split(" ")[:4])
         if expected != supplied:
             raise ValueError("fenAfter does not match the played move")
+        before_side = "white" if chess.Board(self.position.fen_before).turn == chess.WHITE else "black"
+        after_board = chess.Board(self.position.fen_after)
+        after_side = "white" if after_board.turn == chess.WHITE else "black"
+        if self.board_facts.position_before.side_to_move != before_side or self.board_facts.position_after.side_to_move != after_side:
+            raise ValueError("positionUnderstanding sideToMove does not match its FEN")
+        consequence = self.board_facts.future_consequence
+        if consequence is not None:
+            if not any(candidate.pv[: len(consequence.moves)] == consequence.moves for candidate in self.objective.after_candidates):
+                raise ValueError("futureConsequence must be a prefix of an after-position PV")
+            replay = after_board.copy(stack=False)
+            for uci in consequence.moves:
+                candidate = chess.Move.from_uci(uci)
+                if candidate not in replay.legal_moves:
+                    raise ValueError("futureConsequence contains an illegal move")
+                replay.push(candidate)
+            if consequence.opponent_best_response is not None and consequence.opponent_best_response != consequence.moves[0]:
+                raise ValueError("opponentBestResponse must be the first consequence move")
+        practical = self.board_facts.practical_alternative
+        if practical is not None:
+            stockfish = next((candidate for candidate in self.objective.candidates if candidate.rank == practical.stockfish_rank and candidate.pv and candidate.pv[0] == practical.uci), None)
+            human = None if self.human is None else next((candidate for candidate in self.human.candidates if candidate.uci == practical.uci), None)
+            best = next((candidate for candidate in self.objective.candidates if candidate.rank == 1 and candidate.pv), None)
+            if stockfish is None or human is None or best is None:
+                raise ValueError("practicalAlternative must be supported by Stockfish and Maia candidates")
+            if practical.objective_best_uci != best.pv[0] or abs(practical.maia_probability - human.probability) > 1e-9:
+                raise ValueError("practicalAlternative evidence does not match supplied candidates")
         return self
 
 
@@ -311,7 +395,7 @@ class CoachGameSummaryRequest(CoachModel):
 class CoachLinePayload(CoachModel):
     label: str = Field(min_length=1, max_length=80)
     start: Literal["before", "after"]
-    moves: list[str] = Field(max_length=6)
+    moves: list[str] = Field(max_length=4)
     note: str | None = Field(max_length=240)
 
 
@@ -324,6 +408,15 @@ class CoachExplanationPayload(CoachModel):
     human_perspective: str | None = Field(max_length=420)
     tactical_idea: str | None = Field(max_length=420)
     training_tip: str | None = Field(max_length=420)
+    # Coach v3 always returns the six teaching slots. A slot may be null when
+    # its deterministic evidence is absent, but omitting the key is an old or
+    # malformed provider response and must fail schema validation.
+    notice: str | None = Field(max_length=420)
+    move_idea: str | None = Field(max_length=420)
+    problem: str | None = Field(max_length=420)
+    consequence: str | None = Field(max_length=420)
+    practical_alternative: str | None = Field(max_length=420)
+    takeaway: str | None = Field(max_length=420)
     confidence: Literal["high", "medium", "low"]
     lines: list[CoachLinePayload] = Field(max_length=2)
 
@@ -372,6 +465,7 @@ class CoachGrounding(CoachModel):
 class CoachSource(CoachModel):
     provider: Literal["ollama", "openai-compatible"]
     model: str
+    language: Literal["en", "zh-CN"]
     prompt_version: str
     generated_at: str
 
@@ -385,6 +479,12 @@ class CoachExplanationResponse(CoachModel):
     human_perspective: str | None = None
     tactical_idea: str | None = None
     training_tip: str | None = None
+    notice: str | None = None
+    move_idea: str | None = None
+    problem: str | None = None
+    consequence: str | None = None
+    practical_alternative: str | None = None
+    takeaway: str | None = None
     confidence: Literal["high", "medium", "low"]
     validated_lines: list[CoachValidatedLine]
     grounding: CoachGrounding
@@ -418,6 +518,7 @@ class CoachHealth(CoachModel):
     ollama: Literal["available", "offline", "error"]
     ollama_model: Literal["available", "missing", "offline", "error"]
     configured_model: str
+    ollama_models: list[str]
     openai_compatible: Literal["configured", "not-configured"]
 
 

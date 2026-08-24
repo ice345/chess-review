@@ -31,20 +31,56 @@ function scoreLabel(score: EngineScore): string {
 function drawBadge(context: CanvasRenderingContext2D, move: MoveAnalysis, x: number, y: number, size: number) {
   const meta = QUALITY_META[move.classification];
   context.beginPath();
-  context.moveTo(x + size * 0.14, y + size * 0.32);
-  context.bezierCurveTo(x + size * 0.28, y - size * 0.02, x + size * 0.76, y - size * 0.02, x + size * 0.9, y + size * 0.28);
-  context.bezierCurveTo(x + size * 1.05, y + size * 0.61, x + size * 0.76, y + size * 0.98, x + size * 0.43, y + size * 0.95);
-  context.bezierCurveTo(x + size * 0.08, y + size * 0.92, x - size * 0.02, y + size * 0.58, x + size * 0.14, y + size * 0.32);
-  context.closePath();
+  context.moveTo(x + size * .17, y + size * .35);
+  context.bezierCurveTo(x + size * .29, y + size * .02, x + size * .73, y - size * .01, x + size * .89, y + size * .28);
+  context.bezierCurveTo(x + size * 1.04, y + size * .57, x + size * .78, y + size * .91, x + size * .48, y + size * .91);
+  context.bezierCurveTo(x + size * .22, y + size * .91, x + size * .07, y + size * .75, x + size * .04, y + size * .58);
   context.fillStyle = meta.color;
-  context.globalAlpha = .88;
+  context.globalAlpha = .1;
   context.fill();
+  context.globalAlpha = .9;
+  context.strokeStyle = meta.color;
+  context.lineWidth = Math.max(1.5, size * .025);
+  context.lineCap = "round";
+  context.stroke();
   context.globalAlpha = 1;
-  context.fillStyle = "#fffdf8";
+  context.fillStyle = "#3d5661";
   context.font = `800 ${Math.round(size * 0.35)}px system-ui`;
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.fillText(meta.symbol, x + size / 2, y + size * 0.49);
+}
+
+function drawBlueBishopMark(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  context.save();
+  context.translate(x, y);
+  context.scale(size / 48, size / 48);
+  context.fillStyle = "#608899";
+  context.beginPath();
+  context.moveTo(24, 3.7);
+  context.bezierCurveTo(19.3, 3.7, 15.9, 7.4, 15.9, 11.8);
+  context.bezierCurveTo(15.9, 14.7, 17.3, 16.9, 19.1, 18.8);
+  context.bezierCurveTo(14, 22, 10.8, 27.1, 10.6, 33);
+  context.lineTo(37.4, 33);
+  context.bezierCurveTo(37.2, 27.1, 34, 22, 28.9, 18.8);
+  context.bezierCurveTo(30.7, 16.9, 32.1, 14.7, 32.1, 11.8);
+  context.bezierCurveTo(32.1, 7.4, 28.7, 3.7, 24, 3.7);
+  context.fill();
+  context.strokeStyle = "#fbf7ef";
+  context.lineWidth = 3.1;
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(19.2, 7.8);
+  context.lineTo(28.8, 17.2);
+  context.stroke();
+  context.strokeStyle = "#608899";
+  context.beginPath();
+  context.moveTo(7.6, 36.2);
+  context.lineTo(40.4, 36.2);
+  context.moveTo(10.7, 40.1);
+  context.lineTo(37.3, 40.1);
+  context.stroke();
+  context.restore();
 }
 
 function boardPieces(fen: string): Array<Array<string | null>> {
@@ -98,10 +134,11 @@ function background(context: CanvasRenderingContext2D, title: string, subtitle: 
   gradient.addColorStop(1, "#dfeae8");
   context.fillStyle = gradient;
   context.fillRect(0, 0, 1200, 675);
+  drawBlueBishopMark(context, 40, 15, 31);
   context.fillStyle = "#6c8c99";
   context.font = "900 20px system-ui";
   context.textAlign = "left";
-  context.fillText("OPEN CHESS REVIEW", 42, 42);
+  context.fillText("OPEN CHESS REVIEW", 82, 42);
   context.fillStyle = "#294653";
   context.font = "800 30px system-ui";
   context.fillText(title, 620, 72);

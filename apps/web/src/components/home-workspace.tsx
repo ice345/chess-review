@@ -17,6 +17,7 @@ import { listSyncedGames, markSyncedGameAnalyzed } from "../lib/platform-library
 import type { SyncedGame } from "@chess-review/shared";
 import { loadAppSettings } from "../lib/app-settings";
 import { autoAnalyzeSyncedGames } from "../lib/auto-analysis";
+import { BlueBishopMark } from "@chess-review/ui";
 
 const SAMPLE_PGN = `[Event "Open Review Sample"]
 [White "Ada"]
@@ -88,23 +89,29 @@ export function HomeWorkspace() {
       <AppHeader />
       <section className="home-hero">
         <div className="home-copy">
-          <span className="kicker">A focused chess-review workspace</span>
-          <h1>Understand the move.<br />Understand the position.<br /><em>Understand yourself.</em></h1>
-          <p>Stockfish objective truth, Maia human behavior and grounded coaching—separated clearly, brought together when it matters.</p>
-          <div className="layer-preview" aria-label="Analysis layers">
-            <span><b>01</b><strong>Objective</strong><small>What happened?</small></span>
-            <span><b>02</b><strong>Human</strong><small>How findable was it?</small></span>
-            <span><b>03</b><strong>Coach</strong><small>What should I learn?</small></span>
+          <div className="home-chess-identity" aria-hidden="true">
+            <BlueBishopMark size={78} decorative />
+            <span><b>Position by position</b><small>Stockfish · Maia · grounded Coach</small></span>
           </div>
+          <span className="kicker">Open Chess Review</span>
+          <h1>Review a chess game.<br /><em>See what mattered.</em></h1>
+          <p>Import a PGN or position, explore the board, compare objective and human choices, and turn critical moves into lessons.</p>
         </div>
 
-        <section className="import-card" aria-labelledby="import-title">
+        <form
+          className="import-card"
+          aria-labelledby="import-title"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void openReview();
+          }}
+        >
           <div className="import-heading"><span className="kicker">New review</span><h2 id="import-title">Bring in a game</h2></div>
-          <div className="source-tabs" role="tablist" aria-label="Import source">
-            <button role="tab" aria-selected={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => setKind("pgn")}>PGN</button>
-            <button role="tab" aria-selected={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => setKind("fen")}>FEN</button>
-            <button role="tab" aria-selected="false" onClick={() => document.getElementById("connected-accounts")?.scrollIntoView({ behavior: "smooth" })}>Chess.com</button>
-            <button role="tab" aria-selected="false" onClick={() => document.getElementById("connected-accounts")?.scrollIntoView({ behavior: "smooth" })}>Lichess</button>
+          <div className="source-tabs" role="group" aria-label="Import source">
+            <button type="button" aria-pressed={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => setKind("pgn")}>PGN</button>
+            <button type="button" aria-pressed={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => setKind("fen")}>FEN</button>
+            <Link href="/settings#chesscom-link" aria-label="Connect Chess.com in Settings">Chess.com</Link>
+            <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Lichess</Link>
           </div>
           <label className="import-field">
             <span>{kind === "pgn" ? "Paste a complete PGN" : "Paste an explicit FEN"}</span>
@@ -116,15 +123,15 @@ export function HomeWorkspace() {
             />
           </label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button className="primary import-submit" disabled={status === "saving" || input.trim() === ""} onClick={() => void openReview()}>
+          <button type="submit" className="primary import-submit" disabled={status === "saving" || input.trim() === ""}>
             {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
           </button>
-          <button className="text-action" onClick={loadExample}>Load example game</button>
+          <button type="button" className="text-action" onClick={loadExample}>Load example game</button>
           <small className="import-note">Game and analysis records stay in this browser unless you explicitly choose a cloud coach provider.</small>
-        </section>
+        </form>
       </section>
 
-      <ConnectedAccounts onGamesUpdated={applySyncAnalysisPolicy} />
+      <ConnectedAccounts compact onGamesUpdated={applySyncAnalysisPolicy} />
 
       {syncedGames.length > 0 && <section className="synced-games-section">
         <div><span className="kicker">From your accounts</span><h2>Recent games</h2><p>Syncing does not spend engine time. Choose a game when you are ready.</p></div>

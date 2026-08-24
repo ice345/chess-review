@@ -1,0 +1,256 @@
+/* Review analysis lenses. Maia colors and copy stay visually and
+   semantically separate from the objective Stockfish family. */
+
+.analysis-lens-panel {
+  margin: 16px 0 4px;
+  padding: 14px;
+  border: 1px solid rgba(133, 155, 146, .26);
+  border-radius: 14px 17px 13px 16px;
+  background: rgba(235, 241, 235, .48);
+}
+
+.lens-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.lens-toolbar > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.lens-toolbar strong {
+  color: #38545c;
+  font: 500 13px Georgia, "Songti SC", serif;
+}
+
+.lens-switch {
+  padding: 2px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  border: 1px solid rgba(111, 138, 135, .24);
+  border-radius: 9px;
+  background: rgba(255, 253, 248, .7);
+}
+
+.lens-switch button {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #788a8d;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.lens-switch button.active {
+  background: #dfeae5;
+  color: #3e6665;
+  box-shadow: 0 1px 4px rgba(67, 94, 92, .08);
+}
+
+.lens-legend {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  color: #738587;
+  font-size: 8px;
+}
+
+.lens-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lens-legend i {
+  width: 15px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.lens-legend i.objective { background: #527f91; }
+.lens-legend i.human { background: #78977a; }
+
+.human-lens-content {
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(124, 148, 142, .2);
+}
+
+.human-lens-controls {
+  display: grid;
+  grid-template-columns: minmax(100px, .65fr) 1.35fr;
+  align-items: end;
+  gap: 9px;
+}
+
+.human-lens-controls label {
+  display: grid;
+  gap: 4px;
+  color: #728486;
+  font-size: 8px;
+}
+
+.human-lens-controls select {
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #c8d5cf;
+  border-radius: 8px;
+  background: rgba(255, 253, 248, .84);
+  color: #3f5c64;
+}
+
+.human-lens-controls button {
+  min-height: 34px;
+}
+
+.human-service-state {
+  margin: 10px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #718386;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.human-service-state .service-dot {
+  flex: none;
+}
+
+.recommendation-evidence {
+  margin-top: 11px;
+  padding: 10px 11px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid #cfdbd4;
+  border-left: 3px solid #7d9d80;
+  border-radius: 10px;
+  background: rgba(255, 253, 248, .66);
+  color: #667b7c;
+}
+
+.recommendation-evidence.disagreement {
+  border-left-color: #aa8588;
+  background: rgba(247, 237, 232, .6);
+}
+
+.recommendation-evidence strong {
+  color: #3d5b61;
+  font-size: 10px;
+}
+
+.recommendation-evidence span {
+  font-size: 9px;
+}
+
+.recommendation-evidence small {
+  color: #7d8c8c;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.played-probability {
+  margin-top: 10px;
+  padding: 9px 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 3px 10px;
+  border-top: 1px solid rgba(129, 151, 143, .2);
+  border-bottom: 1px solid rgba(129, 151, 143, .2);
+  color: #6e8081;
+  font-size: 9px;
+}
+
+.played-probability strong {
+  color: #5f8066;
+  font-size: 14px;
+}
+
+.played-probability small {
+  grid-column: 1 / -1;
+  color: #869293;
+  font-size: 8px;
+}
+
+.human-lens-candidates {
+  margin-top: 9px;
+  display: grid;
+  gap: 4px;
+}
+
+.human-lens-candidates button {
+  min-height: 34px;
+  padding: 5px 7px;
+  display: grid;
+  grid-template-columns: 20px 42px minmax(55px, 1fr) 36px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #526a6d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.human-lens-candidates button:hover {
+  border-color: #cbd9d0;
+  background: rgba(255, 253, 248, .72);
+}
+
+.human-lens-candidates button > span,
+.human-lens-candidates em {
+  color: #7c8d89;
+  font-size: 8px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.human-lens-candidates i {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbe5dc;
+}
+
+.human-lens-candidates i b {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #78977a;
+}
+
+.model-boundary {
+  margin-top: 9px;
+  display: block;
+  color: #839090;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .lens-toolbar {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .lens-switch {
+    width: 100%;
+  }
+
+  .lens-switch button {
+    padding-inline: 5px;
+  }
+
+  .human-lens-controls {
+    grid-template-columns: 1fr;
+  }
+}

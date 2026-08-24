@@ -105,6 +105,24 @@ class OllamaProvider:
         except httpx.HTTPError:
             return "offline"
 
+    @property
+    def available_models(self) -> list[str]:
+        """Return the local Ollama catalog exposed by `ollama ls`/`/api/tags`."""
+        try:
+            response = self.client.get(f"{self.base_url}/api/tags", timeout=2)
+            if not response.is_success:
+                return []
+            body = response.json()
+            models = body.get("models", []) if isinstance(body, dict) else []
+            names = {
+                str(model.get("name") or model.get("model"))
+                for model in models
+                if isinstance(model, dict) and (model.get("name") or model.get("model"))
+            }
+            return sorted(names, key=str.casefold)
+        except (ValueError, httpx.HTTPError):
+            return []
+
     def generate_json(
         self,
         *,
@@ -239,10 +257,11 @@ class CoachProviderRegistry:
     def get(self, provider: CoachProviderName) -> CoachProvider:
         return self.ollama if provider == "ollama" else self.openai_compatible
 
-    def statuses(self) -> dict[str, str]:
+    def statuses(self) -> dict[str, object]:
         return {
             "ollama": self.ollama.status,
             "ollama_model": getattr(self.ollama, "model_status", "error"),
             "configured_model": getattr(self.ollama, "default_model", "unknown"),
+            "ollama_models": getattr(self.ollama, "available_models", []),
             "openai_compatible": self.openai_compatible.status,
         }

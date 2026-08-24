@@ -1,0 +1,59 @@
+/* Grounded Coach teaching sequence. The numbered flow follows the human
+   decision loop while source and validated-line cards remain separate. */
+
+.coach-teaching-sequence {
+  margin-top: 16px;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid #d8e2de;
+}
+
+.coach-teaching-sequence > section {
+  margin: 0;
+  padding: 13px 2px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  border-bottom: 1px solid #dfe6e3;
+  background: transparent;
+}
+
+.coach-teaching-sequence > section > span {
+  color: #9aacaa;
+  font: italic 400 9px Georgia, "Songti SC", serif;
+}
+
+.coach-teaching-sequence > section > div {
+  display: grid;
+  gap: 5px;
+}
+
+.coach-teaching-sequence strong {
+  color: #426675;
+  font-size: 10px;
+}
+
+.coach-teaching-sequence p {
+  margin: 0;
+  color: #61767c;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.coach-teaching-sequence .teaching-problem {
+  border-left: 2px solid rgba(178, 119, 122, .48);
+  padding-left: 9px;
+}
+
+.coach-teaching-sequence .teaching-consequence {
+  background: rgba(226, 236, 233, .38);
+}
+
+.coach-teaching-sequence .teaching-alternative {
+  border-left: 2px solid rgba(119, 153, 124, .5);
+  padding-left: 9px;
+}
+
+.coach-teaching-sequence .teaching-takeaway strong {
+  color: #697d56;
+}

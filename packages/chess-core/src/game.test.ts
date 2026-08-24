@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fenToEpd, parsePgn, replayUciLine } from "./game";
+import { fenToEpd, legalBoardDestinations, parsePgn, playLegalBoardMove, replayUciLine } from "./game";
 
 describe("parsePgn", () => {
   it("normalizes SAN, UCI, colors, and before/after positions", () => {
@@ -37,5 +37,45 @@ describe("replayUciLine", () => {
 
   it("rejects an illegal continuation instead of inventing SAN", () => {
     expect(() => replayUciLine("8/8/8/8/8/8/K6k/8 w - - 0 1", ["a2a8"])).toThrow(/Illegal UCI move/);
+  });
+});
+
+describe("playLegalBoardMove", () => {
+  it("validates a user move and returns canonical SAN/FEN", () => {
+    const move = playLegalBoardMove("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", {
+      from: "e2",
+      to: "e4",
+    });
+    expect(move).toMatchObject({ uci: "e2e4", san: "e4" });
+    expect(move.fenAfter).toContain(" b KQkq - ");
+  });
+
+  it("rejects an illegal drag", () => {
+    expect(() => playLegalBoardMove("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", {
+      from: "e2",
+      to: "e5",
+    })).toThrow(/Illegal board move/);
+  });
+
+  it("defaults a legal promotion to a queen", () => {
+    const move = playLegalBoardMove("8/P7/8/8/8/8/7k/K7 w - - 0 1", { from: "a7", to: "a8" });
+    expect(move.uci).toBe("a7a8q");
+    expect(move.san).toContain("=Q");
+  });
+});
+
+describe("legalBoardDestinations", () => {
+  it("returns rules-validated quiet and capture hints for one selected piece", () => {
+    const destinations = legalBoardDestinations("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2", "e5");
+
+    expect(destinations.map((move) => move.to)).toContain("d4");
+    expect(destinations.find((move) => move.to === "d4")?.isCapture).toBe(true);
+    expect(destinations.find((move) => move.to === "e4")?.isCapture).toBe(false);
+  });
+
+  it("returns no hints for an empty square or the wrong side to move", () => {
+    const initial = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    expect(legalBoardDestinations(initial, "e4")).toEqual([]);
+    expect(legalBoardDestinations(initial, "e7")).toEqual([]);
   });
 });

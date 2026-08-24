@@ -10,6 +10,7 @@ import { buildReviewRecordFromSyncedGame, listReviewRecords, saveReviewRecord, t
 
 type ProviderFilter = "all" | "manual" | ExternalPlatform;
 type AnalysisFilter = "all" | "reviewed" | "not-reviewed";
+const LIBRARY_PAGE_SIZE = 60;
 
 export function HistoryPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export function HistoryPage() {
   const [result, setResult] = useState("all");
   const [query, setQuery] = useState("");
   const [working, setWorking] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
 
   useEffect(() => {
     void Promise.all([listReviewRecords(), listSyncedGames()]).then(([nextRecords, nextGames]) => {
@@ -45,6 +47,13 @@ export function HistoryPage() {
       && (result === "all" || game[game.accountColor].result === result)
       && `${game.white.username} ${game.black.username}`.toLowerCase().includes(query.toLowerCase());
   });
+  const libraryEntries = [
+    ...pendingGames.map((game) => ({ kind: "pending" as const, date: game.playedAt, game })),
+    ...reviewedRecords.map((record) => ({ kind: "review" as const, date: record.updatedAt, record })),
+  ].sort((left, right) => right.date.localeCompare(left.date));
+  const visibleEntries = libraryEntries.slice(0, visibleCount);
+
+  useEffect(() => setVisibleCount(LIBRARY_PAGE_SIZE), [analysisState, provider, query, result, timeClass]);
 
   async function review(game: SyncedGame) {
     setWorking(game.id);
@@ -59,7 +68,7 @@ export function HistoryPage() {
   }
 
   const loading = records === null || games === null;
-  const empty = !loading && reviewedRecords.length === 0 && pendingGames.length === 0;
+  const empty = !loading && libraryEntries.length === 0;
 
   return (
     <main className="page-scroll utility-page">
@@ -76,18 +85,18 @@ export function HistoryPage() {
         {loading ? <p className="utility-empty">Loading history…</p> : empty ? (
           <div className="utility-empty"><strong>No matching games</strong><span>Change the filters or connect an account.</span><Link href="/">Return home →</Link></div>
         ) : <>
-          {pendingGames.map((game) => <article className="history-game pending" key={game.id}>
-            <span className="record-kind">{game.external.provider === "chesscom" ? "CHESS.COM" : "LICHESS"}</span>
-            <span><strong>{game.white.username} vs {game.black.username}</strong><small>{game.timeClass ?? "game"} · waiting for review</small></span>
-            <time>{new Date(game.playedAt).toLocaleDateString()}</time>
-            <button className="text-button" disabled={working !== null} onClick={() => void review(game)}>{working === game.id ? "Preparing…" : "Analyze →"}</button>
-          </article>)}
-          {reviewedRecords.map((record) => <Link href={record.kind === "pgn" ? `/review/${record.id}` : `/review/${record.id}/engine`} key={record.id}>
-            <span className="record-kind">{record.external?.provider === "chesscom" ? "CHESS.COM" : record.external?.provider === "lichess" ? "LICHESS" : record.kind.toUpperCase()}</span>
-            <span><strong>{record.title}</strong><small>{record.subtitle}</small></span>
-            <time>{new Date(record.updatedAt).toLocaleDateString()}</time>
+          {visibleEntries.map((entry) => entry.kind === "pending" ? <article className="history-game pending" key={entry.game.id}>
+            <span className="record-kind">{entry.game.external.provider === "chesscom" ? "CHESS.COM" : "LICHESS"}</span>
+            <span><strong>{entry.game.white.username} vs {entry.game.black.username}</strong><small>{entry.game.timeClass ?? "game"} · waiting for review</small></span>
+            <time>{new Date(entry.game.playedAt).toLocaleDateString()}</time>
+            <button className="text-button" disabled={working !== null} onClick={() => void review(entry.game)}>{working === entry.game.id ? "Preparing…" : "Analyze →"}</button>
+          </article> : <Link href={entry.record.kind === "pgn" ? `/review/${entry.record.id}` : `/review/${entry.record.id}/engine`} key={entry.record.id}>
+            <span className="record-kind">{entry.record.external?.provider === "chesscom" ? "CHESS.COM" : entry.record.external?.provider === "lichess" ? "LICHESS" : entry.record.kind.toUpperCase()}</span>
+            <span><strong>{entry.record.title}</strong><small>{entry.record.subtitle}</small></span>
+            <time>{new Date(entry.record.updatedAt).toLocaleDateString()}</time>
             <em>Open →</em>
           </Link>)}
+          {visibleCount < libraryEntries.length && <button className="secondary library-load-more" onClick={() => setVisibleCount((count) => count + LIBRARY_PAGE_SIZE)}>Load {Math.min(LIBRARY_PAGE_SIZE, libraryEntries.length - visibleCount)} more · {visibleCount} of {libraryEntries.length}</button>}
         </>}
       </section>
     </main>

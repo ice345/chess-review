@@ -17,6 +17,7 @@ export interface LocalAiHealth {
     ollama: "available" | "offline" | "error";
     ollamaModel: "available" | "missing" | "offline" | "error";
     configuredModel: string;
+    ollamaModels: string[];
     openaiCompatible: "configured" | "not-configured";
   };
 }
@@ -26,7 +27,7 @@ export interface MaiaMovesRequest {
   targetElo: number;
   selfElo: number;
   opponentElo: number;
-  playedMove: string;
+  playedMove?: string;
   multiPv?: number;
   model?: MaiaModel;
 }
@@ -107,7 +108,7 @@ export async function analyzeMaiaMove(
       target_elo: request.targetElo,
       self_elo: request.selfElo,
       opponent_elo: request.opponentElo,
-      played_move: request.playedMove,
+      ...(request.playedMove === undefined ? {} : { played_move: request.playedMove }),
       multi_pv: request.multiPv ?? 5,
       model: request.model ?? "maia3-5m",
     }),
@@ -147,6 +148,12 @@ function normalizeExplanation(value: CoachExplanation): CoachExplanation {
     ...(typeof nullable.humanPerspective === "string" ? { humanPerspective: nullable.humanPerspective } : {}),
     ...(typeof nullable.tacticalIdea === "string" ? { tacticalIdea: nullable.tacticalIdea } : {}),
     ...(typeof nullable.trainingTip === "string" ? { trainingTip: nullable.trainingTip } : {}),
+    ...(typeof nullable.notice === "string" ? { notice: nullable.notice } : {}),
+    ...(typeof nullable.moveIdea === "string" ? { moveIdea: nullable.moveIdea } : {}),
+    ...(typeof nullable.problem === "string" ? { problem: nullable.problem } : {}),
+    ...(typeof nullable.consequence === "string" ? { consequence: nullable.consequence } : {}),
+    ...(typeof nullable.practicalAlternative === "string" ? { practicalAlternative: nullable.practicalAlternative } : {}),
+    ...(typeof nullable.takeaway === "string" ? { takeaway: nullable.takeaway } : {}),
     confidence: value.confidence,
     validatedLines: value.validatedLines.map((line) => ({
       label: line.label,

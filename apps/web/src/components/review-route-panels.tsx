@@ -5,10 +5,11 @@ import { useState } from "react";
 import { replayUciLine } from "@chess-review/chess-core";
 import { QUALITY_META, QualityIcon } from "@chess-review/ui";
 import { CoachPanel } from "./coach-panel";
-import { HumanPanel } from "./human-panel";
+import { AnalysisLensPanel } from "./review/analysis-lens-panel";
 import { ReviewMoves, ReviewOverview } from "./review-presentation";
 import { useReviewRuntime } from "./review-runtime";
 import { formatEngineScore } from "../lib/review-format";
+import { selectedBranchNode } from "../lib/analysis-branch";
 import { useReviewStore } from "../store/review-store";
 
 function AnalysisGate({ section }: { section: string }) {
@@ -26,32 +27,28 @@ function AnalysisGate({ section }: { section: string }) {
   );
 }
 
-function TopContinuations() {
+function PositionAnalysis() {
   const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
   const currentPly = useReviewStore((store) => store.currentPly);
   const positionFen = useReviewStore((store) => store.positionFen);
-  const variation = useReviewStore((store) => store.variation);
+  const branch = useReviewStore((store) => store.branch);
   const returnToGame = useReviewStore((store) => store.returnToGame);
-  const canonical = analysis?.moves[currentPly]?.stockfish ?? null;
+  const canonical = branch ? null : analysis?.moves[currentPly]?.stockfish ?? null;
   const result = runtime.continuationResult ?? canonical;
-  const rootFen = variation?.rootFen ?? positionFen;
+  const rootFen = positionFen;
   const lines = result?.lines.slice(0, runtime.continuationLines) ?? [];
-  const needsSearch = !result || result.lines.length < runtime.continuationLines;
+  const selectedRank = branch
+    ? selectedBranchNode(branch).sources.find((source) => source.kind === "stockfish")?.rank
+    : undefined;
 
   return (
-    <section className="continuations-panel">
-      <header>
-        <div><span className="kicker">Current position</span><h2>Top continuations</h2></div>
-        <div className="continuation-controls">
-          <label><span>Lines</span><select value={runtime.continuationLines} onChange={(event) => runtime.setContinuationLines(Number(event.target.value) as 1 | 2 | 3 | 4 | 5)}>{[1, 2, 3, 4, 5].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
-          <label><span>Moves</span><select value={runtime.continuationLength} onChange={(event) => runtime.setContinuationLength(Number(event.target.value) as 6 | 8 | 10 | 12 | 16)}>{[6, 8, 10, 12, 16].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>
-        </div>
-      </header>
-      {variation && (
-        <div className="variation-banner"><span>Exploring line #{variation.rank} · {variation.cursor}/{variation.moves.length}</span><button className="text-button" onClick={returnToGame}>Return to game <kbd>Esc</kbd></button></div>
+    <section className="position-analysis">
+      <AnalysisLensPanel objective={result} />
+      {branch && (
+        <div className="variation-banner"><span>Analysis branch · root ply {branch.rootPly} · {branch.selectedIndex}/{branch.activePath.length - 1}</span><button className="text-button" onClick={returnToGame}>Return to game <kbd>Esc</kbd></button></div>
       )}
-      <div className="continuation-list">
+      {runtime.analysisLens === "objective" && <div className="continuation-list" aria-label="Stockfish continuations">
         {lines.map((line) => {
           const san = (() => {
             try {
@@ -61,7 +58,7 @@ function TopContinuations() {
             }
           })();
           return (
-            <button className={variation?.rank === line.rank ? "active" : ""} key={line.rank} onClick={() => runtime.playContinuation(line.rank, result)}>
+            <button className={selectedRank === line.rank ? "active" : ""} key={line.rank} onClick={() => runtime.playContinuation(line.rank, result)}>
               <span className="line-rank">{line.rank}</span>
               <strong>{formatEngineScore(line.score)}</strong>
               <span className="line-moves">{san.join(" ")}</span>
@@ -69,11 +66,9 @@ function TopContinuations() {
             </button>
           );
         })}
-        {lines.length === 0 && <p className="continuation-empty">Ask browser Stockfish for candidate lines from this exact position.</p>}
-      </div>
-      {needsSearch && <button className="secondary continuation-search" disabled={runtime.continuationState === "running"} onClick={() => void runtime.analyzeContinuations()}>{runtime.continuationState === "running" ? "Calculating continuations…" : `Load ${runtime.continuationLines} line${runtime.continuationLines === 1 ? "" : "s"}`}</button>}
-      {runtime.continuationError && <p className="error">{runtime.continuationError}</p>}
-      <small className="continuation-note">Changing displayed move length only truncates validated SAN; it does not rerun Stockfish.</small>
+        {lines.length === 0 && <p className="continuation-empty">{runtime.continuationState === "running" ? "Analyzing this position…" : "Stockfish candidates appear here when this position is analyzed."}</p>}
+      </div>}
+      {runtime.analysisLens === "objective" && runtime.continuationError && <p className="error">{runtime.continuationError} <button className="text-button" onClick={() => void runtime.analyzeContinuations()}>Retry</button></p>}
     </section>
   );
 }
@@ -81,24 +76,23 @@ function TopContinuations() {
 export function ObjectiveRoutePanel() {
   const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
-  const goToPly = useReviewStore((store) => store.goToPly);
   const currentPly = useReviewStore((store) => store.currentPly);
-  if (!analysis) return <div className="route-panel objective-route"><TopContinuations /><AnalysisGate section="Objective review" /></div>;
+  if (!analysis) return <div className="route-panel objective-route"><PositionAnalysis /><AnalysisGate section="Objective review" /></div>;
   const move = currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   return (
     <div className="route-panel objective-route">
       <div className="route-heading"><span className="kicker">Objective review</span><h1>What happened?</h1><p>Engine truth first; interpretation comes later.</p></div>
-      {move && <section className="position-verdict-card"><QualityIcon classification={move.classification} size={38} /><div><span>{move.ply}. {move.san}</span><strong>{QUALITY_META[move.classification].label}</strong><small>Accuracy {move.accuracy.toFixed(1)} · {formatEngineScore(move.evaluationBefore)} → {formatEngineScore(move.playedMoveScore)}</small></div><details><summary>Why this label?</summary><p>{move.classificationReason.precedenceRule.replaceAll("-", " ")} · Win% loss {move.classificationReason.winPercentLoss.toFixed(1)}</p></details></section>}
-      <TopContinuations />
-      <ReviewOverview analysis={analysis} onSelectPly={goToPly} allMomentsHref={`/review/${runtime.gameId}/moves`} />
+      {move && <section className="position-verdict-card"><QualityIcon classification={move.classification} size={38} /><div><span>{move.ply}. {move.san}</span><strong>{QUALITY_META[move.classification].label}</strong><small>Objective move quality · Stockfish · Accuracy {move.accuracy.toFixed(1)} · {formatEngineScore(move.evaluationBefore)} → {formatEngineScore(move.playedMoveScore)}</small></div><details><summary>Why this label?</summary><p>{move.classificationReason.precedenceRule.replaceAll("-", " ")} · Win% loss {move.classificationReason.winPercentLoss.toFixed(1)}</p></details></section>}
+      <PositionAnalysis />
+      <ReviewOverview analysis={analysis} onSelectPly={runtime.navigateToPly} allMomentsHref={`/review/${runtime.gameId}/moves`} />
     </div>
   );
 }
 
 export function MovesRoutePanel() {
+  const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
   const currentPly = useReviewStore((store) => store.currentPly);
-  const goToPly = useReviewStore((store) => store.goToPly);
   const [filter, setFilter] = useState<"all" | "critical" | "errors">("all");
   if (!analysis) return <AnalysisGate section="Move explorer" />;
   const move = currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
@@ -106,25 +100,8 @@ export function MovesRoutePanel() {
     <div className="route-panel moves-route">
       <div className="route-heading"><span className="kicker">Move explorer</span><h1>Every decision, in context</h1></div>
       <div className="move-filters" aria-label="Move filters">{(["all", "critical", "errors"] as const).map((value) => <button className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div>
-      <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={goToPly} filter={filter} />
+      <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} filter={filter} />
       {move && <section className="move-evidence"><div><QualityIcon classification={move.classification} size={28} /><span><strong>{move.san} · {QUALITY_META[move.classification].label}</strong><small>{move.phase} · Accuracy {move.accuracy.toFixed(1)}</small></span></div><dl><div><dt>Rule</dt><dd>{move.classificationReason.precedenceRule.replaceAll("-", " ")}</dd></div><div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div><div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div><div><dt>Legal choices</dt><dd>{move.classificationReason.legalMoveCount}</dd></div></dl>{move.classificationReason.exclusions.length > 0 && <small>Exclusions · {move.classificationReason.exclusions.join(", ")}</small>}</section>}
-    </div>
-  );
-}
-
-export function HumanRoutePanel() {
-  const runtime = useReviewRuntime();
-  const analysis = useReviewStore((store) => store.analysis);
-  const currentPly = useReviewStore((store) => store.currentPly);
-  const game = useReviewStore((store) => store.game);
-  const setMoveHuman = useReviewStore((store) => store.setMoveHuman);
-  if (!analysis) return <AnalysisGate section="Human analysis" />;
-  const move = currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
-  const normalizedMove = currentPly === 0 ? null : game?.plies[currentPly - 1] ?? null;
-  return (
-    <div className="route-panel human-route">
-      <div className="route-heading"><span className="kicker">Human lens</span><h1>How natural was this move?</h1><p>Maia estimates human choice at a target rating. It never changes the Stockfish verdict.</p></div>
-      <HumanPanel move={move} isForcing={normalizedMove?.isCheck === true || normalizedMove?.isCapture === true} onUpdate={(human) => move && runtime.persistEnrichedAnalysis(setMoveHuman(move.ply, human))} />
     </div>
   );
 }
@@ -133,7 +110,6 @@ export function CoachRoutePanel() {
   const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
   const currentPly = useReviewStore((store) => store.currentPly);
-  const goToPly = useReviewStore((store) => store.goToPly);
   const setMoveCoach = useReviewStore((store) => store.setMoveCoach);
   const setGameCoachSummary = useReviewStore((store) => store.setGameCoachSummary);
   if (!analysis) return <AnalysisGate section="AI coach" />;
@@ -141,7 +117,7 @@ export function CoachRoutePanel() {
   return (
     <div className="route-panel coach-route">
       <div className="route-heading"><span className="kicker">Coach</span><h1>Turn this position into a lesson</h1><p>Explanations stay inside the facts already verified by Stockfish, Maia and the rules layer.</p></div>
-      <CoachPanel analysis={analysis} move={move} onMoveUpdate={(coach) => move && runtime.persistEnrichedAnalysis(setMoveCoach(move.ply, coach))} onGameUpdate={(summary) => runtime.persistEnrichedAnalysis(setGameCoachSummary(summary))} onSelectPly={goToPly} />
+      <CoachPanel analysis={analysis} move={move} onMoveUpdate={(coach) => move && runtime.persistEnrichedAnalysis(setMoveCoach(move.ply, coach))} onGameUpdate={(summary) => runtime.persistEnrichedAnalysis(setGameCoachSummary(summary))} onSelectPly={runtime.navigateToPly} />
     </div>
   );
 }
