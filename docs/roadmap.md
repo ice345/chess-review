@@ -270,37 +270,37 @@ The terminal-position repair was revalidated with real browser Stockfish runs
 before further Phase 6 work. Further Phase 6 work must start from this
 exact-interaction and Study product boundary.
 
-## Phase 6 — desktop application
+## Phase 6 — desktop application (complete)
 
 - [x] Tauri 2 application shell
 - [x] shared React/TypeScript packages
 - [x] arm64 macOS `.app` and `.dmg` local build (ad-hoc only)
-- [ ] Windows build
-- [ ] Linux build
+- [x] Windows x64 NSIS build on a native runner
+- [x] Linux x64 deb/AppImage build on a native runner
 - [x] managed packaged local-ai sidecar
 - [x] managed Ollama discovery/startup
 - [x] local model setup workflow with explicit download approval
 - [x] process ownership and shutdown for Ollama and local-ai
 - [x] native PGN file open/import
-- [x] native Windows/Linux bundle configuration and artifact workflow (runner results pending)
-- [ ] packaged releases and CI artifacts
+- [x] native Windows/Linux bundle configuration and verified artifact workflow
+- [x] unsigned packaged CI artifacts for macOS arm64, Windows x64 and Linux x64
 
-Phase 6 opened on 2026-08-24 with the independent Vite/React/Tauri shell. The
-preview imports the project-owned UI mark plus PGN parser from workspace
-packages. Its first platform milestone now produces ad-hoc arm64 macOS `.app`
-and `.dmg` bundles using generated Blue Bishop platform icons. This does not yet
-claim signing, notarization, a universal or other operating-system build, or a
-published release artifact. Native PGN association/import, the Ollama ownership
-boundary and a self-contained PyInstaller local-ai sidecar were subsequently
-implemented and validated in the rebuilt macOS app. The sidecar exposes the
-real FastAPI health contract and is stopped with the app, while a pre-existing
-Ollama process remains untouched. Windows/Linux native configurations and an artifact
-matrix are committed but do not count as completed builds before their runners
-pass. During the
-Phase 6 gate, two shared Review-runtime gaps were also closed: Coach generation
-now survives navigation among nested review routes, and user-played temporary
-variations receive runtime-only Stockfish Move Quality through the canonical
-classifier without mutating the imported game or objective cache.
+Phase 6 opened and completed on 2026-08-24. The independent Vite/React/Tauri
+shell imports shared packages, owns native PGN integration and manages both the
+packaged PyInstaller local-ai sidecar and Ollama without taking ownership of
+pre-existing processes. The macOS app/DMG was exercised locally against the real
+sidecar lifecycle. The native artifact matrix then completed successfully for
+macOS arm64 app/DMG, Windows x64 NSIS and Linux x64 deb/AppImage in
+[Desktop artifacts run 32719600786](https://github.com/ice345/chess-review/actions/runs/32719600786).
+During the Phase 6 gate, two shared Review-runtime gaps were also closed: Coach
+generation now survives navigation among nested review routes, and user-played
+temporary variations receive runtime-only Stockfish Move Quality through the
+canonical classifier without mutating the imported game or objective cache.
+
+Developer signing, macOS notarization/universal binaries and publishing a
+versioned GitHub release remain release-operations follow-ups. They require
+distribution credentials and an explicit release/version decision and are not
+part of the Phase 6 implementation gate.
 
 ## Phase 7 — advanced study
 

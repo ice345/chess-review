@@ -28,6 +28,9 @@ not embed or start an SSR server.
   pre-existing service without ownership, or starts the packaged executable and
   retains its child handle. The sidecar includes the Maia runtime but no Maia or
   Ollama model checkpoints; those downloads remain explicit user actions.
+- The locked packaged runtime uses the official CPU-only PyTorch index. This
+  keeps the portable baseline independent of CUDA drivers and prevents Linux
+  installers from silently absorbing several gigabytes of CUDA libraries.
 - The project-owned Blue Bishop SVG generates the platform icon set. macOS uses
   a platform override that enables local `.app` and `.dmg` bundles
   while the base configuration stays bundle-disabled for unverified targets.
@@ -47,8 +50,12 @@ Developer ID-signed, notarized or universal release.
 Windows NSIS and Linux deb/AppImage platform configurations now exist alongside
 the macOS override. `.github/workflows/desktop-artifacts.yml` defines native
 GitHub-hosted runners and uploads the unsigned outputs on manual runs or
-`desktop-v*` tags. Those target checkboxes remain open until the workflow has
-actually completed on the corresponding operating systems.
+`desktop-v*` tags. The macOS arm64, Windows x64 and Linux x64 jobs, including
+their packaged local-ai sidecars, completed successfully in
+[artifact run 32719600786](https://github.com/ice345/chess-review/actions/runs/32719600786).
+Every generated package is checked against a 768 MiB ceiling before upload so a
+dependency-source regression fails the workflow instead of publishing an
+unexpected multi-gigabyte installer.
 
 ## Native lifecycle boundary
 
@@ -72,8 +79,12 @@ process survives application shutdown.
 
 The macOS package was validated against the real packaged `/health` response;
 closing its Tauri host stopped the owned sidecar and left the pre-existing
-Ollama process running. Completed Windows/Linux runner builds, signing,
-notarization, universal binaries and published release artifacts remain
-unchecked Phase 6 work. The HTML file input
-remains only as the browser-hosted desktop-preview fallback; packaged builds use
-the native dialog and registered file association.
+Ollama process running. Native Windows/Linux runners also produced and uploaded
+the expected unsigned installers, completing the Phase 6 platform matrix. The
+HTML file input remains only as the browser-hosted desktop-preview fallback;
+packaged builds use the native dialog and registered file association.
+
+Developer signing, notarization, universal macOS binaries and a tagged public
+release are separate release-operations work. They require distribution
+credentials and an explicit version decision; the artifact workflow does not
+claim that unsigned CI outputs are production-signed releases.

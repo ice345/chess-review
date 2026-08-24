@@ -22,6 +22,7 @@ jobs:
             runner: macos-latest
             args: --target aarch64-apple-darwin --bundles app,dmg --no-sign
             artifact: desktop-macos-arm64
+            bundle_root: apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle
             paths: |
               apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
               apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
@@ -29,11 +30,13 @@ jobs:
             runner: windows-latest
             args: --bundles nsis
             artifact: desktop-windows-x64
+            bundle_root: apps/desktop/src-tauri/target/release/bundle
             paths: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           - name: Linux x64 deb and AppImage
             runner: ubuntu-22.04
             args: --bundles deb,appimage
             artifact: desktop-linux-x64
+            bundle_root: apps/desktop/src-tauri/target/release/bundle
             paths: |
               apps/desktop/src-tauri/target/release/bundle/deb/*.deb
               apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
@@ -62,7 +65,9 @@ jobs:
       - name: Build Tauri bundles
         working-directory: apps/desktop
         run: pnpm tauri build --config src-tauri/tauri.sidecar.conf.json ${{ matrix.args }}
-      - uses: actions/upload-artifact@v4
+      - name: Audit packaged artifact sizes
+        run: node scripts/check-desktop-artifact-sizes.mjs "${{ matrix.bundle_root }}"
+      - uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.paths }}

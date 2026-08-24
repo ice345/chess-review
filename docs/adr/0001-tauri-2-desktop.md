@@ -1,6 +1,6 @@
 # ADR 0001: Tauri 2 desktop architecture
 
-- Status: accepted; Phase 6 foundation implemented
+- Status: accepted; Phase 6 implemented and verified
 - Date: 2026-08-23
 
 ## Context
@@ -58,5 +58,6 @@ is not used as the release architecture.
 Phase 6 opened on 2026-08-24 with a static Vite/React frontend and minimal Tauri
 Rust host under `apps/desktop`. The shell imports `@chess-review/ui` and
 `@chess-review/chess-core` directly. Native PGN integration, managed Ollama and
-the packaged local-ai sidecar lifecycle are now implemented. See
-[`../desktop.md`](../desktop.md).
+the packaged local-ai sidecar lifecycle are implemented. Native runners also
+verified macOS arm64, Windows x64 and Linux x64 unsigned packages, completing
+the phase on 2026-08-24. See [`../desktop.md`](../desktop.md).

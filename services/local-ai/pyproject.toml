@@ -13,8 +13,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.4,<9"]
-maia = ["maia3 @ git+https://github.com/CSSLab/maia3.git@1e13597"]
+maia = ["maia3 @ git+https://github.com/CSSLab/maia3.git@1e13597", "torch>=2.9,<3"]
 bundle = ["pyinstaller>=6.16,<7"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling>=1.27"]

@@ -146,8 +146,9 @@ remains optimized for the web and is not forced into a Tauri SSR runtime. See
 
 Tauri manages a packaged local-ai sidecar, Ollama discovery/startup, model setup
 with explicit approval, process ownership and native PGN file-open integration.
-The arm64 macOS package is verified; Windows and Linux configurations await
-their native runner results. See `docs/adr/0001-tauri-2-desktop.md`.
+The arm64 macOS package is verified locally, and native CI runners have verified
+macOS arm64 app/DMG, Windows x64 NSIS and Linux x64 deb/AppImage artifacts. See
+`docs/adr/0001-tauri-2-desktop.md`.
 
 ## Engineering verification
 
@@ -161,8 +162,8 @@ runs cached TypeScript, Python, build and browser-workflow jobs; see
 
 ## Current implementation status
 
-Phases 0–5.3 are complete. Phase 6 is active: the independent Vite/React/Tauri 2
-shell, shared-package imports, native PGN integration, managed Ollama, packaged
-local-ai ownership and an ad-hoc arm64 macOS `.app`/`.dmg` build are implemented
-and verified. Windows/Linux and universal macOS bundles, signing, notarization
-and published release artifacts remain deliberately unchecked.
+Phases 0–6 are complete. The independent Vite/React/Tauri 2 shell,
+shared-package imports, native PGN integration, managed Ollama, packaged
+local-ai ownership and the three-platform unsigned artifact matrix are
+implemented and verified. Signing, notarization, universal macOS binaries and a
+versioned public release remain explicit release-operations follow-ups.
