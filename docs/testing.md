@@ -39,7 +39,7 @@ No CI job starts the managed local service or contacts a chess platform. Failure
 The separate `desktop-artifacts.yml` workflow builds the frozen local-ai
 sidecar on each native runner before Tauri packaging. The macOS arm64 app/DMG,
 Windows x64 NSIS and Linux x64 deb/AppImage jobs all completed successfully in
-[run 32719600786](https://github.com/ice345/chess-review/actions/runs/32719600786),
+[run 32721845895](https://github.com/ice345/chess-review/actions/runs/32721845895),
 including strict missing-artifact checks and upload of each unsigned package.
 The workflow also rejects any individual package above 768 MiB; the locked
 sidecar intentionally selects CPU-only PyTorch so CUDA runtime wheels cannot

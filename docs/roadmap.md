@@ -291,7 +291,7 @@ packaged PyInstaller local-ai sidecar and Ollama without taking ownership of
 pre-existing processes. The macOS app/DMG was exercised locally against the real
 sidecar lifecycle. The native artifact matrix then completed successfully for
 macOS arm64 app/DMG, Windows x64 NSIS and Linux x64 deb/AppImage in
-[Desktop artifacts run 32719600786](https://github.com/ice345/chess-review/actions/runs/32719600786).
+[Desktop artifacts run 32721845895](https://github.com/ice345/chess-review/actions/runs/32721845895).
 During the Phase 6 gate, two shared Review-runtime gaps were also closed: Coach
 generation now survives navigation among nested review routes, and user-played
 temporary variations receive runtime-only Stockfish Move Quality through the

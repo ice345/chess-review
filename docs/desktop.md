@@ -52,10 +52,14 @@ the macOS override. `.github/workflows/desktop-artifacts.yml` defines native
 GitHub-hosted runners and uploads the unsigned outputs on manual runs or
 `desktop-v*` tags. The macOS arm64, Windows x64 and Linux x64 jobs, including
 their packaged local-ai sidecars, completed successfully in
-[artifact run 32719600786](https://github.com/ice345/chess-review/actions/runs/32719600786).
+[artifact run 32721845895](https://github.com/ice345/chess-review/actions/runs/32721845895).
 Every generated package is checked against a 768 MiB ceiling before upload so a
 dependency-source regression fails the workflow instead of publishing an
 unexpected multi-gigabyte installer.
+
+The verified unsigned package sizes are 161.3 MiB for the macOS app, 150.9 MiB
+for its DMG, 160.3 MiB for Windows NSIS, 248.9 MiB for Linux deb and 322.6 MiB
+for Linux AppImage.
 
 ## Native lifecycle boundary
 
