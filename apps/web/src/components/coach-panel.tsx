@@ -182,7 +182,7 @@ export function CoachPanel({
           <section>
             <div className="eyebrow">HUMAN · MAIA</div>
             {move.human ? (
-              <><strong>{(move.human.playedMoveProbability * 100).toFixed(1)}%</strong><span>{move.human.findDifficulty.label.replaceAll("-", " ")}</span><small>Model prediction @ {move.human.targetElo}</small></>
+              <><strong>{(move.human.playedMoveProbability * 100).toFixed(1)}%</strong><span>{move.human.findDifficulty.label.replaceAll("-", " ")} · Policy rank #{move.human.playedMoveRank}</span><small>{move.human.model} @ {move.human.targetElo} · same persisted move facts</small></>
             ) : (
               <><strong>Not requested</strong><span>No human claim added</span></>
             )}

@@ -6,7 +6,7 @@ import {
   type NormalizedGame,
   type ReplayedUciMove,
 } from "@chess-review/chess-core";
-import { divideGame } from "@chess-review/analysis";
+import { divideGame, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
 import { recognizeOpening } from "@chess-review/openings";
 import type {
   CoachExplanation,
@@ -14,6 +14,7 @@ import type {
   GameCoachSummary,
   GameDivision,
   HumanAnalysis,
+  MaiaModel,
   OpeningInfo,
 } from "@chess-review/shared";
 import {
@@ -46,6 +47,7 @@ interface ReviewState {
   stepBranch: (delta: number) => void;
   returnToGame: () => void;
   setMoveHuman: (ply: number, human: HumanAnalysis) => GameAnalysisV1 | null;
+  invalidateHumanAnalysis: (model: MaiaModel, targetElo: number) => GameAnalysisV1 | null;
   setMoveCoach: (ply: number, coach: CoachExplanation) => GameAnalysisV1 | null;
   setGameCoachSummary: (coachSummary: GameCoachSummary) => GameAnalysisV1 | null;
 }
@@ -149,8 +151,33 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (!analysis || ply < 1 || ply > analysis.moves.length) return null;
     const updated = {
       ...analysis,
-      moves: analysis.moves.map((move) => move.ply === ply ? { ...move, human } : move),
+      moves: analysis.moves.map((move) => {
+        if (move.ply !== ply) return move;
+        const enriched = { ...move, human };
+        delete enriched.coach;
+        return enriched;
+      }),
     };
+    // Coach prose may have incorporated the previous/no-human fact set.
+    delete updated.coachSummary;
+    set({ analysis: updated });
+    return updated;
+  },
+  invalidateHumanAnalysis: (model, targetElo) => {
+    const analysis = get().analysis;
+    if (!analysis) return null;
+    let changed = false;
+    const moves = analysis.moves.map((move) => {
+      if (move.human === undefined || matchesHumanAnalysisIdentity(move.human, model, targetElo)) return move;
+      changed = true;
+      const withoutHuman = { ...move };
+      delete withoutHuman.human;
+      delete withoutHuman.coach;
+      return withoutHuman;
+    });
+    if (!changed) return analysis;
+    const updated = { ...analysis, moves };
+    delete updated.coachSummary;
     set({ analysis: updated });
     return updated;
   },

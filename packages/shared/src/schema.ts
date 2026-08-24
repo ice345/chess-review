@@ -154,6 +154,55 @@ export interface HumanMoveCandidate {
   uci: string;
   san: string;
   probability: number;
+  policyRank: number;
+  /** Human-game WDL from the perspective of the player choosing this move. */
+  wdl?: HumanWdl;
+}
+
+export type MaiaModel = "maia3-5m" | "maia3-23m" | "maia3-79m";
+
+export interface HumanWdl {
+  win: number;
+  draw: number;
+  loss: number;
+}
+
+/** Maia facts for one already-played move, rooted at that move's fenBefore. */
+export interface MaiaMoveReview {
+  kind: "move-review";
+  fenBefore: string;
+  playedMove: string;
+  model: MaiaModel;
+  targetElo: number;
+  selfElo: number;
+  opponentElo: number;
+  candidates: HumanMoveCandidate[];
+  candidateProbabilityMass: number;
+  playedMoveProbability: number;
+  playedMoveRank: number;
+  expectedHumanMove?: string;
+  /** Human-game WDL from the perspective of the player who played the move. */
+  playedMoveWdl?: HumanWdl;
+  modelPrediction: true;
+}
+
+/** Maia facts for the exact board position currently displayed. */
+export interface MaiaPositionAnalysis {
+  kind: "position-analysis";
+  fen: string;
+  sideToMove: PlayerColor;
+  model: MaiaModel;
+  targetElo: number;
+  selfElo: number;
+  opponentElo: number;
+  candidates: HumanMoveCandidate[];
+  /** Bounded union of Maia top-K and explicitly requested comparison moves. */
+  evaluatedCandidates: HumanMoveCandidate[];
+  candidateProbabilityMass: number;
+  /** Human-game WDL from the perspective of sideToMove. */
+  rootWdl: HumanWdl;
+  expectedHumanMove?: string;
+  modelPrediction: true;
 }
 
 export type HumanFindDifficultyLabel = "natural" | "findable" | "hard" | "very-hard" | "exceptional";
@@ -183,15 +232,18 @@ export interface HumanFindDifficulty {
 }
 
 export interface HumanAnalysis {
-  model: string;
+  version: "human-v2";
+  model: MaiaModel;
   targetElo: number;
   selfElo: number;
   opponentElo: number;
   candidates: HumanMoveCandidate[];
   candidateProbabilityMass: number;
   playedMoveProbability: number;
+  playedMoveRank: number;
   expectedHumanMove?: string;
-  humanWdl?: { win: number; draw: number; loss: number };
+  /** Human-game WDL for the reviewed played move, from that mover's perspective. */
+  playedMoveWdl?: HumanWdl;
   modelPrediction: true;
   findDifficulty: HumanFindDifficulty;
 }

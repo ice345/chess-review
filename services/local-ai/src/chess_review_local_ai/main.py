@@ -5,7 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .coach_provider import CoachGenerationError, CoachUnavailableError
 from .coach_service import CoachService
-from .maia_provider import Maia3Provider, MaiaInferenceError, MaiaProvider, MaiaUnavailableError
+from .maia_provider import (
+    Maia3Provider,
+    MaiaInferenceError,
+    MaiaModelSetupRequiredError,
+    MaiaProvider,
+    MaiaUnavailableError,
+)
 from .schemas import (
     CoachExplainRequest,
     CoachExplanationResponse,
@@ -13,8 +19,14 @@ from .schemas import (
     CoachGameSummaryResponse,
     CoachHealth,
     HealthResponse,
+    MaiaModelName,
+    MaiaModelSetupResponse,
+    MaiaMoveReviewRequest,
+    MaiaMoveReviewResponse,
     MaiaMovesRequest,
     MaiaMovesResponse,
+    MaiaPositionAnalysisRequest,
+    MaiaPositionAnalysisResponse,
 )
 
 app = FastAPI(title="Open Chess Review Local AI", version="0.1.0")
@@ -41,16 +53,21 @@ def health(
     provider: MaiaProvider = Depends(get_maia_provider),
     coach_service: CoachService = Depends(get_coach_service),
 ) -> HealthResponse:
-    return HealthResponse(maia=provider.status, coach=CoachHealth(**coach_service.registry.statuses()))
+    return HealthResponse(
+        maia=provider.status,
+        maia_models=provider.model_statuses,
+        coach=CoachHealth(**coach_service.registry.statuses()),
+    )
 
 
-@app.post("/maia/moves", response_model=MaiaMovesResponse)
-def maia_moves(
-    request: MaiaMovesRequest,
-    provider: MaiaProvider = Depends(get_maia_provider),
-) -> MaiaMovesResponse:
+def _run_maia(operation):
     try:
-        return provider.analyze(request)
+        return operation()
+    except MaiaModelSetupRequiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "maia-model-not-cached", "message": str(exc)},
+        ) from exc
     except MaiaUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -61,6 +78,39 @@ def maia_moves(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "maia-inference-failed", "message": str(exc)},
         ) from exc
+
+
+@app.post("/maia/move-review", response_model=MaiaMoveReviewResponse)
+def maia_move_review(
+    request: MaiaMoveReviewRequest,
+    provider: MaiaProvider = Depends(get_maia_provider),
+) -> MaiaMoveReviewResponse:
+    return _run_maia(lambda: provider.review_move(request))
+
+
+@app.post("/maia/position-analysis", response_model=MaiaPositionAnalysisResponse)
+def maia_position_analysis(
+    request: MaiaPositionAnalysisRequest,
+    provider: MaiaProvider = Depends(get_maia_provider),
+) -> MaiaPositionAnalysisResponse:
+    return _run_maia(lambda: provider.analyze_position(request))
+
+
+@app.post("/maia/models/{model}/download", response_model=MaiaModelSetupResponse)
+def maia_model_download(
+    model: MaiaModelName,
+    provider: MaiaProvider = Depends(get_maia_provider),
+) -> MaiaModelSetupResponse:
+    model_status = _run_maia(lambda: provider.prepare_model(model))
+    return MaiaModelSetupResponse(model=model, status=model_status)
+
+
+@app.post("/maia/moves", response_model=MaiaMovesResponse)
+def maia_moves(
+    request: MaiaMovesRequest,
+    provider: MaiaProvider = Depends(get_maia_provider),
+) -> MaiaMovesResponse:
+    return _run_maia(lambda: provider.analyze(request))
 
 
 @app.post("/maia/analyze", response_model=MaiaMovesResponse)

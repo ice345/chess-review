@@ -8,7 +8,7 @@ Open Chess Review is an open-source chess game review and coaching workspace. It
 
 - Imports PGN games and explicit FEN positions.
 - Runs Stockfish 18 WASM in the browser for evaluation, MultiPV, classifications, Accuracy, phases, openings, critical moments, and legal analysis variations.
-- Compares objective candidates with optional Maia-3 human move probabilities at a chosen target Elo.
+- Reviews with Stockfish, Maia or Compare mode while keeping objective Move Quality separate from Elo-conditioned human probability, WDL and Find Difficulty.
 - Produces on-demand coaching from structured facts and validated engine lines, with deterministic copy when the language provider is unavailable.
 - Syncs complete public Chess.com archives and authorized Lichess game history into a local IndexedDB library with resumable checkpoints.
 - Exports annotated PGN, canonical JSON, position PNGs, and game-review PNGs.
@@ -36,7 +36,7 @@ The pnpm workspace keeps those boundaries explicit:
 | `packages/stockfish` | Stockfish transport, UCI parsing, cache identity and worker integration |
 | `packages/openings` | Lichess opening data and position-based recognition |
 | `packages/shared` | Versioned schemas shared across browser, analysis and service boundaries |
-| `packages/ui` | Original Blue Bishop identity and reusable move-quality marks |
+| `packages/ui` | Original Blue Bishop identity, Feather Annotation move-quality marks and quieter human-difficulty marks |
 | `services/local-ai` | Optional FastAPI Maia and provider-neutral grounded Coach adapters |
 | `apps/desktop` | Phase 6 Vite/React/Tauri 2 native shell; it imports shared packages and owns no analysis semantics |
 
@@ -50,7 +50,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 | Enhanced Local | `pnpm dev` | Browser Core plus managed/reused FastAPI, Maia-3, Ollama discovery and grounded local coaching |
 | Services only | `pnpm dev:local-ai` | Starts or reuses optional services for a separately running web app |
 
-`pnpm dev` is the normal full-development entry point. It reuses healthy services, starts only missing executables, and stops only processes it owns. Ollama is started with `ollama serve`; no model is downloaded automatically. `pnpm dev:check` reports runtime availability without starting anything.
+`pnpm dev` is the normal full-development entry point. It reuses healthy services, starts only missing executables, and stops only processes it owns. Ollama is started with `ollama serve`; no Ollama or Maia model is downloaded automatically. Maia-3 5M/23M/79M setup is an explicit Settings/Review action. `pnpm dev:check` reports runtime availability without starting anything.
 
 The web product remains fully usable when local-ai is offline. In that state Stockfish continues in the browser, Maia controls show an explicit offline state, and Coach requests use deterministic canonical copy.
 

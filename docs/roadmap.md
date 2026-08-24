@@ -61,7 +61,7 @@
 - [x] import-to-review navigation and persisted review IDs
 - [x] normal-document Review workspace with a prominent board and full-width timeline
 - [x] persistent board across review sub-routes
-- [x] Review / Moves / Human / Coach route separation
+- [x] Review / Moves / Coach route separation with Human Lens inside Review
 - [x] advanced Engine Lab separation
 - [x] simplified export controls
 - [x] compact critical moments
@@ -116,7 +116,7 @@ alone do not complete an item.
 ### Milestone D — Human Lens
 
 - [x] persisted preferred Maia target Elo
-- [x] mutually exclusive Stockfish / Maia analysis selection in Review
+- [x] direct Stockfish / Maia analysis selection in Review (expanded by Phase 5.2)
 - [x] Maia probability arrows with explicit model-prediction semantics
 - [x] Stockfish/Maia recommendation disagreement as first-class evidence
 - [x] Maia target Elo and candidate evidence merged into Review; Human Lab removed
@@ -164,6 +164,62 @@ audit, and manual review of the seven committed workspace screenshots. The gate
 did not change canonical Accuracy, Divider, WinPercent, White-POV or move-quality
 classification semantics.
 
+## Phase 5.2 — dual analysis semantics and review polish
+
+Phase 5.2 was inserted as a repair gate after the Phase 3 and Phase 5.1 audit.
+It separates the already-played move from the exact position currently displayed
+and verifies shipped behavior rather than preserving ambiguous or aspirational
+checkboxes.
+
+### Milestone A — explicit Maia contracts
+
+- [x] `MaiaMoveReview` keyed by canonical `fenBefore + played UCI + model + target Elo`
+- [x] `MaiaPositionAnalysis` keyed by exact displayed FEN, model and target Elo
+- [x] exact played-move policy probability/rank and played-move WDL
+- [x] exact-position root WDL from the side-to-move perspective
+- [x] stale-request protection across ply, branch, model and Elo changes
+- [x] identity-checked `human-v2` move persistence in IndexedDB
+- [x] mismatched human and dependent Coach enrichment invalidation
+
+### Milestone B — real source modes
+
+- [x] Stockfish, Maia and Compare modes with distinct arrows and verdicts
+- [x] source-aware evaluation bar: canonical Stockfish WinPercent, Maia root WDL, Compare marker
+- [x] objective Move Quality remains separate from Human Find Difficulty
+- [x] Move Quality summary remains discoverable in ordinary Review
+- [x] branch positions never invent a played-move verdict
+
+### Milestone C — model selection and bounded inference
+
+- [x] real Maia-3 5M / 23M / 79M setting wired through requests and persistence
+- [x] per-tier health/setup status and explicit checkpoint download action
+- [x] no checkpoint download during selection or analysis
+- [x] one resident Maia model with release-before-allocation tier switching
+- [x] one all-legal root policy pass and bounded candidate-value union
+- [x] root and candidate human-game WDL exposed without centipawn reinterpretation
+
+### Milestone D — visual and stylesheet completion
+
+- [x] Feather Annotation Move Quality V2 with a distinct motif for every classification
+- [x] quieter Human Find Difficulty mark family
+- [x] shared icon semantics across board, lists, summary, graph and PNG export
+- [x] 14-label visual fixture at 20/24/28/36 px on paper and board backgrounds
+- [x] remove stale global review CSS and assign shell/workspace/panel/semantic ownership
+- [x] regression guard for duplicate review selector owners
+
+### Milestone E — acceptance gate
+
+- [x] deterministic move-N / position-N request-alignment coverage
+- [x] model/Elo invalidation, IndexedDB restoration and Coach-fact coverage
+- [x] offline Browser Stockfish fallback and explicit model-setup coverage
+- [x] all semantic browser workflows and existing visual baselines preserved
+- [x] complete icon-gallery visual baseline added and manually reviewed
+- [x] objective Accuracy, Divider, WinPercent, White-POV and classification semantics unchanged
+
+Phase 5.2 closed on 2026-08-24 after the contract, persistence, Coach, CSS and
+visual audits passed. The repair gate is complete, so work may continue on the
+remaining Phase 6 desktop items without inheriting the ambiguous Maia semantics.
+
 ## Phase 6 — desktop application
 
 - [x] Tauri 2 application shell
@@ -197,4 +253,4 @@ sidecar lifecycle, native file association or release artifact.
 - [ ] define mobile capability boundaries
 - [ ] design a local/remote AI strategy
 
-Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phase 5 does not change Accuracy, Divider, WinPercent, score POV or classification semantics.
+Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phases 5–5.2 do not change Accuracy, Divider, WinPercent, score POV or objective classification semantics.

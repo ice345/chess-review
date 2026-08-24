@@ -29,9 +29,9 @@ The visual language distinguishes three sources:
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
 - Coach: generated explanation with source, confidence and grounding details.
 
-The primary review navigation contains Review, Moves and Coach. Engine Lab is deliberately placed under the secondary More menu. Stockfish/Maia selection and target Elo live in Review. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
+The primary review navigation contains Review, Moves and Coach. Engine Lab is deliberately placed under the secondary More menu. Stockfish/Maia/Compare selection, target Elo and Maia model live in Review. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
 
-Quality icons come from `packages/ui` and use one original watercolor annotation-seal language across move list, destination-square overlay, charts, summary and PNG exports. The incomplete irregular ring keeps the color secondary to a readable non-color symbol, including at board-overlay size. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
+Quality icons come from `packages/ui` and use the original Feather Annotation V2 language across move list, destination-square overlay, charts, summary and PNG exports. Every objective classification has a distinct open watercolor motif and readable non-color symbol; no common enclosed badge shape carries the semantics. Human Find Difficulty uses a quieter separate mark family. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
 
 The project identity is the original Blue Bishop: a simplified bishop silhouette whose diagonal cut continues into a restrained feather/wing gesture. The same geometry is used for the generated Next.js favicon, square app mark, header mark and PNG export signature. The bishop remains legible at 16px; there is no literal bird character or third-party chess artwork.
 
@@ -39,11 +39,11 @@ The visual system uses warm paper, mist blue, dusty pink, sage and cream with bl
 
 CSS follows the same component boundary. `tokens.css` owns the palette, type and
 shared measurements; `base.css` owns document defaults; `chrome.css`, `home.css`
-and `utilities.css` own route-level composition; and Review, Human, Coach,
-connected-platform and visual-identity rules stay in their corresponding focused
-modules. `globals.css` is now the remaining shared form/review glue, not a second
-token source. New route-specific styles should extend the focused module instead
-of rebuilding global primitives.
+and `utilities.css` own route-level composition. Review shell, panels, board
+workspace and source-aware semantics each have a named stylesheet owner, while
+Human, Coach, connected-platform and visual-identity rules stay in their focused
+modules. There is no fallback `globals.css` review layer. A regression test locks
+the key selector owners so new route-specific styles extend the correct module.
 
 Coach move lessons use one decision sequence: What to notice, Your idea, The problem, What happens next, A practical alternative and Remember this. Only slots supported by the response are shown. The short consequence line remains a separate rules-validated UCI/SAN artifact, and objective and Maia source cards remain visually distinct from generated prose.
 
@@ -71,10 +71,13 @@ Opponent profiles are not fetched during sync or ordinary review.
 
 Analysis arrows have explicit source semantics. Stockfish arrows are objective
 MultiPV candidates; Maia arrows are policy probabilities at the selected target
-Elo. The Review selector shows one source at a time without calculating a
-synthetic score. Recommendation comparison may show both top moves, Maia
-probability and Stockfish rank as separate evidence. Text continuations remain
-compact supporting evidence. Maia target Elo is persisted in Settings.
+Elo; Compare shows both and uses a distinct dual-source arrow when they overlap.
+No synthetic chess score is calculated. The evaluation bar uses Stockfish
+WinPercent in Stockfish mode, exact-position root human-game WDL in Maia mode,
+and a Stockfish bar plus Maia marker in Compare. Recommendation comparison shows
+both top moves, Maia probability and Stockfish rank as separate evidence. Text
+continuations remain compact supporting evidence. Maia target Elo and model are
+persisted in Settings.
 
 Clicking a side-to-move piece highlights legal destinations with dots for quiet
 moves and rings for captures; clicking a destination moves it. Dragging remains
@@ -90,7 +93,7 @@ implementation status for each workspace part is kept in `docs/roadmap.md`.
 
 ## Service states
 
-Browser Core remains useful when local-ai is offline. Review's Maia selector and Coach use short capability-specific copy, poll for recovery, and never hide objective review. Settings lists every model returned by Ollama's local catalog and lets the user choose one. A missing model shows an explicit setup command; it never triggers a silent download.
+Browser Core remains useful when local-ai is offline. Review's Maia selector and Coach use short capability-specific copy, poll for recovery, and never hide objective review. Settings lists every model returned by Ollama's local catalog and lets the user choose one. Maia Settings separately shows 5M/23M/79M cache status and an explicit Download model action. Selecting either an Ollama or Maia model never triggers a silent download.
 
 ## Connected identity and Library
 

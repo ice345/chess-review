@@ -20,7 +20,7 @@ Stockfish is canonical for evaluation, mate, best move, candidate lines and obje
 - `packages/stockfish`: UCI parsing, browser worker transport and deterministic cache keys.
 - `packages/openings`: EPD index and backward position recognition.
 - `packages/shared`: versioned schemas shared by analysis, services, UI and export.
-- `packages/ui`: reusable presentation primitives, original annotation-seal quality icons and the Blue Bishop project mark.
+- `packages/ui`: reusable presentation primitives, original Feather Annotation quality icons, quieter Human Find Difficulty marks and the Blue Bishop project mark.
 - `services/local-ai`: optional Maia and provider-neutral grounded coaching.
 
 No package below `apps/web` imports React except `packages/ui`. Neither web nor future desktop code may reconstruct canonical chess algorithms.
@@ -66,13 +66,15 @@ the evaluation bar receives `EngineScore`, calls the one canonical
 `winPercentFromScore()` conversion, and only then applies board-orientation
 presentation. It does not contain its own centipawn curve.
 
-Review's Maia selection is a separate optional runtime path. A Maia request is keyed
-in presentation by the exact displayed FEN and persisted preferred target Elo;
-stale results are hidden if the board or Elo changes during inference. Stockfish
-and Maia modes retain their source metadata, and only rules-validated candidate
-moves may enter the analysis tree. The two sources are selected directly in
-Review and are never blended. Human output never replaces the evaluation bar,
-objective Move Quality or canonical move facts.
+Review's Maia selection is a separate optional runtime path with two explicit
+contracts. Move review is keyed by canonical `fenBefore + played UCI + Maia model
++ target Elo`; exact-position analysis is keyed by displayed FEN plus model/Elo.
+Stale output is hidden if any identity field changes during inference. Review has
+Stockfish, Maia and Compare modes. Stockfish supplies canonical WinPercent; Maia
+supplies side-to-move root human-game WDL; Compare keeps Stockfish as the primary
+bar and adds a Maia marker. Only rules-validated candidate moves may enter the
+analysis tree. No blended chess score is calculated, and human output never
+changes objective Move Quality or canonical move facts.
 
 Connected-platform providers normalize only account and game-import metadata. Chess.com uses the public Published Data API and produces an explicitly unverified username link. Lichess uses a public OAuth client with Authorization Code + PKCE (`S256`); tokens are encrypted into server-only HttpOnly cookies and are never stored in IndexedDB or exposed to the React bundle. Both providers page full history through persistent browser checkpoints, process requests serially and preserve the checkpoint on pause, failure or rate limit. See `docs/connected-platforms.md`.
 
@@ -105,7 +107,14 @@ The future desktop application may own native sidecars. Development process orch
 
 ## Local AI
 
-The Maia adapter is optional and pinned to an official Maia-3 Git revision. It lazily loads CPU models and returns Elo-conditioned policy/WDL facts. Human Find Difficulty remains a separate deterministic evidence-bearing heuristic.
+The Maia adapter is optional and pinned to an official Maia-3 Git revision. It
+offers separately typed move-review and exact-position endpoints, returns one
+all-legal policy distribution plus bounded candidate/root WDL facts, and never
+silently downloads a checkpoint. Settings exposes 5M/23M/79M status and an
+explicit download action. The service releases the previous network before
+allocating another tier so only one Maia model remains resident. Human Find
+Difficulty is built from an identity-matched move review and remains a separate
+deterministic evidence-bearing heuristic.
 
 The coach accepts only versioned move/game fact payloads. Its rules layer derives bounded before/after position indicators, a short after-position Stockfish consequence and—only when both engines support it—a practical Maia/Stockfish alternative. Ollama and OpenAI Responses-compatible transports implement one provider contract; Pydantic validates JSON, and `python-chess` accepts only exact prefixes of canonical engine PVs before returning SAN. Coach v3 requires a nullable six-part teaching shape and validates both move and game output against the requested language; human, tactical, consequence and practical-alternative sections are removed when their source facts are absent. Provider failure falls back to deterministic browser copy with the same teaching order and language.
 
@@ -127,13 +136,14 @@ Tauri will eventually manage a packaged local-ai sidecar, Ollama discovery/start
 Critical browser workflows use deterministic Playwright fixtures backed by the
 real parser, analysis assembler and IndexedDB contracts. The local-ai boundary is
 mocked so CI never depends on Maia, Ollama or a cloud provider. Representative
-visual baselines cover the principal Phase 5.1 workspace states. GitHub Actions
+visual baselines cover the principal workspace states and the complete Move
+Quality V2 icon fixture. GitHub Actions
 runs cached TypeScript, Python, build and browser-workflow jobs; see
 [`testing.md`](testing.md).
 
 ## Current implementation status
 
-Phases 0–5.1 are complete. Phase 6 is active: the independent Vite/React/Tauri 2
+Phases 0–5.2 are complete. Phase 6 is active: the independent Vite/React/Tauri 2
 shell and its first shared-package imports are implemented and verified. Native
 sidecar ownership, Ollama lifecycle, platform bundles, file-open integration and
 release artifacts remain deliberately unchecked.

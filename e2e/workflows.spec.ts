@@ -74,16 +74,74 @@ test("shows deterministic offline and mocked Maia states without live services",
   await mockLocalAi(page, "available");
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
-  await page.getByRole("button", { name: "Maia" }).click();
+  await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.getByText("Stockfish and Maia recommend the same move")).toBeVisible();
-  await expect(page.getByText(/model prediction, not objective quality/)).toBeVisible();
+  await expect(page.getByText(/predicts human choices and outcomes/)).toBeVisible();
   await expect(page.getByText("NaN%", { exact: true })).toHaveCount(0);
 
   await page.unrouteAll({ behavior: "wait" });
   await mockLocalAi(page, "offline");
   await page.reload();
-  await page.getByRole("button", { name: "Maia" }).click();
+  await page.getByRole("button", { name: "Maia", exact: true }).click();
   await expect(page.getByText(/Local Maia service is offline/)).toBeVisible();
+});
+
+test("keeps move N, position N, model identity and persisted Coach facts aligned", async ({ page }) => {
+  const mocked = await mockLocalAi(page, "available");
+  const { record, analysis, cacheKey } = await seedReview(page);
+  await page.goto(`/review/${record.id}`);
+  await page.getByRole("button", { name: "Next move" }).click();
+  await page.getByRole("button", { name: "Next move" }).click();
+  await expect(page.locator(".move-status").getByText("1… e5", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Maia", exact: true }).click();
+  await expect(page.getByText(/2\. e5 · .* to find/)).toBeVisible();
+  await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /Maia predicted human-game WDL/);
+  await expect.poll(() => mocked.requests.filter((request) => request.path === "/maia/move-review").length).toBeGreaterThan(0);
+  const firstMoveRequest = mocked.requests.find((request) => request.path === "/maia/move-review");
+  const firstPositionRequest = mocked.requests.find((request) => request.path === "/maia/position-analysis");
+  expect(firstMoveRequest?.body).toMatchObject({
+    fen_before: analysis.moves[1]?.fenBefore,
+    played_move: analysis.moves[1]?.uci,
+    model: "maia3-5m",
+    target_elo: 1400,
+  });
+  expect(firstPositionRequest?.body).toMatchObject({ fen: analysis.moves[1]?.fenAfter });
+
+  await page.getByRole("button", { name: "Stockfish" }).click();
+  await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /Stockfish objective evaluation/);
+  await page.getByRole("button", { name: "Compare" }).click();
+  await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /with Maia human marker/);
+  await page.getByRole("button", { name: "Maia", exact: true }).click();
+  await page.getByLabel("Target Elo").selectOption("1600");
+  await page.getByLabel("Maia model").selectOption("maia3-23m");
+  await expect(page.getByText(/maia3-23m @ 1600 predicts/i)).toBeVisible();
+  await expect.poll(() => mocked.requests.some((request) => (
+    request.path === "/maia/move-review"
+    && request.body.model === "maia3-23m"
+    && request.body.target_elo === 1600
+  ))).toBe(true);
+
+  await expect.poll(async () => page.evaluate(async (key) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("open-chess-review", 3);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const value = await new Promise<unknown>((resolve, reject) => {
+      const request = database.transaction("objective-analyses").objectStore("objective-analyses").get(key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    const human = (value as { moves?: Array<{ human?: { model?: string; targetElo?: number; version?: string } }> })?.moves?.[1]?.human;
+    return human ? `${human.version}:${human.model}:${human.targetElo}` : "missing";
+  }, cacheKey)).toBe("human-v2:maia3-23m:1600");
+
+  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Coach" }).click();
+  await expect(page.locator(".coach-fact-boundaries")).toContainText("maia3-23m @ 1600");
+  await expect(page.locator(".coach-fact-boundaries")).toContainText("Policy rank #");
 });
 
 test("renders a large connected Library progressively", async ({ page }) => {

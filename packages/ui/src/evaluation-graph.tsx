@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { EngineScore, GameAnalysisV1, MoveAnalysis, MoveClassification } from "@chess-review/shared";
-import { QUALITY_META } from "./quality-icon";
+import type { EngineScore, GameAnalysisV1, MoveAnalysis } from "@chess-review/shared";
+import { QUALITY_META, QualityIcon } from "./quality-icon";
 
 export interface EvaluationGraphProps {
   analysis: GameAnalysisV1;
@@ -11,10 +11,6 @@ export interface EvaluationGraphProps {
 function graphValue(score: EngineScore): number {
   if (score.kind === "mate") return score.mateIn > 0 ? 6 : -6;
   return Math.max(-6, Math.min(6, score.cp / 100));
-}
-
-function markerColor(classification: MoveClassification): string {
-  return QUALITY_META[classification].color;
 }
 
 function scoreLabel(score: EngineScore): string {
@@ -80,6 +76,8 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
         <line x1={x(currentPly)} x2={x(currentPly)} y1={top} y2={height - bottom} stroke="#344f5c" strokeWidth="1.3" opacity=".54" />
         {points.map((point) => {
           const move = point.move;
+          const critical = move && analysis.criticalMoments.some((moment) => moment.ply === move.ply);
+          const markerSize = point.ply === currentPly ? 18 : critical ? 15 : 12;
           return (
             <g
               key={point.ply}
@@ -98,14 +96,14 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
             >
               <title>{move ? `Ply ${point.ply} · ${move.san} · ${QUALITY_META[move.classification].label} · ${scoreLabel(point.score)}` : `Starting position · ${scoreLabel(point.score)}`}</title>
               <circle cx={x(point.ply)} cy={y(point.score)} r="12" fill="transparent" />
-              <circle
-                cx={x(point.ply)}
-                cy={y(point.score)}
-                r={point.ply === currentPly ? 6 : move && analysis.criticalMoments.some((critical) => critical.ply === move.ply) ? 5.1 : 3.6}
-                fill={move ? markerColor(move.classification) : "#fffdf8"}
-                stroke={point.ply === currentPly ? "#294754" : "#fffdf8"}
-                strokeWidth={point.ply === currentPly ? 2.4 : 1.5}
-              />
+              {move ? (
+                <g transform={`translate(${x(point.ply) - markerSize / 2} ${y(point.score) - markerSize / 2})`} pointerEvents="none">
+                  <QualityIcon classification={move.classification} size={markerSize} />
+                </g>
+              ) : (
+                <circle cx={x(point.ply)} cy={y(point.score)} r="4" fill="#fffdf8" />
+              )}
+              <circle cx={x(point.ply)} cy={y(point.score)} r={point.ply === currentPly ? 10 : 7} fill="transparent" stroke={point.ply === currentPly ? "#294754" : "transparent"} strokeWidth="1.8" />
             </g>
           );
         })}

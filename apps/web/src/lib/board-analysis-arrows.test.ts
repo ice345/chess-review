@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
-import type { MaiaMovesResponse } from "./local-ai";
+import type { MaiaPositionAnalysis } from "@chess-review/shared";
 import {
-  analysisLensArrows,
+  analysisModeArrows,
   candidateRankAtSquare,
   compareRecommendations,
   humanCandidateAtSquare,
@@ -20,18 +20,22 @@ const result: StockfishMoveAnalysis = {
   ],
 };
 
-const human: MaiaMovesResponse = {
+const human: MaiaPositionAnalysis = {
+  kind: "position-analysis",
+  fen: "start",
+  sideToMove: "white",
   model: "maia3-5m",
   targetElo: 1400,
   selfElo: 1400,
   opponentElo: 1400,
   candidates: [
-    { uci: "g1f3", san: "Nf3", probability: 0.31 },
-    { uci: "e2e4", san: "e4", probability: 0.24 },
-    { uci: "c2c4", san: "c4", probability: 0.16 },
+    { uci: "g1f3", san: "Nf3", probability: 0.31, policyRank: 1 },
+    { uci: "e2e4", san: "e4", probability: 0.24, policyRank: 2 },
+    { uci: "c2c4", san: "c4", probability: 0.16, policyRank: 3 },
   ],
+  evaluatedCandidates: [],
   candidateProbabilityMass: 0.71,
-  playedMoveProbability: 0.24,
+  rootWdl: { win: 0.4, draw: 0.35, loss: 0.25 },
   expectedHumanMove: "g1f3",
   modelPrediction: true,
 };
@@ -54,7 +58,7 @@ describe("Stockfish board arrows", () => {
   });
 
   it("uses a separate Maia family without merging objective and human semantics", () => {
-    expect(analysisLensArrows({ lens: "human", stockfish: result, human, lineCount: 3 })[0]?.color).toContain("104, 137, 111");
+    expect(analysisModeArrows({ mode: "maia", stockfish: result, human, lineCount: 3 })[0]?.color).toContain("104, 137, 111");
     expect(humanCandidateAtSquare(human, "c4", 3)?.uci).toBe("c2c4");
   });
 
@@ -70,7 +74,14 @@ describe("Stockfish board arrows", () => {
   });
 
   it("keeps Browser Stockfish usable when Maia has no offline result", () => {
-    expect(analysisLensArrows({ lens: "human", stockfish: result, human: null, lineCount: 3 })).toEqual([]);
-    expect(analysisLensArrows({ lens: "objective", stockfish: result, human: null, lineCount: 3 })).toEqual(stockfishCandidateArrows(result, 3));
+    expect(analysisModeArrows({ mode: "maia", stockfish: result, human: null, lineCount: 3 })).toEqual([]);
+    expect(analysisModeArrows({ mode: "stockfish", stockfish: result, human: null, lineCount: 3 })).toEqual(stockfishCandidateArrows(result, 3));
+  });
+
+  it("keeps both candidate families visible in Compare mode", () => {
+    const arrows = analysisModeArrows({ mode: "compare", stockfish: result, human, lineCount: 2 });
+    expect(arrows).toHaveLength(3);
+    expect(arrows[0]?.color).toContain("76, 126, 126");
+    expect(arrows[2]?.color).toContain("104, 137, 111");
   });
 });

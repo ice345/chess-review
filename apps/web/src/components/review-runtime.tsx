@@ -1,11 +1,18 @@
 "use client";
 
 import { createContext, useContext, type Dispatch, type SetStateAction } from "react";
-import type { GameAnalysisV1, StockfishMoveAnalysis } from "@chess-review/shared";
+import type {
+  GameAnalysisV1,
+  HumanAnalysis,
+  MaiaModel,
+  MaiaMoveReview,
+  MaiaPositionAnalysis,
+  StockfishMoveAnalysis,
+} from "@chess-review/shared";
 import type { GameReviewProgress } from "@chess-review/stockfish";
 import type { ReviewRecord } from "../lib/review-library";
-import type { LocalAiHealth, MaiaMovesResponse } from "../lib/local-ai";
-import type { AnalysisLens } from "../lib/board-analysis-arrows";
+import type { LocalAiHealth, MaiaModelState } from "../lib/local-ai";
+import type { AnalysisMode } from "../lib/board-analysis-arrows";
 import type { MaiaServiceState } from "../lib/human-lens-state";
 
 export type ReviewRunState = "idle" | "running" | "complete" | "cached" | "error";
@@ -28,20 +35,26 @@ export interface ReviewRuntimeValue {
   continuationResult: StockfishMoveAnalysis | null;
   continuationState: "idle" | "running" | "error";
   continuationError: string | null;
-  analysisLens: AnalysisLens;
-  setAnalysisLens: Dispatch<SetStateAction<AnalysisLens>>;
+  analysisMode: AnalysisMode;
+  setAnalysisMode: Dispatch<SetStateAction<AnalysisMode>>;
   humanTargetElo: number;
   setHumanTargetElo: (value: number) => void;
-  humanPositionResult: MaiaMovesResponse | null;
+  humanModel: MaiaModel;
+  setHumanModel: (value: MaiaModel) => void;
+  humanModelState: MaiaModelState;
+  humanModelSetupState: "idle" | "running" | "error";
+  humanMoveReview: MaiaMoveReview | null;
+  currentHuman: HumanAnalysis | null;
+  humanPositionResult: MaiaPositionAnalysis | null;
   humanPositionState: "idle" | "running" | "error";
   humanPositionError: string | null;
   humanServiceState: MaiaServiceState;
-  humanPlayedMove: string | undefined;
   analyzeFullGame: () => Promise<void>;
   cancelFullGame: () => void;
   analyzePosition: () => Promise<void>;
   analyzeContinuations: () => Promise<void>;
   analyzeHumanPosition: () => Promise<void>;
+  setupHumanModel: () => Promise<void>;
   refreshHumanService: () => Promise<LocalAiHealth | null>;
   navigateToPly: (ply: number) => void;
   playContinuation: (rank: number, result?: StockfishMoveAnalysis | null) => void;

@@ -4,8 +4,8 @@
 
 - Package Vitest suites cover canonical TypeScript algorithms, schemas, browser orchestration helpers and state models.
 - `services/local-ai/tests` covers FastAPI schemas, Maia/provider behavior, Coach validation and deterministic grounding in Python.
-- Playwright workflow tests cover import, canonical navigation, orientation, legal user variation moves, Return to Game, mocked Maia availability/offline behavior and progressive large-library rendering.
-- Playwright screenshot tests cover Home, White/Black board orientation, Brilliant/Blunder marks, a user variation, combined Stockfish/Maia evidence, deterministic grounded Coach copy and Library composition.
+- Playwright workflow tests cover import, canonical navigation, orientation, legal user variation moves, Return to Game, mocked Maia availability/offline/setup behavior, move-N versus position-N request identity, model/Elo invalidation, IndexedDB restoration, matching Coach facts and progressive large-library rendering.
+- Playwright screenshot tests cover Home, White/Black board orientation, Brilliant/Blunder marks, a user variation, combined Stockfish/Maia evidence, deterministic grounded Coach copy, Library composition and the complete 14-label Feather Annotation fixture across four sizes/background families.
 
 `e2e/fixtures.ts` builds review data through the real parser and analysis assembler, writes only deterministic records to IndexedDB, and mocks the local-ai HTTP boundary. Tests must not require live Chess.com, Lichess, Maia, Ollama or cloud credentials.
 
@@ -20,7 +20,7 @@ pnpm test:e2e
 uv run --project services/local-ai --extra dev pytest services/local-ai/tests
 ```
 
-Screenshot baselines live in `e2e/__screenshots__`. After visually reviewing an intentional UI change, regenerate them with `pnpm test:e2e:update`; do not accept a changed image only to make CI green.
+Screenshot baselines live in `e2e/__screenshots__`. After visually reviewing an intentional UI change, regenerate them with `pnpm test:e2e:update`; do not accept a changed image only to make CI green. `style-ownership.test.ts` also prevents the canonical review-shell, workspace, panel and semantic selectors from regaining multiple stylesheet owners.
 
 The E2E web server uses `pnpm dev:web`, so browser workflows validate Browser Core's offline boundary. The CI E2E job runs the semantic workflow suite on Linux. The committed visual suite remains available for reviewed local regression runs; platform-specific baselines can be added when the release matrix is introduced.
 
