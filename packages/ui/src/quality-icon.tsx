@@ -23,16 +23,17 @@ export interface QualityIconProps {
   title?: string;
 }
 
-/** Project-owned annotation language; no third-party trademark assets. */
+/** Project-owned watercolor annotation seal; no third-party trademark assets. */
 export function QualityIcon({ classification, size = 28, title }: QualityIconProps) {
   const meta = QUALITY_META[classification];
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" role="img" aria-label={title ?? classification}>
       <title>{title ?? classification}</title>
-      <path d="M5.2 10.1c1.9-5.6 8.9-8.4 15-6.1 6.3 2.3 9.1 9.2 6.3 15.1-2.9 6.1-10 9.8-16.3 7.2C3.9 23.7 3 16.5 5.2 10.1Z" fill={meta.color} opacity=".86" />
-      <path d="M8.5 7.5c4.1-3 10.9-2.5 14.4 1.7 3.2 3.9 2.5 10.4-1.6 13.7-4 3.1-10.6 2.7-14-1.3-3.5-4.2-2.9-11.2 1.2-14.1Z" fill={meta.color} opacity=".38" transform="rotate(8 16 16)" />
-      <path d="M6.7 17.6c3.8 6.1 12.9 7.9 19.1 2.8" fill="none" stroke="rgba(255,255,255,.48)" strokeWidth="1.1" strokeLinecap="round" />
-      <text x="16" y="20.1" textAnchor="middle" fontSize="10.5" fontWeight="750" fill="#fffdf8" fontFamily="ui-rounded, system-ui, sans-serif">
+      <path d="M5.7 10.2C8.2 4.8 15 2.4 21 4.8c5.6 2.2 8.4 8.4 6.2 14.2-1.8 4.8-6.5 8.3-11.5 8.2-4.9-.1-9.4-3.4-10.8-8" fill={meta.color} opacity=".09" />
+      <path d="M5.7 10.2C8.2 4.8 15 2.4 21 4.8c5.6 2.2 8.4 8.4 6.2 14.2-1.8 4.8-6.5 8.3-11.5 8.2-4.9-.1-9.4-3.4-10.8-8" fill="none" stroke={meta.color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8.2 7.9c4.2-3.1 10.2-3.4 14.3-.4M25.7 22.2c-2.7 3.2-7 4.7-11.2 4.1" fill="none" stroke={meta.color} strokeWidth=".8" strokeLinecap="round" opacity=".5" />
+      <circle cx="6.1" cy="17.1" r=".9" fill={meta.color} opacity=".62" />
+      <text x="16" y="19.8" textAnchor="middle" fontSize="10.2" fontWeight="760" fill="#3d5661" fontFamily="ui-rounded, system-ui, sans-serif">
         {meta.symbol}
       </text>
     </svg>

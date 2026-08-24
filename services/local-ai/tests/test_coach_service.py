@@ -47,6 +47,32 @@ def move_facts() -> dict[str, object]:
         "black": {"pawn": 8, "knight": 2, "bishop": 2, "rook": 2, "queen": 1},
         "balanceCp": 0,
     }
+    def side_position() -> dict[str, object]:
+        return {
+            "inCheck": False,
+            "castled": False,
+            "pawnShieldCount": 3,
+            "undevelopedMinorSquares": ["b1", "c1", "f1", "g1"],
+            "doubledPawnFiles": [],
+            "isolatedPawnFiles": [],
+            "passedPawnSquares": [],
+        }
+
+    def position_understanding(side_to_move: str, white_center: list[str]) -> dict[str, object]:
+        return {
+            "sideToMove": side_to_move,
+            "legalMoveCount": 20,
+            "checks": [],
+            "captures": [],
+            "forcingCandidates": [],
+            "attackedUndefendedPieces": [],
+            "center": {"whiteOccupied": white_center, "blackOccupied": [], "contested": []},
+            "openFiles": [],
+            "whiteSemiOpenFiles": [],
+            "blackSemiOpenFiles": [],
+            "white": side_position(),
+            "black": side_position(),
+        }
     return {
         "factsVersion": 1,
         "position": {"fenBefore": before, "fenAfter": after, "phase": "opening"},
@@ -66,6 +92,13 @@ def move_facts() -> dict[str, object]:
             "isCapture": False,
             "givesCheck": False,
             "motifs": [],
+            "positionBefore": position_understanding("white", []),
+            "positionAfter": position_understanding("black", ["e4"]),
+            "futureConsequence": {
+                "start": "after",
+                "moves": ["e7e5", "g1f3"],
+                "opponentBestResponse": "e7e5",
+            },
         },
         "phaseAccuracy": {"white": 99.2},
     }
@@ -81,6 +114,12 @@ def explanation_payload() -> dict[str, object]:
         "humanPerspective": None,
         "tacticalIdea": None,
         "trainingTip": "Do not invent h2h5.",
+        "notice": "Compare the supplied forcing candidates.",
+        "moveIdea": "The move preserves the supplied objective score.",
+        "problem": "null",
+        "consequence": "The supplied line starts with e5.",
+        "practicalAlternative": None,
+        "takeaway": "Compare the move idea with the validated line.",
         "confidence": "high",
         "lines": [
             {"label": "Canonical", "start": "before", "moves": ["e2e4", "e7e5"], "note": None},
@@ -107,6 +146,7 @@ def test_move_coach_validates_lines_and_removes_ungrounded_notation() -> None:
     assert "h2h5" in response.grounding.removed_move_mentions
     assert "a2a3" in response.grounding.removed_move_mentions
     assert "h2h5" not in response.headline
+    assert response.problem is None
     assert response.confidence == "low"
 
 
@@ -123,21 +163,58 @@ def test_move_coach_removes_sections_without_required_evidence() -> None:
     payload = explanation_payload()
     payload["humanPerspective"] = "Human players prefer e4."
     payload["tacticalIdea"] = "e4 creates a tactical threat."
+    payload["consequence"] = "The opponent must reply e5."
+    payload["practicalAlternative"] = "Play d4 instead."
     provider = FakeCoachProvider(payload)
     service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
 
+    facts = move_facts()
+    board_facts = facts["boardFacts"]
+    assert isinstance(board_facts, dict)
+    board_facts.pop("futureConsequence")
+
     response = service.explain(CoachExplainRequest.model_validate({
         "factsVersion": 1,
-        "facts": move_facts(),
+        "facts": facts,
+        "language": "en",
     }))
 
     assert response.human_perspective is None
     assert response.tactical_idea is None
+    assert response.consequence is None
+    assert response.practical_alternative is None
     assert response.confidence == "low"
     assert response.grounding.removed_unsupported_claims == [
         "humanPerspective: no Maia facts supplied",
         "tacticalIdea: no tactical evidence supplied",
+        "consequence: no deterministic future-consequence facts supplied",
+        "practicalAlternative: no Stockfish/Maia-supported alternative supplied",
     ]
+
+
+def test_move_facts_reject_a_future_line_that_is_not_an_after_position_pv() -> None:
+    facts = move_facts()
+    board_facts = facts["boardFacts"]
+    assert isinstance(board_facts, dict)
+    consequence = board_facts["futureConsequence"]
+    assert isinstance(consequence, dict)
+    consequence["moves"] = ["c7c5"]
+    consequence["opponentBestResponse"] = "c7c5"
+
+    with pytest.raises(ValueError, match="prefix of an after-position PV"):
+        CoachExplainRequest.model_validate({"factsVersion": 1, "facts": facts})
+
+
+def test_move_coach_rejects_a_provider_that_ignores_requested_chinese() -> None:
+    provider = FakeCoachProvider(explanation_payload())
+    service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
+
+    with pytest.raises(CoachGenerationError, match="requested language"):
+        service.explain(CoachExplainRequest.model_validate({
+            "factsVersion": 1,
+            "facts": move_facts(),
+            "language": "zh-CN",
+        }))
 
 
 def game_facts() -> dict[str, object]:
@@ -171,7 +248,7 @@ def test_game_summary_filters_unknown_moments_and_ungrounded_moves() -> None:
         "confidence": "high",
     })
     service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
-    request = CoachGameSummaryRequest.model_validate({"factsVersion": 1, "facts": game_facts()})
+    request = CoachGameSummaryRequest.model_validate({"factsVersion": 1, "facts": game_facts(), "language": "en"})
 
     response = service.game_summary(request)
 
@@ -182,3 +259,45 @@ def test_game_summary_filters_unknown_moments_and_ungrounded_moves() -> None:
     assert "a2a4" in response.grounding.removed_move_mentions
     assert "a2a4" not in response.summary
     assert response.confidence == "low"
+
+
+def test_game_summary_rejects_a_provider_that_ignores_requested_chinese() -> None:
+    provider = FakeCoachProvider({
+        "headline": "Game summary",
+        "summary": "The game should be reviewed carefully.",
+        "strengths": ["Good decisions"],
+        "weaknesses": ["One critical error"],
+        "criticalMoments": [{"ply": 2, "insight": "A large swing happened here."}],
+        "trainingRecommendations": [{"title": "Calculation", "reason": "One blunder", "focus": "Compare forcing lines"}],
+        "confidence": "high",
+    })
+    service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
+
+    with pytest.raises(CoachGenerationError, match="requested language"):
+        service.game_summary(CoachGameSummaryRequest.model_validate({
+            "factsVersion": 1,
+            "facts": game_facts(),
+            "language": "zh-CN",
+        }))
+
+
+def test_game_summary_accepts_the_requested_chinese_and_records_it_in_source() -> None:
+    provider = FakeCoachProvider({
+        "headline": "整盘复盘总结",
+        "summary": "这盘棋需要重点复盘关键节点和候选着法。",
+        "strengths": ["能够找到高质量的着法。"],
+        "weaknesses": ["关键节点的计算仍需加强。"],
+        "criticalMoments": [{"ply": 2, "insight": "这里出现了明显的胜率波动。"}],
+        "trainingRecommendations": [{"title": "计算训练", "reason": "本局出现一次严重失误。", "focus": "比较强制着法和候选变化。"}],
+        "confidence": "high",
+    })
+    service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
+
+    response = service.game_summary(CoachGameSummaryRequest.model_validate({
+        "factsVersion": 1,
+        "facts": game_facts(),
+        "language": "zh-CN",
+    }))
+
+    assert response.source.language == "zh-CN"
+    assert response.headline == "整盘复盘总结"

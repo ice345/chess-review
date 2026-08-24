@@ -1,6 +1,6 @@
 # ADR 0001: Tauri 2 desktop architecture
 
-- Status: accepted for Phase 6 planning
+- Status: accepted; Phase 6 foundation implemented
 - Date: 2026-08-23
 
 ## Context
@@ -49,3 +49,11 @@ The local-ai Python packaging strategy will be validated in Phase 6. Candidate a
 - macOS, Windows and Linux are initial targets.
 - Mobile remains exploratory; heavy Gemma/Maia workloads are not assumed to fit ordinary phones.
 - Phase 5 may prepare shared UI boundaries and development orchestration, but it does not claim desktop packaging or releases.
+
+## Implementation note
+
+Phase 6 opened on 2026-08-24 with a static Vite/React frontend and minimal Tauri
+Rust host under `apps/desktop`. The shell imports `@chess-review/ui` and
+`@chess-review/chess-core` directly. No native lifecycle permission or sidecar
+plugin is enabled yet; those remain separate reviewed milestones. See
+[`../desktop.md`](../desktop.md).

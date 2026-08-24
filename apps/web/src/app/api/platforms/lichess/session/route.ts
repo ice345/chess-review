@@ -13,9 +13,11 @@ export async function GET() {
       provider: "lichess",
       username: session.account.username,
       ...(session.account.displayName ? { displayName: session.account.displayName } : {}),
+      ...(session.account.avatarUrl ? { avatarUrl: session.account.avatarUrl } : {}),
       authMode: "oauth-pkce",
       verified: true,
       linkedAt: new Date().toISOString(),
+      ...(session.account.ratings ? { ratings: session.account.ratings } : {}),
     };
     return Response.json({ connected: true, account, expiresAt: session.expiresAt });
   } catch {

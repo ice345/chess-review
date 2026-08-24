@@ -36,11 +36,12 @@ class UnavailableMaia:
 
 
 class CoachRegistryStatus:
-    def statuses(self) -> dict[str, str]:
+    def statuses(self) -> dict[str, object]:
         return {
             "ollama": "available",
             "ollama_model": "available",
             "configured_model": "gemma4:12b-it-qat",
+            "ollama_models": ["gemma4:12b-it-qat", "qwen3:8b"],
             "openai_compatible": "not-configured",
         }
 
@@ -67,6 +68,7 @@ def test_health_preserves_optional_capability_status() -> None:
             "ollama": "available",
             "ollamaModel": "available",
             "configuredModel": "gemma4:12b-it-qat",
+            "ollamaModels": ["gemma4:12b-it-qat", "qwen3:8b"],
             "openaiCompatible": "not-configured",
         },
     }

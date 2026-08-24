@@ -24,7 +24,7 @@ from .schemas import (
     CoachValidatedMove,
 )
 
-PROMPT_VERSION = "coach-v1"
+PROMPT_VERSION = "coach-v3"
 MOVE_TOKEN = re.compile(
     r"(?<![\w])(?:"
     r"[a-h][1-8][a-h][1-8][qrbn]?|"
@@ -33,6 +33,15 @@ MOVE_TOKEN = re.compile(
     r"[a-h](?:x[a-h])?[1-8](?:=[QRBN])?[+#]?"
     r")(?![\w])"
 )
+CJK_TOKEN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
+
+
+def _ensure_requested_language(language: str, task: str, values: list[str | None]) -> None:
+    if language != "zh-CN":
+        return
+    sample = " ".join(value for value in values if value is not None)
+    if len(CJK_TOKEN.findall(sample)) < 6:
+        raise CoachGenerationError(f"Coach {task} response did not use the requested language.")
 
 
 def _instructions(task: str, language: str) -> str:
@@ -40,11 +49,12 @@ def _instructions(task: str, language: str) -> str:
     return f"""You are the explanation layer for a chess review application.
 The supplied structured facts are canonical. Stockfish owns objective evaluation and classification; Maia owns only human-model probabilities. Never change, recalculate, contradict, or invent those facts.
 Write in {language_name}. Return only JSON matching the supplied schema.
-If evidence is missing, use null or communicate uncertainty. Do not infer tactics, material, openings, or human frequencies beyond the fields supplied.
+If evidence is missing, use null or communicate uncertainty. Do not infer tactics, material, openings, position features, or human frequencies beyond the fields supplied.
 Every position-specific sentence must be a direct paraphrase of an explicit field. Do not add chess knowledge from pretraining. In particular: do not name openings or variations unless the opening object supplies that exact name; do not call a move common, popular, natural, easy, or hard unless the human object supplies model evidence; and do not claim center control, development, space, initiative, king safety, or a tactical motif unless the structured facts explicitly supply that evidence.
 humanPerspective must be null when human is absent. tacticalIdea must be null when motifs is empty and classificationReason.sacrifice is absent. Generic training advice may describe a review process, but must not introduce named openings, positions, moves, or tactical facts.
+Organize move teaching around notice, moveIdea, problem, consequence, practicalAlternative, and takeaway. Keep a field null when its corresponding deterministic fact is absent. consequence may only paraphrase boardFacts.futureConsequence and should be paired with that short validated line. practicalAlternative must be null unless boardFacts.practicalAlternative exists; it is a humanly likely, objectively acceptable option, never a replacement for the objective best move.
 Concrete chess moves belong only in the structured lines field. Each line must use UCI moves copied as a prefix from a supplied canonical PV, with the correct before/after start. Do not put SAN or UCI notation in prose unless it appears verbatim in the facts.
-Be concise: keep the complete move explanation under 350 words or the complete game summary under 500 words. Use at most one short validated line for a move explanation. Use null rather than filling unsupported optional fields.
+Be concise: keep the complete move explanation under 350 words or the complete game summary under 500 words. Use at most one 2–4-ply validated line for a move explanation. Use null rather than filling unsupported optional fields.
 Task: {task}."""
 
 
@@ -81,7 +91,7 @@ def _move_grounding(facts: CoachMoveFacts) -> tuple[set[str], list[chess.Board]]
 
 
 def _sanitize_text(value: str | None, notation: set[str], removed: list[str]) -> str | None:
-    if value is None:
+    if value is None or value.strip().lower() in {"", "null", "none", "n/a"}:
         return None
 
     def replace(match: re.Match[str]) -> str:
@@ -146,7 +156,7 @@ class CoachService:
     def explain(self, request: CoachExplainRequest) -> CoachExplanationResponse:
         provider = self.registry.get(request.provider)
         result = provider.generate_json(
-            instructions=_instructions("Explain the reviewed move and give one evidence-grounded training tip", request.language),
+            instructions=_instructions("Teach the reviewed move through notice, idea, problem, short consequence, supported practical alternative, and takeaway", request.language),
             facts_json=request.facts.model_dump_json(by_alias=True, exclude_none=True),
             schema=CoachExplanationPayload.model_json_schema(by_alias=True),
             schema_name="coach_move_explanation",
@@ -156,6 +166,16 @@ class CoachService:
             payload = CoachExplanationPayload.model_validate(result.content)
         except ValidationError as exc:
             raise CoachGenerationError("Coach move response failed schema validation.") from exc
+        _ensure_requested_language(request.language, "move", [
+            payload.headline,
+            payload.summary,
+            payload.notice,
+            payload.move_idea,
+            payload.problem,
+            payload.consequence,
+            payload.practical_alternative,
+            payload.takeaway,
+        ])
 
         notation, _boards = _move_grounding(request.facts)
         removed: list[str] = []
@@ -173,6 +193,14 @@ class CoachService:
         if not has_tactical_evidence and tactical_idea is not None:
             unsupported.append("tacticalIdea: no tactical evidence supplied")
             tactical_idea = None
+        consequence = _sanitize_text(payload.consequence, notation, removed)
+        if request.facts.board_facts.future_consequence is None and consequence is not None:
+            unsupported.append("consequence: no deterministic future-consequence facts supplied")
+            consequence = None
+        practical_alternative = _sanitize_text(payload.practical_alternative, notation, removed)
+        if request.facts.board_facts.practical_alternative is None and practical_alternative is not None:
+            unsupported.append("practicalAlternative: no Stockfish/Maia-supported alternative supplied")
+            practical_alternative = None
         fields = {
             "headline": _sanitize_text(payload.headline, notation, removed) or "Grounded move review",
             "summary": _sanitize_text(payload.summary, notation, removed) or "Insufficient grounded explanation.",
@@ -182,6 +210,12 @@ class CoachService:
             "human_perspective": human_perspective,
             "tactical_idea": tactical_idea,
             "training_tip": _sanitize_text(payload.training_tip, notation, removed),
+            "notice": _sanitize_text(payload.notice, notation, removed),
+            "move_idea": _sanitize_text(payload.move_idea, notation, removed),
+            "problem": _sanitize_text(payload.problem, notation, removed),
+            "consequence": consequence,
+            "practical_alternative": practical_alternative,
+            "takeaway": _sanitize_text(payload.takeaway, notation, removed),
         }
         return CoachExplanationResponse(
             **fields,
@@ -195,6 +229,7 @@ class CoachService:
             source=CoachSource(
                 provider=request.provider,
                 model=result.model,
+                language=request.language,
                 prompt_version=PROMPT_VERSION,
                 generated_at=datetime.now(UTC).isoformat(),
             ),
@@ -213,6 +248,14 @@ class CoachService:
             payload = CoachGameSummaryPayload.model_validate(result.content)
         except ValidationError as exc:
             raise CoachGenerationError("Coach game summary failed schema validation.") from exc
+        _ensure_requested_language(request.language, "game summary", [
+            payload.headline,
+            payload.summary,
+            *payload.strengths,
+            *payload.weaknesses,
+            *(moment.insight for moment in payload.critical_moments),
+            *(value for item in payload.training_recommendations for value in (item.title, item.reason, item.focus)),
+        ])
 
         notation = {move.uci for move in request.facts.moves} | {move.san for move in request.facts.moves}
         removed: list[str] = []
@@ -254,6 +297,7 @@ class CoachService:
             source=CoachSource(
                 provider=request.provider,
                 model=result.model,
+                language=request.language,
                 prompt_version=PROMPT_VERSION,
                 generated_at=datetime.now(UTC).isoformat(),
             ),

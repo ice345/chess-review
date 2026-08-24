@@ -1,9 +1,13 @@
 import type { ExternalPlatform, PlatformAccount, SyncedGame } from "@chess-review/shared";
+import type { PlatformSyncMode } from "../platform-sync";
 
 export interface PlatformSyncRequest {
   account: PlatformAccount;
   since?: string;
+  cursor?: string;
   limit?: number;
+  mode?: PlatformSyncMode;
+  signal?: AbortSignal;
 }
 
 export interface PlatformSyncResult {
@@ -11,6 +15,15 @@ export interface PlatformSyncResult {
   account: PlatformAccount;
   games: SyncedGame[];
   cursor?: string;
+  done: boolean;
+  progress?: { completed: number; total?: number };
+}
+
+export class PlatformRequestError extends Error {
+  constructor(message: string, readonly status: number, readonly retryAfter?: string) {
+    super(message);
+    this.name = "PlatformRequestError";
+  }
 }
 
 /** Provider-neutral boundary consumed by the browser workspace. */
@@ -23,7 +36,11 @@ export interface ChessPlatformProvider {
 
 async function jsonOrThrow<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null) as { error?: string } | T | null;
-  if (!response.ok) throw new Error(body && typeof body === "object" && "error" in body && body.error ? body.error : `Platform request failed (${response.status}).`);
+  if (!response.ok) throw new PlatformRequestError(
+    body && typeof body === "object" && "error" in body && body.error ? body.error : `Platform request failed (${response.status}).`,
+    response.status,
+    response.headers.get("Retry-After") ?? undefined,
+  );
   return body as T;
 }
 
@@ -42,7 +59,8 @@ export const chessComProvider: ChessPlatformProvider = {
     return jsonOrThrow<PlatformSyncResult>(await fetch("/api/platforms/chesscom/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ account: request.account, since: request.since, limit: request.limit }),
+      body: JSON.stringify({ account: request.account, since: request.since, cursor: request.cursor, limit: request.limit, mode: request.mode }),
+      ...(request.signal ? { signal: request.signal } : {}),
     }));
   },
   async disconnect() {},
@@ -58,7 +76,8 @@ export const lichessProvider: ChessPlatformProvider = {
     return jsonOrThrow<PlatformSyncResult>(await fetch("/api/platforms/lichess/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ since: request.since, limit: request.limit }),
+      body: JSON.stringify({ since: request.since, cursor: request.cursor, limit: request.limit, mode: request.mode }),
+      ...(request.signal ? { signal: request.signal } : {}),
     }));
   },
   async disconnect() {

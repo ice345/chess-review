@@ -7,7 +7,13 @@ export interface LichessSession {
   accessToken: string;
   tokenType: string;
   expiresAt: string;
-  account: { id: string; username: string; displayName?: string };
+  account: {
+    id: string;
+    username: string;
+    displayName?: string;
+    avatarUrl?: string;
+    ratings?: Partial<Record<string, number>>;
+  };
 }
 
 export interface LichessPkceState {

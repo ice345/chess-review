@@ -37,12 +37,28 @@ export async function GET(request: Request) {
     const token = await tokenResponse.json() as { access_token: string; token_type?: string; expires_in?: number };
     const accountResponse = await fetch("https://lichess.org/api/account", { headers: { Authorization: `Bearer ${token.access_token}`, Accept: "application/json" }, cache: "no-store" });
     if (!accountResponse.ok) throw new Error(`Lichess account request failed (${accountResponse.status}).`);
-    const account = await accountResponse.json() as { id: string; username: string; profile?: { realName?: string } };
+    const account = await accountResponse.json() as {
+      id: string;
+      username: string;
+      profile?: { realName?: string };
+      perfs?: Record<string, { rating?: number }>;
+    };
+    const ratings = Object.fromEntries(
+      ["bullet", "blitz", "rapid", "classical", "correspondence"].flatMap((key) => {
+        const rating = account.perfs?.[key]?.rating;
+        return rating === undefined ? [] : [[key, rating]];
+      }),
+    );
     const session: LichessSession = {
       accessToken: token.access_token,
       tokenType: token.token_type ?? "Bearer",
       expiresAt: new Date(Date.now() + (token.expires_in ?? 365 * 24 * 60 * 60) * 1000).toISOString(),
-      account: { id: account.id, username: account.username, ...(account.profile?.realName ? { displayName: account.profile.realName } : {}) },
+      account: {
+        id: account.id,
+        username: account.username,
+        ...(account.profile?.realName ? { displayName: account.profile.realName } : {}),
+        ...(Object.keys(ratings).length > 0 ? { ratings } : {}),
+      },
     };
     const response = NextResponse.redirect(new URL("/settings?lichess=connected", requestUrl.origin));
     response.cookies.set(LICHESS_SESSION_COOKIE, sealLichessValue(session), {

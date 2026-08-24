@@ -78,11 +78,12 @@ Research snapshot: 2026-08-22. Repositories are shallow clones under `references
 
 ## LeelaChessZero/lc0 (`d8ce482`)
 
+- Product decision: retained as historical research only; Lc0 is not on the implementation roadmap.
 - Relevant areas: UCI frontend and backend abstraction.
 - Already solves: neural search offering a strategic second opinion.
 - Reuse: only the generic UCI-adapter lesson.
 - Do not reuse: Lc0 as a human model or objective canonical replacement.
-- Integration: optional post-MVP engine provider.
+- Integration: none planned.
 
 ## dev-arcturus/positional_chess (`efefb3c`)
 

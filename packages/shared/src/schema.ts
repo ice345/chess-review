@@ -50,10 +50,16 @@ export interface PlatformAccount {
 export interface PlatformSyncState {
   accountId: string;
   provider: ExternalPlatform;
-  status: "idle" | "syncing" | "complete" | "error";
+  status: "idle" | "syncing" | "paused" | "rate-limited" | "complete" | "error";
+  mode?: "incremental" | "full-history";
   cursor?: string;
+  since?: string;
   lastSyncAt?: string;
   importedCount: number;
+  completedBatches?: number;
+  completedUnits?: number;
+  totalUnits?: number;
+  retryAfter?: string;
   error?: string;
 }
 
@@ -206,6 +212,58 @@ export interface CoachCandidateFacts {
   pv: string[];
 }
 
+export interface CoachPieceSquareFacts {
+  color: PlayerColor;
+  piece: "pawn" | "knight" | "bishop" | "rook" | "queen";
+  square: string;
+}
+
+export interface CoachSidePositionFacts {
+  inCheck: boolean;
+  castled: boolean;
+  pawnShieldCount: number;
+  undevelopedMinorSquares: string[];
+  doubledPawnFiles: string[];
+  isolatedPawnFiles: string[];
+  passedPawnSquares: string[];
+}
+
+export interface CoachPositionUnderstanding {
+  sideToMove: PlayerColor;
+  legalMoveCount: number;
+  checks: string[];
+  captures: string[];
+  forcingCandidates: string[];
+  attackedUndefendedPieces: CoachPieceSquareFacts[];
+  center: {
+    whiteOccupied: string[];
+    blackOccupied: string[];
+    contested: string[];
+  };
+  openFiles: string[];
+  whiteSemiOpenFiles: string[];
+  blackSemiOpenFiles: string[];
+  white: CoachSidePositionFacts;
+  black: CoachSidePositionFacts;
+}
+
+export interface CoachFutureConsequenceFacts {
+  start: "after";
+  moves: string[];
+  opponentBestResponse?: string;
+}
+
+export interface CoachPracticalAlternativeFacts {
+  uci: string;
+  san: string;
+  stockfishRank: number;
+  score: EngineScore;
+  maiaProbability: number;
+  objectiveBestUci: string;
+  objectiveBestMaiaProbability?: number;
+  winPercentCost: number;
+}
+
 export interface CoachMoveFacts {
   factsVersion: 1;
   position: {
@@ -237,6 +295,10 @@ export interface CoachMoveFacts {
     isCapture: boolean;
     givesCheck: boolean;
     motifs: string[];
+    positionBefore: CoachPositionUnderstanding;
+    positionAfter: CoachPositionUnderstanding;
+    futureConsequence?: CoachFutureConsequenceFacts;
+    practicalAlternative?: CoachPracticalAlternativeFacts;
   };
   opening?: OpeningInfo;
   phaseAccuracy: { white?: number; black?: number };
@@ -283,6 +345,7 @@ export interface CoachGrounding {
 export interface CoachSource {
   provider: CoachProvider;
   model: string;
+  language: CoachLanguage;
   promptVersion: string;
   generatedAt: string;
   fallbackReason?: string;
@@ -297,6 +360,12 @@ export interface CoachExplanation {
   humanPerspective?: string;
   tacticalIdea?: string;
   trainingTip?: string;
+  notice?: string;
+  moveIdea?: string;
+  problem?: string;
+  consequence?: string;
+  practicalAlternative?: string;
+  takeaway?: string;
   confidence: "high" | "medium" | "low";
   validatedLines: CoachValidatedLine[];
   grounding: CoachGrounding;

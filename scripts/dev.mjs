@@ -67,7 +67,7 @@ function pipeLines(stream, scope, target) {
   });
 }
 
-function startOwned(scope, command, args, options = {}) {
+function startOwned(scope, command, args, options = {}, fatal = true) {
   const child = spawn(command, args, {
     ...options,
     env: { ...process.env, ...options.env },
@@ -81,9 +81,11 @@ function startOwned(scope, command, args, options = {}) {
   child.on("error", (error) => log(scope, `failed to start: ${error.message}`));
   child.on("exit", (code, signal) => {
     ownedChildren.delete(child);
-    if (!stopping && code !== 0) {
+    if (!stopping && code !== 0 && fatal) {
       log(scope, `exited unexpectedly (${signal ?? `code ${code}`}).`);
       shutdown(1);
+    } else if (!stopping && code !== 0) {
+      log(scope, `optional process exited (${signal ?? `code ${code}`}); Browser Core remains available.`);
     }
   });
   return child;
@@ -123,7 +125,7 @@ async function ensureOllama() {
       return;
     }
     log("ollama", `starting ${executable} serve (owned by this launcher).`);
-    startOwned("ollama", executable, ["serve"]);
+    startOwned("ollama", executable, ["serve"], {}, SERVICES_ONLY);
     tags = await waitFor(`${OLLAMA_URL}/api/tags`, 30, "Ollama");
   }
 
@@ -151,7 +153,7 @@ async function ensureLocalAi() {
   log("local-ai", `starting optional service at ${LOCAL_AI_URL} (owned by this launcher).`);
   startOwned("local-ai", "uv", ["run", "uvicorn", "chess_review_local_ai.main:app", "--host", "127.0.0.1", "--port", "8000"], {
     cwd: new URL("../services/local-ai", import.meta.url),
-  });
+  }, SERVICES_ONLY);
   await waitFor(healthUrl, 40, "local-ai");
 }
 
@@ -183,8 +185,22 @@ process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
 try {
-  await ensureOllama();
-  await ensureLocalAi();
+  const web = !CHECK_ONLY && !SERVICES_ONLY ? await ensureWeb() : null;
+  if (SERVICES_ONLY || CHECK_ONLY) {
+    await ensureOllama();
+    await ensureLocalAi();
+  } else {
+    try {
+      await ensureOllama();
+    } catch (error) {
+      log("ollama", `${error instanceof Error ? error.message : String(error)} Browser Core remains available.`);
+    }
+    try {
+      await ensureLocalAi();
+    } catch (error) {
+      log("local-ai", `${error instanceof Error ? error.message : String(error)} Browser Core remains available.`);
+    }
+  }
   if (CHECK_ONLY) {
     log("dev", "runtime check complete; no process was started.");
     process.exit(0);
@@ -193,7 +209,6 @@ try {
     log("dev", "local services are ready. Keep this process open; press Ctrl+C to stop services started here.");
     setInterval(() => undefined, 60_000);
   } else {
-    const web = await ensureWeb();
     if (web) web.on("exit", (code) => shutdown(code ?? 0));
     else setInterval(() => undefined, 60_000);
   }

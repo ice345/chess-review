@@ -48,10 +48,6 @@ Responsible for:
 Stockfish is the canonical objective engine unless a documented
 architecture decision explicitly changes this.
 
-Lc0 may later exist as an optional second opinion, but it must not
-replace the canonical objective-analysis path without an explicit
-design decision.
-
 ---
 
 ## 2. Human chess behavior
@@ -428,7 +424,6 @@ May provide:
 - Maia-3
 - Ollama
 - native Stockfish
-- optional Lc0
 
 Browser-only functionality must not accidentally depend on the
 local service unless the feature explicitly requires it.
@@ -543,7 +538,6 @@ Important references include:
 - official-stockfish/Stockfish
 - CSSLab/maia3
 - CSSLab/maia-platform-frontend
-- LeelaChessZero/lc0
 - dev-arcturus/positional_chess
 - imutkarsht/Chess_analyzer
 - SikamikanikoBG/patzer

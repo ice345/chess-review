@@ -1,0 +1,91 @@
+:root {
+  color: #294958;
+  background: #f7f2e9;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 760px; background: #f7f2e9; }
+body { margin: 0; min-width: 760px; min-height: 100vh; }
+button, input { font: inherit; }
+button, a, label { -webkit-tap-highlight-color: transparent; }
+
+.desktop-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 85% 30%, rgba(215, 235, 233, .82), transparent 33%),
+    radial-gradient(circle at 12% 27%, rgba(239, 219, 220, .66), transparent 31%),
+    #f7f2e9;
+}
+
+.desktop-header {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 34px;
+  border-bottom: 1px solid rgba(86, 119, 130, .18);
+  background: rgba(251, 248, 242, .88);
+}
+
+.desktop-brand { display: flex; gap: 11px; align-items: center; color: inherit; text-decoration: none; }
+.desktop-brand > span:last-child { display: grid; gap: 2px; }
+.desktop-brand strong { font-size: 14px; }
+.desktop-brand small, .desktop-mode { color: #66818c; font-size: 9px; letter-spacing: .16em; text-transform: uppercase; }
+.desktop-mark { width: 38px; height: 38px; display: grid; place-items: center; color: #78a4b2; border: 1px solid #bed3d7; border-radius: 50%; background: #e5f0ef; }
+.desktop-mode { padding: 8px 12px; border: 1px solid #bfd0d1; border-radius: 999px; background: rgba(250, 249, 244, .68); }
+
+.desktop-hero {
+  width: min(1180px, calc(100% - 72px));
+  min-height: calc(100vh - 132px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(360px, .78fr);
+  gap: clamp(56px, 8vw, 116px);
+  align-items: center;
+  padding: 72px 0 82px;
+}
+
+.kicker { color: #5d8595; font-size: 10px; font-weight: 750; letter-spacing: .2em; text-transform: uppercase; }
+.desktop-intro h1 { max-width: 700px; margin: 18px 0 22px; font: 500 clamp(48px, 5.1vw, 76px)/.98 Georgia, "Times New Roman", serif; letter-spacing: -.045em; color: #284754; }
+.desktop-intro > p { max-width: 650px; margin: 0; color: #5d7681; font-size: 17px; line-height: 1.7; }
+
+.source-boundaries { display: flex; flex-wrap: wrap; gap: 13px 22px; margin-top: 38px; color: #536e79; font-size: 12px; }
+.source-boundaries span { display: flex; align-items: center; gap: 8px; }
+.source-boundaries i { width: 8px; height: 8px; border-radius: 50%; }
+.source-boundaries .objective { background: #5f8fa2; }
+.source-boundaries .human { background: #789e80; }
+.source-boundaries .coach { background: #c58d91; }
+
+.desktop-import {
+  padding: 34px;
+  border: 1px solid rgba(102, 137, 145, .28);
+  border-radius: 22px;
+  background: rgba(253, 251, 246, .86);
+  box-shadow: 0 28px 76px rgba(56, 78, 84, .13);
+}
+
+.desktop-import h2 { margin: 10px 0 12px; font: 500 30px/1.05 Georgia, "Times New Roman", serif; }
+.desktop-import > p { margin: 0 0 25px; color: #647b84; font-size: 13px; line-height: 1.65; }
+.file-button, .example-button { width: 100%; min-height: 44px; display: grid; place-items: center; border-radius: 10px; cursor: pointer; font-weight: 700; }
+.file-button { color: #fbf7ef; background: #406579; }
+.file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.example-button { margin-top: 9px; color: #406579; border: 1px solid #b8cccf; background: transparent; }
+.file-button:hover, .example-button:hover { transform: translateY(-1px); }
+.file-button:focus-within, .example-button:focus-visible { outline: 3px solid rgba(82, 142, 163, .24); outline-offset: 2px; }
+
+.import-result { min-height: 64px; margin-top: 22px; padding: 14px 15px; display: grid; align-content: center; gap: 4px; border: 1px solid #d5dfdc; border-radius: 11px; background: rgba(241, 244, 238, .72); }
+.import-result strong { font-size: 13px; }
+.import-result span { color: #6c8187; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.import-result.ready { border-left: 3px solid #7da184; }
+.import-result.error { border-left: 3px solid #c87980; background: #fbefed; }
+
+.desktop-footer { min-height: 64px; padding: 0 34px; display: flex; align-items: center; justify-content: space-between; gap: 24px; color: #6d8289; border-top: 1px solid rgba(86, 119, 130, .16); font-size: 11px; }
+
+@media (max-width: 900px) {
+  .desktop-hero { grid-template-columns: 1fr; gap: 46px; padding-top: 54px; }
+  .desktop-intro h1 { font-size: 56px; }
+  .desktop-footer { align-items: flex-start; flex-direction: column; justify-content: center; gap: 5px; }
+}

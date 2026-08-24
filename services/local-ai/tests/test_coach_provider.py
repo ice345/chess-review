@@ -69,6 +69,19 @@ def test_ollama_provider_reports_missing_configured_model(monkeypatch: pytest.Mo
     assert provider.model_status == "missing"
 
 
+def test_ollama_provider_lists_every_installed_model_in_stable_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.test")
+    provider = OllamaProvider(httpx.Client(transport=httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"models": [
+            {"name": "qwen3:8b"},
+            {"model": "gemma4:12b-it-qat"},
+            {"name": "qwen3:8b"},
+        ]})
+    )))
+
+    assert provider.available_models == ["gemma4:12b-it-qat", "qwen3:8b"]
+
+
 def test_openai_provider_uses_responses_json_schema(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_BASE_URL", "https://compatible.test/v1")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")

@@ -13,11 +13,14 @@
     "dev:check": "node scripts/dev.mjs --check",
     "build": "pnpm -r --if-present run build",
     "test": "pnpm -r --if-present run test",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test e2e/visual.spec.ts --update-snapshots=all",
     "typecheck": "pnpm -r --if-present run typecheck",
     "lint": "eslint ."
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "^1.62.1",
     "eslint": "10.9.0",
     "typescript": "5.9.2",
     "typescript-eslint": "8.67.0",

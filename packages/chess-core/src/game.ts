@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { Chess, type PieceSymbol, type Square } from "chess.js";
 import type { PlayerColor } from "@chess-review/shared";
 
 export interface NormalizedPly {
@@ -29,6 +29,20 @@ export interface ReplayedUciMove {
   san: string;
   fenBefore: string;
   fenAfter: string;
+}
+
+export interface LegalBoardMove {
+  from: string;
+  to: string;
+  promotion?: PieceSymbol;
+}
+
+export interface LegalBoardDestination {
+  from: string;
+  to: string;
+  san: string;
+  isCapture: boolean;
+  promotion?: PieceSymbol;
 }
 
 export function parsePgn(pgn: string): NormalizedGame {
@@ -107,4 +121,53 @@ export function replayUciLine(fen: string, uciMoves: readonly string[]): Replaye
       fenAfter: chess.fen(),
     };
   });
+}
+
+/** Apply one user/engine board move through chess.js and return canonical SAN/FEN.
+ *
+ * Promotion defaults to a queen only when a pawn actually reaches the back
+ * rank. Callers can explicitly request an underpromotion.
+ */
+export function playLegalBoardMove(fen: string, input: LegalBoardMove): ReplayedUciMove {
+  const chess = new Chess(fen);
+  const from = input.from as Square;
+  const to = input.to as Square;
+  const piece = chess.get(from);
+  const promotes = piece?.type === "p" && (to[1] === "1" || to[1] === "8");
+  let move;
+  try {
+    move = chess.move({
+      from,
+      to,
+      ...(promotes ? { promotion: input.promotion ?? "q" } : {}),
+    });
+  } catch {
+    throw new Error(`Illegal board move: ${input.from}${input.to}${input.promotion ?? ""}`);
+  }
+  if (!move) throw new Error(`Illegal board move: ${input.from}${input.to}${input.promotion ?? ""}`);
+  return {
+    ply: 1,
+    uci: `${move.from}${move.to}${move.promotion ?? ""}`,
+    san: move.san,
+    fenBefore: fen,
+    fenAfter: chess.fen(),
+  };
+}
+
+/** List every legal destination for one board piece.
+ *
+ * This is presentation-safe rules data for click-to-move hints. It does not
+ * evaluate or rank moves, and therefore cannot affect Stockfish move quality.
+ */
+export function legalBoardDestinations(fen: string, from: string): LegalBoardDestination[] {
+  const chess = new Chess(fen);
+  const square = from as Square;
+  if (!chess.get(square)) return [];
+  return chess.moves({ square, verbose: true }).map((move) => ({
+    from: move.from,
+    to: move.to,
+    san: move.san,
+    isCapture: move.isCapture(),
+    ...(move.promotion === undefined ? {} : { promotion: move.promotion }),
+  }));
 }

@@ -4,7 +4,11 @@ node_modules/
 .pytest_cache/
 .next/
 dist/
+target/
+**/src-tauri/gen/schemas/
 coverage/
+playwright-report/
+test-results/
 *.tsbuildinfo
 .DS_Store
 .env

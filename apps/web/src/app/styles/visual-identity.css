@@ -1,0 +1,42 @@
+/* Original Blue Bishop brand and annotation-seal finishing rules. */
+
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(219, 233, 232, .82);
+  color: #608899;
+  box-shadow: inset 0 0 0 1px rgba(92, 129, 143, .16);
+  transform: none;
+}
+
+.brand-mark svg { width: 72%; height: 72%; }
+.app-header.compact .brand-mark { width: 32px; height: 32px; border-radius: 50%; }
+
+.home-chess-identity {
+  width: fit-content;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 19px;
+  color: #6b929f;
+}
+
+.home-chess-identity > svg {
+  filter: drop-shadow(0 10px 19px rgba(74, 107, 118, .12));
+}
+
+.home-chess-identity > span { display: grid; gap: 4px; }
+.home-chess-identity b { color: #3e5f6e; font: 500 15px Georgia, "Songti SC", serif; }
+.home-chess-identity small { color: #829399; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+
+.board-quality-badge svg {
+  filter: drop-shadow(0 1px 1px rgba(48, 62, 67, .18));
+}
+
+@media (max-width: 760px) {
+  .home-chess-identity { margin-bottom: 20px; }
+  .home-chess-identity > svg { width: 60px; height: 60px; }
+}

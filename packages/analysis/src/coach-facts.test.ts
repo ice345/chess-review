@@ -146,6 +146,21 @@ describe("canonical coach facts", () => {
     expect(facts.human?.playedMoveProbability).toBe(0.65);
     expect(facts.boardFacts).toMatchObject({ isCapture: false, givesCheck: false });
     expect(facts.boardFacts.materialBefore.balanceCp).toBe(0);
+    expect(facts.boardFacts.positionBefore).toMatchObject({
+      sideToMove: "white",
+      legalMoveCount: 20,
+      openFiles: [],
+    });
+    expect(facts.boardFacts.positionAfter).toMatchObject({
+      sideToMove: "black",
+      legalMoveCount: 20,
+      center: { whiteOccupied: ["e4"], blackOccupied: [] },
+    });
+    expect(facts.boardFacts.futureConsequence).toEqual({
+      start: "after",
+      moves: ["e7e5", "g1f3"],
+      opponentBestResponse: "e7e5",
+    });
   });
 
   it("creates a rules-validated deterministic continuation when a provider is absent", () => {
@@ -153,12 +168,45 @@ describe("canonical coach facts", () => {
     const coach = buildDeterministicMoveCoach(facts, "en", "provider offline");
 
     expect(coach.source.provider).toBe("deterministic");
+    expect(coach.source.language).toBe("en");
     expect(coach.validatedLines[0]?.moves).toEqual([
-      { uci: "e2e4", san: "e4" },
       { uci: "e7e5", san: "e5" },
       { uci: "g1f3", san: "Nf3" },
     ]);
+    expect(coach.validatedLines[0]?.start).toBe("after");
+    expect(coach.notice).toBeTruthy();
+    expect(coach.moveIdea).toBeTruthy();
+    expect(coach.consequence).toBeTruthy();
+    expect(coach.takeaway).toBeTruthy();
     expect(coach.grounding.validatedLineCount).toBe(1);
+  });
+
+  it("offers a practical alternative only when Stockfish and Maia both support it", () => {
+    const withPracticalAlternative = structuredClone(analysis);
+    const firstMove = withPracticalAlternative.moves[0];
+    if (!firstMove?.human) throw new Error("Expected Maia fixture facts.");
+    firstMove.human.candidates = [
+      { uci: "e2e4", san: "e4", probability: 0.15 },
+      { uci: "d2d4", san: "d4", probability: 0.35 },
+    ];
+
+    const facts = buildMoveCoachFacts(withPracticalAlternative, 1);
+
+    expect(facts.boardFacts.practicalAlternative).toMatchObject({
+      uci: "d2d4",
+      san: "d4",
+      stockfishRank: 2,
+      maiaProbability: 0.35,
+      objectiveBestUci: "e2e4",
+      objectiveBestMaiaProbability: 0.15,
+    });
+    expect(facts.boardFacts.practicalAlternative?.winPercentCost).toBeLessThanOrEqual(4);
+
+    const withoutMaiaSupport = structuredClone(withPracticalAlternative);
+    const candidate = withoutMaiaSupport.moves[0]?.human?.candidates.find(({ uci }) => uci === "d2d4");
+    if (!candidate) throw new Error("Expected practical alternative fixture.");
+    candidate.probability = 0.1;
+    expect(buildMoveCoachFacts(withoutMaiaSupport, 1).boardFacts.practicalAlternative).toBeUndefined();
   });
 
   it("derives game-summary training advice only from canonical counts and moments", () => {
@@ -167,6 +215,7 @@ describe("canonical coach facts", () => {
 
     expect(facts.moves[1]).toMatchObject({ classification: "blunder", winPercentLoss: 23 });
     expect(summary.trainingRecommendations[0]?.title).toBe("Tactical scan");
+    expect(summary.source.language).toBe("en");
     expect(summary.criticalMoments).toEqual([{ ply: 2, insight: "The canonical analysis records a 23.0-point win-percentage swing." }]);
   });
 });

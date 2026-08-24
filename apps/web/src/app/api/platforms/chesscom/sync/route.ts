@@ -1,4 +1,5 @@
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
+import { chessComCursor, encodeChessComCursor, type PlatformSyncMode } from "../../../../../lib/platform-sync";
 
 const HEADERS = { Accept: "application/json", "User-Agent": "OpenChessReview/0.1 contact: local-user" };
 
@@ -21,28 +22,49 @@ function normalizedResult(value: string | undefined): string | undefined {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { account?: PlatformAccount; since?: string; limit?: number } | null;
+  const body = await request.json().catch(() => null) as { account?: PlatformAccount; since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
   const account = body?.account;
   if (!account || account.provider !== "chesscom") return Response.json({ error: "A linked Chess.com account is required." }, { status: 400 });
-  const response = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(account.username.toLowerCase())}/games/archives`, { headers: HEADERS, cache: "no-store" });
+  const response = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(account.username.toLowerCase())}/games/archives`, { headers: HEADERS, cache: "no-store", signal: request.signal });
   if (!response.ok) return Response.json({ error: `Chess.com archive request failed (${response.status}).` }, { status: 502 });
   const archiveBody = await response.json() as { archives?: string[] };
-  const sinceMs = body.since ? Date.parse(body.since) : 0;
+  const mode = body.mode ?? "incremental";
+  const sinceMs = mode === "incremental" && body.since ? Date.parse(body.since) : 0;
   const limit = Math.max(1, Math.min(100, body.limit ?? 50));
   const archiveUrls = (archiveBody.archives ?? []).filter((url) => {
     if (!sinceMs) return true;
     const match = url.match(/\/(\d{4})\/(\d{2})$/);
     return !match || Date.UTC(Number(match[1]), Number(match[2]), 1) >= sinceMs - 32 * 86_400_000;
-  }).slice(-3).reverse();
-  const rawGames: ChessComGame[] = [];
-  for (const archiveUrl of archiveUrls) {
-    if (rawGames.length >= limit) break;
-    const archiveResponse = await fetch(archiveUrl, { headers: HEADERS, cache: "no-store" });
-    if (archiveResponse.status === 429) return Response.json({ error: "Chess.com rate limit reached. Try syncing again shortly." }, { status: 429 });
-    if (!archiveResponse.ok) continue;
-    const archive = await archiveResponse.json() as { games?: ChessComGame[] };
-    rawGames.push(...(archive.games ?? []).reverse());
+  }).reverse();
+  const checkpoint = chessComCursor(body.cursor);
+  if (checkpoint.archiveIndex >= archiveUrls.length) {
+    const now = new Date().toISOString();
+    return Response.json({
+      provider: "chesscom",
+      account: { ...account, lastSyncAt: now },
+      games: [],
+      done: true,
+      progress: { completed: archiveUrls.length, total: archiveUrls.length },
+    });
   }
+  const archiveUrl = archiveUrls[checkpoint.archiveIndex];
+  if (!archiveUrl) return Response.json({ error: "Chess.com archive checkpoint is invalid." }, { status: 400 });
+  const archiveResponse = await fetch(archiveUrl, { headers: HEADERS, cache: "no-store", signal: request.signal });
+  if (archiveResponse.status === 429) return Response.json(
+    { error: "Chess.com rate limit reached. Sync can resume from the saved archive checkpoint." },
+    { status: 429, headers: { "Retry-After": archiveResponse.headers.get("Retry-After") ?? "60" } },
+  );
+  if (!archiveResponse.ok) return Response.json({ error: `Chess.com monthly archive failed (${archiveResponse.status}).` }, { status: 502 });
+  const archive = await archiveResponse.json() as { games?: ChessComGame[] };
+  const eligibleGames = (archive.games ?? [])
+    .filter((game) => !sinceMs || Boolean(game.end_time && game.end_time * 1000 > sinceMs))
+    .sort((left, right) => (right.end_time ?? 0) - (left.end_time ?? 0));
+  const rawGames = eligibleGames.slice(checkpoint.offset, checkpoint.offset + limit);
+  const archiveComplete = checkpoint.offset + rawGames.length >= eligibleGames.length;
+  const nextCheckpoint = archiveComplete
+    ? { archiveIndex: checkpoint.archiveIndex + 1, offset: 0 }
+    : { archiveIndex: checkpoint.archiveIndex, offset: checkpoint.offset + rawGames.length };
+  const done = nextCheckpoint.archiveIndex >= archiveUrls.length;
   const now = new Date().toISOString();
   const normalizedUsername = account.username.toLowerCase();
   const games: SyncedGame[] = rawGames
@@ -69,6 +91,16 @@ export async function POST(request: Request) {
         syncedAt: now,
       };
     });
-  const updatedAccount: PlatformAccount = { ...account, lastSyncAt: now };
-  return Response.json({ provider: "chesscom", account: updatedAccount, games, ...(games[0] ? { cursor: games[0].playedAt } : {}) });
+  const updatedAccount: PlatformAccount = done ? { ...account, lastSyncAt: now } : account;
+  return Response.json({
+    provider: "chesscom",
+    account: updatedAccount,
+    games,
+    done,
+    ...(done ? {} : { cursor: encodeChessComCursor(nextCheckpoint) }),
+    progress: {
+      completed: checkpoint.archiveIndex + (archiveComplete ? 1 : 0),
+      total: archiveUrls.length,
+    },
+  });
 }

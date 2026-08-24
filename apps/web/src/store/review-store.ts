@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { normalizeFen, parsePgn, type NormalizedGame, type ReplayedUciMove } from "@chess-review/chess-core";
+import {
+  normalizeFen,
+  parsePgn,
+  playLegalBoardMove,
+  type NormalizedGame,
+  type ReplayedUciMove,
+} from "@chess-review/chess-core";
 import { divideGame } from "@chess-review/analysis";
 import { recognizeOpening } from "@chess-review/openings";
 import type {
@@ -10,14 +16,14 @@ import type {
   HumanAnalysis,
   OpeningInfo,
 } from "@chess-review/shared";
-
-export interface ReviewVariation {
-  rank: number;
-  rootPly: number;
-  rootFen: string;
-  moves: ReplayedUciMove[];
-  cursor: number;
-}
+import {
+  appendBranchLine,
+  appendBranchMove,
+  createAnalysisBranch,
+  selectedBranchNode,
+  stepAnalysisBranch,
+  type AnalysisBranchTree,
+} from "../lib/analysis-branch";
 
 interface ReviewState {
   game: NormalizedGame | null;
@@ -27,15 +33,17 @@ interface ReviewState {
   currentPly: number;
   positionFen: string;
   orientation: "white" | "black";
-  variation: ReviewVariation | null;
+  branch: AnalysisBranchTree | null;
   error: string | null;
   loadPgn: (pgn: string) => void;
   loadFen: (fen: string) => void;
   goToPly: (ply: number) => void;
   setAnalysis: (analysis: GameAnalysisV1 | null) => void;
   setOrientation: (orientation: "white" | "black") => void;
-  startVariation: (rank: number, moves: ReplayedUciMove[]) => void;
-  stepVariation: (delta: number) => void;
+  startEngineLine: (rank: number, moves: ReplayedUciMove[]) => void;
+  playAnalysisMove: (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
+  playHumanCandidate: (uci: string, targetElo: number, probability: number) => boolean;
+  stepBranch: (delta: number) => void;
   returnToGame: () => void;
   setMoveHuman: (ply: number, human: HumanAnalysis) => GameAnalysisV1 | null;
   setMoveCoach: (ply: number, coach: CoachExplanation) => GameAnalysisV1 | null;
@@ -52,14 +60,14 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   currentPly: 0,
   positionFen: initialFen,
   orientation: "white",
-  variation: null,
+  branch: null,
   error: null,
   loadPgn: (pgn) => {
     try {
       const game = parsePgn(pgn);
       const division = divideGame(game);
       const opening = recognizeOpening(game) ?? null;
-      set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, variation: null, error: null });
+      set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, branch: null, error: null });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "PGN 解析失败。" });
     }
@@ -73,7 +81,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         analysis: null,
         currentPly: 0,
         positionFen: normalizeFen(fen),
-        variation: null,
+        branch: null,
         error: null,
       });
     } catch (error) {
@@ -85,31 +93,56 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (!game) return;
     const bounded = Math.max(0, Math.min(game.plies.length, ply));
     const positionFen = bounded === 0 ? game.initialFen : game.plies[bounded - 1]?.fenAfter ?? game.initialFen;
-    set({ currentPly: bounded, positionFen, variation: null });
+    set({ currentPly: bounded, positionFen, branch: null });
   },
   setAnalysis: (analysis) => set({ analysis }),
   setOrientation: (orientation) => set({ orientation }),
-  startVariation: (rank, moves) => {
+  startEngineLine: (rank, moves) => {
     if (moves.length === 0) return;
     const current = get();
-    const rootFen = current.variation?.rootFen ?? current.positionFen;
-    const rootPly = current.variation?.rootPly ?? current.currentPly;
-    set({
-      variation: { rank, rootPly, rootFen, moves, cursor: 1 },
-      positionFen: moves[0]?.fenAfter ?? rootFen,
-    });
+    const root = current.branch ?? createAnalysisBranch(current.currentPly, current.positionFen);
+    const branch = appendBranchLine(root, moves, rank);
+    set({ branch, positionFen: selectedBranchNode(branch).fen, error: null });
   },
-  stepVariation: (delta) => {
-    const variation = get().variation;
-    if (!variation) return;
-    const cursor = Math.max(0, Math.min(variation.moves.length, variation.cursor + delta));
-    const positionFen = cursor === 0 ? variation.rootFen : variation.moves[cursor - 1]?.fenAfter ?? variation.rootFen;
-    set({ variation: { ...variation, cursor }, positionFen });
+  playAnalysisMove: (from, to, promotion) => {
+    const current = get();
+    try {
+      const move = playLegalBoardMove(current.positionFen, { from, to, ...(promotion ? { promotion } : {}) });
+      const root = current.branch ?? createAnalysisBranch(current.currentPly, current.positionFen);
+      const branch = appendBranchMove(root, move);
+      set({ branch, positionFen: selectedBranchNode(branch).fen, error: null });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  playHumanCandidate: (uci, targetElo, probability) => {
+    const current = get();
+    try {
+      const promotion = uci[4];
+      const move = playLegalBoardMove(current.positionFen, {
+        from: uci.slice(0, 2),
+        to: uci.slice(2, 4),
+        ...((promotion === "q" || promotion === "r" || promotion === "b" || promotion === "n") ? { promotion } : {}),
+      });
+      const root = current.branch ?? createAnalysisBranch(current.currentPly, current.positionFen);
+      const branch = appendBranchMove(root, move, { kind: "maia", targetElo, probability });
+      set({ branch, positionFen: selectedBranchNode(branch).fen, error: null });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  stepBranch: (delta) => {
+    const branch = get().branch;
+    if (!branch) return;
+    const updated = stepAnalysisBranch(branch, delta);
+    set({ branch: updated, positionFen: selectedBranchNode(updated).fen });
   },
   returnToGame: () => {
-    const variation = get().variation;
-    if (!variation) return;
-    set({ variation: null, positionFen: variation.rootFen });
+    const branch = get().branch;
+    if (!branch) return;
+    set({ branch: null, positionFen: branch.rootFen });
   },
   setMoveHuman: (ply, human) => {
     const analysis = get().analysis;

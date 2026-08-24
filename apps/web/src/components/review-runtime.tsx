@@ -4,6 +4,9 @@ import { createContext, useContext, type Dispatch, type SetStateAction } from "r
 import type { GameAnalysisV1, StockfishMoveAnalysis } from "@chess-review/shared";
 import type { GameReviewProgress } from "@chess-review/stockfish";
 import type { ReviewRecord } from "../lib/review-library";
+import type { LocalAiHealth, MaiaMovesResponse } from "../lib/local-ai";
+import type { AnalysisLens } from "../lib/board-analysis-arrows";
+import type { MaiaServiceState } from "../lib/human-lens-state";
 
 export type ReviewRunState = "idle" | "running" | "complete" | "cached" | "error";
 
@@ -21,17 +24,28 @@ export interface ReviewRuntimeValue {
   engineState: "idle" | "running" | "error";
   engineError: string | null;
   continuationLines: 1 | 2 | 3 | 4 | 5;
-  setContinuationLines: Dispatch<SetStateAction<1 | 2 | 3 | 4 | 5>>;
   continuationLength: 6 | 8 | 10 | 12 | 16;
-  setContinuationLength: Dispatch<SetStateAction<6 | 8 | 10 | 12 | 16>>;
   continuationResult: StockfishMoveAnalysis | null;
   continuationState: "idle" | "running" | "error";
   continuationError: string | null;
+  analysisLens: AnalysisLens;
+  setAnalysisLens: Dispatch<SetStateAction<AnalysisLens>>;
+  humanTargetElo: number;
+  setHumanTargetElo: (value: number) => void;
+  humanPositionResult: MaiaMovesResponse | null;
+  humanPositionState: "idle" | "running" | "error";
+  humanPositionError: string | null;
+  humanServiceState: MaiaServiceState;
+  humanPlayedMove: string | undefined;
   analyzeFullGame: () => Promise<void>;
   cancelFullGame: () => void;
   analyzePosition: () => Promise<void>;
   analyzeContinuations: () => Promise<void>;
+  analyzeHumanPosition: () => Promise<void>;
+  refreshHumanService: () => Promise<LocalAiHealth | null>;
+  navigateToPly: (ply: number) => void;
   playContinuation: (rank: number, result?: StockfishMoveAnalysis | null) => void;
+  playHumanCandidate: (uci: string, probability: number) => void;
   persistEnrichedAnalysis: (analysis: GameAnalysisV1 | null) => void;
 }
 

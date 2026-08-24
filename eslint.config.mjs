@@ -8,6 +8,8 @@ export default tseslint.config(
       "**/coverage/**",
       "**/dist/**",
       "**/node_modules/**",
+      "**/target/**",
+      "**/src-tauri/gen/**",
       "**/.venv/**",
       "**/public/engine/**",
       "references/**",

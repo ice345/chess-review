@@ -9,6 +9,7 @@ export interface AppSettings {
   reviewMultiPv: 1 | 2 | 3 | 4 | 5;
   continuationLines: 1 | 2 | 3 | 4 | 5;
   continuationLength: 6 | 8 | 10 | 12 | 16;
+  humanTargetElo: number;
   autoAnalyzeImported: 0 | 1 | 3 | 5;
 }
 
@@ -20,6 +21,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   reviewMultiPv: 3,
   continuationLines: 3,
   continuationLength: 10,
+  humanTargetElo: 1400,
   autoAnalyzeImported: 0,
 };
 
@@ -38,4 +40,11 @@ export function loadAppSettings(): AppSettings {
 export function saveAppSettings(settings: AppSettings): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   window.dispatchEvent(new CustomEvent("open-chess-review-settings", { detail: settings }));
+}
+
+export function savePreferredHumanTargetElo(targetElo: number): AppSettings {
+  const bounded = Math.max(400, Math.min(3000, Math.round(targetElo)));
+  const settings = { ...loadAppSettings(), humanTargetElo: bounded };
+  saveAppSettings(settings);
+  return settings;
 }

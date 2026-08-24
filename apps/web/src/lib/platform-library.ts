@@ -24,10 +24,27 @@ function write<T>(database: IDBDatabase, storeName: string, key: string, value: 
   });
 }
 
+function readOne<T>(database: IDBDatabase, storeName: string, key: string): Promise<T | null> {
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(storeName, "readonly").objectStore(storeName).get(key);
+    request.onsuccess = () => resolve((request.result as T | undefined) ?? null);
+    request.onerror = () => reject(request.error ?? new Error(`Unable to read ${storeName}.`));
+  });
+}
+
 export async function listPlatformAccounts(): Promise<PlatformAccount[]> {
   const database = await openReviewDatabase();
   try {
     return (await readAll<PlatformAccount>(database, PLATFORM_ACCOUNT_STORE)).sort((left, right) => left.linkedAt.localeCompare(right.linkedAt));
+  } finally {
+    database.close();
+  }
+}
+
+export async function getPlatformAccount(accountId: string): Promise<PlatformAccount | null> {
+  const database = await openReviewDatabase();
+  try {
+    return await readOne<PlatformAccount>(database, PLATFORM_ACCOUNT_STORE, accountId);
   } finally {
     database.close();
   }
@@ -66,6 +83,15 @@ export async function listSyncedGames(filters: { provider?: ExternalPlatform; an
       .filter((game) => filters.provider === undefined || game.external.provider === filters.provider)
       .filter((game) => filters.analyzed === undefined || game.analyzed === filters.analyzed)
       .sort((left, right) => right.playedAt.localeCompare(left.playedAt));
+  } finally {
+    database.close();
+  }
+}
+
+export async function getSyncedGame(gameId: string): Promise<SyncedGame | null> {
+  const database = await openReviewDatabase();
+  try {
+    return await readOne<SyncedGame>(database, SYNCED_GAME_STORE, gameId);
   } finally {
     database.close();
   }
