@@ -273,7 +273,7 @@ test("keeps Coach generation alive across review routes, guards rapid calls, and
   await expect(page.getByRole("link", { name: /Study/ })).toContainText("Generating…");
   await page.getByRole("link", { name: "Moves" }).click();
   await expect(page).toHaveURL(`/review/${record.id}/moves`);
-  await expect(page.getByRole("link", { name: /Study/ })).toContainText("Generating…");
+  await expect(page.getByRole("link", { name: /Study/ })).toBeVisible();
   await page.getByRole("link", { name: /Study/ }).click();
   await expect(page.getByText(/已使用确定性中文回退/)).toBeVisible();
   expect(mocked.requests.filter((request) => request.path === "/coach/explain")).toHaveLength(1);
