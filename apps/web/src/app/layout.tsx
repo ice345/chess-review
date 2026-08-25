@@ -13,6 +13,7 @@ import "./styles/human-lens.css";
 import "./styles/platforms.css";
 import "./styles/coach.css";
 import "./styles/visual-identity.css";
+import "./styles/study.css";
 
 export const metadata: Metadata = {
   title: "Open Chess Review",

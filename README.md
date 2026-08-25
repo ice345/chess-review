@@ -10,6 +10,7 @@ Open Chess Review is an open-source chess game review and coaching workspace. It
 - Runs Stockfish 18 WASM in the browser for evaluation, MultiPV, classifications, Accuracy, phases, openings, critical moments, and legal analysis variations.
 - Reviews with Stockfish, Maia or Compare mode while keeping objective Move Quality separate from Elo-conditioned human probability, WDL and Find Difficulty.
 - Turns structured facts and validated engine lines into contextual move lessons and a whole-game Study plan, with deterministic copy when the language provider is unavailable.
+- Builds player-specific multi-game trends, color-separated opening repertoire, evidence-bearing recurring weaknesses, and a persistent training queue from completed reviews.
 - Syncs complete public Chess.com archives and authorized Lichess game history into a local IndexedDB library with resumable checkpoints.
 - Exports annotated PGN, canonical JSON, position PNGs, and game-review PNGs.
 
@@ -32,7 +33,7 @@ The pnpm workspace keeps those boundaries explicit:
 | --- | --- |
 | `apps/web` | Next.js routes, browser UX, review orchestration, IndexedDB and connected platforms |
 | `packages/chess-core` | PGN/FEN normalization, legal replay and deterministic chess primitives |
-| `packages/analysis` | WinPercent, Accuracy, game phases, classification, tactics and Coach facts |
+| `packages/analysis` | WinPercent, Accuracy, game phases, classification, tactics, Coach facts and deterministic multi-game study |
 | `packages/stockfish` | Stockfish transport, UCI parsing, cache identity and worker integration |
 | `packages/openings` | Lichess opening data and position-based recognition |
 | `packages/shared` | Versioned schemas shared across browser, analysis and service boundaries |
@@ -54,7 +55,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 
 The web product remains fully usable when local-ai is offline. In that state Stockfish continues in the browser, Maia controls show an explicit offline state, and Coach requests use deterministic canonical copy.
 
-The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **More → Engine Lab** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
+The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **Training** owns cross-game progress, repertoire, weaknesses and queue state; **More → Engine Lab** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
 
 ## Setup
 

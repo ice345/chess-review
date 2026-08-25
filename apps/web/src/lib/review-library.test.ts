@@ -53,6 +53,7 @@ describe("review library records", () => {
     });
 
     expect(record.preferredOrientation).toBe("black");
+    expect(record.playedAt).toBe("2026-08-23T00:00:00.000Z");
     expect(record.sourceTimeClass).toBe("rapid");
     expect(record.sourceResult).toBe("loss");
     expect(record.external?.externalGameId).toBe("abc123");

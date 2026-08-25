@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
@@ -130,6 +130,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   }, [humanRuntime.moveReview, reviewedAnalysis]);
   const currentHuman = matchingStoredHuman ?? liveHuman;
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const requestedPlyApplied = useRef<string | null>(null);
   const legalDestinations = useMemo(
     () => selectedSquare ? legalBoardDestinations(state.positionFen, selectedSquare) : [],
     [selectedSquare, state.positionFen],
@@ -142,6 +143,15 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSelectedSquare(null);
   }, [state.positionFen]);
+
+  useEffect(() => {
+    if (loadState !== "ready" || !state.game) return;
+    const identity = `${gameId}:${window.location.search}`;
+    if (requestedPlyApplied.current === identity) return;
+    requestedPlyApplied.current = identity;
+    const requested = Number(new URLSearchParams(window.location.search).get("ply"));
+    if (Number.isInteger(requested) && requested >= 0) state.goToPly(requested);
+  }, [gameId, loadState, state.game, state.goToPly]);
 
   useEffect(() => {
     if (!state.analysis) return;

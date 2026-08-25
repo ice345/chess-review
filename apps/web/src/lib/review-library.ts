@@ -14,6 +14,7 @@ export interface ReviewRecord {
   totalPlies: number;
   createdAt: string;
   updatedAt: string;
+  playedAt?: string;
   external?: ExternalGameReference;
   preferredOrientation?: "white" | "black";
   orientationOverride?: "white" | "black";
@@ -24,6 +25,7 @@ export interface ReviewRecord {
 export async function buildReviewRecordFromSyncedGame(game: SyncedGame): Promise<ReviewRecord> {
   return {
     ...await buildReviewRecord("pgn", game.pgn),
+    playedAt: game.playedAt,
     external: game.external,
     preferredOrientation: game.accountColor,
     ...(game.timeClass ? { sourceTimeClass: game.timeClass } : {}),

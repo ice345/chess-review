@@ -508,3 +508,34 @@ export interface GameAnalysisV1 {
   coachSummary?: GameCoachSummary;
   createdAt: string;
 }
+
+export type StudyWeaknessKind =
+  | "opening-decisions"
+  | "middlegame-decisions"
+  | "endgame-decisions"
+  | "missed-opportunities";
+
+export type TrainingQueueStatus = "queued" | "in-progress" | "completed";
+
+export interface TrainingEvidenceReference {
+  gameId: string;
+  ply: number;
+  san: string;
+  phase: GamePhase;
+  classification: MoveClassification;
+  winPercentLoss: number;
+}
+
+/** Versioned browser-persisted progress for one deterministic recurring weakness. */
+export interface TrainingQueueItemV1 {
+  version: 1;
+  id: string;
+  playerKey: string;
+  weaknessKind: StudyWeaknessKind;
+  status: TrainingQueueStatus;
+  priority: number;
+  evidence: TrainingEvidenceReference[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}

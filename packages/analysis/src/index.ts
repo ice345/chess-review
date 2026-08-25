@@ -7,4 +7,5 @@ export * from "./human-analysis";
 export * from "./human-difficulty";
 export * from "./sacrifice";
 export * from "./score";
+export * from "./study";
 export * from "./win-percent";

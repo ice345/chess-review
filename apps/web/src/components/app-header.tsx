@@ -10,6 +10,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
       </Link>
       <nav aria-label="Application navigation">
         <Link href="/history">History</Link>
+        <Link href="/training">Training</Link>
         <Link href="/settings">Settings</Link>
       </nav>
     </header>

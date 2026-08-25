@@ -40,6 +40,7 @@ The web product uses Next.js App Router nested layouts:
   /engine
 
 /history
+/training
 /settings
 ```
 
@@ -100,6 +101,15 @@ PGN -> opening EPD lookup -> structural Divider -> Stockfish queue
 ```
 
 Full-game work is queued through a browser pool capped at two Stockfish workers. A second `searchmoves` pass evaluates only played moves missing from MultiPV. Cancellation terminates active workers. Coach enrichments share the cached analysis record but are invalidated independently by prompt version.
+
+Advanced study reads completed current-version `GameAnalysisV1` records from the
+browser cache. `packages/analysis` groups already-computed game Accuracy, phase
+Accuracy, opening identity and move-classification evidence; the web route does
+not rerun Stockfish or reconstruct chess semantics. Manual imports may be viewed
+from either named player's perspective, while connected records use the linked
+account color. Training progress is versioned separately in IndexedDB and stores
+traceable game/ply evidence rather than generated prose. See
+[`advanced-study.md`](advanced-study.md).
 
 Phase 5.1 uses one shared browser scheduler with two logical slots and three
 priorities: current interactive board, interactive branch, then background
@@ -162,8 +172,11 @@ runs cached TypeScript, Python, build and browser-workflow jobs; see
 
 ## Current implementation status
 
-Phases 0–6 are complete. The independent Vite/React/Tauri 2 shell,
+Phases 0–7 are complete. The independent Vite/React/Tauri 2 shell,
 shared-package imports, native PGN integration, managed Ollama, packaged
 local-ai ownership and the three-platform unsigned artifact matrix are
 implemented and verified. Signing, notarization, universal macOS binaries and a
-versioned public release remain explicit release-operations follow-ups.
+versioned public release remain explicit release-operations follow-ups. Phase 7
+adds deterministic multi-game trends, color-specific opening repertoire,
+recurring weakness evidence and a persistent training queue without changing the
+canonical single-game algorithms.

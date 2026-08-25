@@ -76,3 +76,16 @@ export async function putCachedAnalysis(
     database.close();
   }
 }
+
+export async function listCachedAnalyses(): Promise<GameAnalysisV1[]> {
+  const database = await openReviewDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = database.transaction(ANALYSIS_STORE, "readonly").objectStore(ANALYSIS_STORE).getAll();
+      request.onsuccess = () => resolve((request.result as GameAnalysisV1[]).map(withoutStaleCoach));
+      request.onerror = () => reject(request.error ?? new Error("Unable to list the analysis cache."));
+    });
+  } finally {
+    database.close();
+  }
+}

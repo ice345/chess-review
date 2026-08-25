@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { SAMPLE_PGN, mockLocalAi, seedConnectedLibrary, seedReview, seedUnanalyzedReview } from "./fixtures";
+import { SAMPLE_PGN, mockLocalAi, seedAdvancedStudy, seedConnectedLibrary, seedReview, seedUnanalyzedReview } from "./fixtures";
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -206,7 +206,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
 
   await expect.poll(async () => page.evaluate(async (key) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 3);
+      const request = indexedDB.open("open-chess-review", 4);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -312,4 +312,30 @@ test("renders a large connected Library progressively", async ({ page }) => {
   await expect(page.locator(".history-game")).toHaveCount(60);
   await page.getByRole("button", { name: /Load 24 more/ }).click();
   await expect(page.locator(".history-game")).toHaveCount(84);
+});
+
+test("builds advanced study evidence and persists an actionable training queue", async ({ page }) => {
+  const fixtures = await seedAdvancedStudy(page);
+  await page.goto("/training");
+
+  await expect(page.getByRole("heading", { name: "Progress and training" })).toBeVisible();
+  await expect(page.getByLabel("Study player")).toHaveValue("ada");
+  await expect(page.locator(".study-metrics")).toContainText("3");
+  await expect(page.getByText("Italian Game", { exact: true })).toBeVisible();
+  await expect(page.getByText("Opening decisions", { exact: true })).toBeVisible();
+  await expect(page.getByText("Missed opportunities", { exact: true })).toBeVisible();
+
+  const missedCard = page.locator(".weakness-grid > article").filter({ hasText: "Missed opportunities" });
+  await missedCard.getByRole("button", { name: "Add to training queue" }).click();
+  await expect(page.getByRole("status")).toContainText("added to the training queue");
+  await expect(page.locator(".training-list")).toContainText("Missed opportunities");
+
+  await page.locator(".training-list").getByRole("button", { name: "Start" }).click();
+  await expect(page.locator(".training-list")).toContainText("in progress");
+  await page.reload();
+  await expect(page.locator(".training-list")).toContainText("in progress");
+
+  await page.locator(".training-sources a").first().click();
+  await expect(page).toHaveURL(new RegExp(`/review/(?:${fixtures[0]!.record.id}|${fixtures[1]!.record.id})/moves\\?ply=3$`));
+  await expect(page.locator(".move-status")).toContainText("2. Nf3");
 });

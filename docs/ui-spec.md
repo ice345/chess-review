@@ -9,7 +9,7 @@ The product is route-based rather than a single analysis dashboard:
 - `/review/[gameId]/moves` is the move explorer.
 - `/review/[gameId]/coach` is the Study surface for grounded move lessons and whole-game learning (the URL remains stable).
 - `/review/[gameId]/engine` is the advanced Stockfish lab.
-- `/history` and `/settings` are application utilities.
+- `/history`, `/training` and `/settings` are application utilities.
 
 Import UI is never mounted inside the review workspace. A valid input is normalized, saved as a deterministic IndexedDB review record, and navigated to its review route. The objective cache remains separate and is not duplicated by routing.
 
@@ -109,3 +109,18 @@ Library keeps source, review status, time-control, result and text filters. It
 sorts the merged reviewed/pending collection by date and renders at most 60 rows
 per page, with an explicit Load more control for larger collections. Syncing never
 mounts or analyzes every imported game automatically.
+
+## Advanced study and training
+
+`/training` is player-specific. Connected games default to the linked account
+color; manual PGNs expose both meaningful named players. The route contains four
+ordered sections: canonical multi-game form, White/Black-separated opening
+repertoire, recurring weakness evidence, and persistent deliberate-practice
+tasks. The trend chart links back to each review. Weakness and queue evidence
+links include the exact canonical ply so Review opens on the source decision.
+
+No weakness is presented as recurring until the deterministic signal occurs in
+at least two distinct games. Move-quality icons and labels reuse the shared V3
+system. Training status supports queued, in progress and completed, remains in
+IndexedDB after refresh, and is never inferred from Coach text. At mobile width,
+all sections stack without document-level horizontal overflow.

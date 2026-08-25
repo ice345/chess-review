@@ -302,12 +302,24 @@ versioned GitHub release remain release-operations follow-ups. They require
 distribution credentials and an explicit release/version decision and are not
 part of the Phase 6 implementation gate.
 
-## Phase 7 — advanced study
+## Phase 7 — advanced study (complete)
 
-- [ ] multi-game trends
-- [ ] opening repertoire analysis
-- [ ] recurring weakness detection
-- [ ] training queue
+- [x] multi-game trends
+- [x] opening repertoire analysis
+- [x] recurring weakness detection
+- [x] training queue
+
+Phase 7 completed on 2026-08-26. The current-version browser analysis cache now
+feeds a player-specific `AdvancedStudyReport`: game and phase Accuracy are
+aggregated from canonical results, opening repertoire is separated by player
+color, and weak signals require matching evidence in at least two distinct
+games. The `/training` workflow persists queued/in-progress/completed tasks in a
+versioned IndexedDB store and deep-links every saved source to its exact review
+ply. Package fixtures and a deterministic Playwright workflow cover aggregation,
+cache/player projection, queue persistence and deep links. The phase does not
+change Accuracy, Divider, WinPercent, White-POV score handling, classification or
+Human Find Difficulty. Lc0 is intentionally not part of this product phase; it is
+not required by any advanced-study calculation.
 
 ## Phase 8 — mobile companion exploration
 

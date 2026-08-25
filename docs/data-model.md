@@ -61,4 +61,13 @@ Accuracy, classification or an engine score from that metadata.
 
 `ClassificationReason.sacrifice` uses centipawns for material and compensation. `see` is signed from the mover's perspective, so a negative value means the opponent can gain material by accepting the offer. `survivesBestResponse` requires an opponent reply in the Stockfish root PV plus evaluation preservation; `recoveredWithinPv` reports material recovered after the largest observed PV deficit.
 
+Phase 7 does not add cross-game fields to `GameAnalysisV1`. The analysis package
+accepts a selected-player projection of multiple canonical records and produces a
+runtime `AdvancedStudyReport`. This keeps one-game cache identity independent of
+study presentation. Persisted training progress uses `TrainingQueueItemV1` in a
+separate IndexedDB store. Each item records a deterministic player/weakness ID,
+status, priority and up to five `TrainingEvidenceReference` objects containing
+`gameId`, ply, SAN, phase, canonical classification and WinPercent loss. It stores
+no Coach prose and never mutates the source analysis.
+
 `GameDivision.middlePly` and `endPly` are zero-based indices into positions immediately before moves, matching the selected Divider port. Public move records use one-based `ply`. `phaseForPly()` is the canonical conversion.

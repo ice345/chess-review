@@ -1,0 +1,150 @@
+import { describe, expect, it } from "vitest";
+import type {
+  ClassificationReason,
+  GameAnalysisV1,
+  GamePhase,
+  MoveAnalysis,
+  MoveClassification,
+  PlayerColor,
+} from "@chess-review/shared";
+import { buildAdvancedStudyReport, STUDY_ALGORITHM_VERSION, type StudyGameInput } from "./study";
+
+function reason(loss: number): ClassificationReason {
+  return {
+    precedenceRule: "fixture",
+    isEngineBest: loss === 0,
+    winPercentBefore: 55,
+    winPercentAfter: 55 - loss,
+    winPercentLoss: loss,
+    legalMoveCount: 20,
+    isForced: false,
+    isBook: false,
+    isCheckmate: false,
+    isObviousRecapture: false,
+    isTrivialCheckEscape: false,
+    playedMoveOutsideMultiPv: false,
+    exclusions: [],
+  };
+}
+
+function move(
+  ply: number,
+  color: PlayerColor,
+  phase: GamePhase,
+  classification: MoveClassification,
+  loss: number,
+): MoveAnalysis {
+  return {
+    ply,
+    color,
+    san: ply % 2 === 1 ? "Nf3" : "Nc6",
+    uci: ply % 2 === 1 ? "g1f3" : "b8c6",
+    fenBefore: "fixture-before",
+    fenAfter: "fixture-after",
+    phase,
+    evaluationBefore: { kind: "cp", cp: 20 },
+    evaluationAfter: { kind: "cp", cp: 20 },
+    playedMoveScore: { kind: "cp", cp: 20 },
+    playedMoveOutsideMultiPv: false,
+    classification,
+    classificationReason: reason(loss),
+    stockfish: { fen: "fixture-before", score: { kind: "cp", cp: 20 }, lines: [], depth: 12 },
+    accuracy: Math.max(0, 100 - loss * 2),
+    motifs: [],
+  };
+}
+
+function game(
+  gameId: string,
+  playedAt: string,
+  accuracy: number,
+  result: StudyGameInput["result"],
+  moves: MoveAnalysis[],
+  color: PlayerColor = "white",
+): StudyGameInput {
+  const analysis: GameAnalysisV1 = {
+    version: 1,
+    algorithmVersion: "objective-v1-preview.3",
+    game: { headers: { White: "Ada", Black: "Mikhail", Result: "*" }, initialFen: "fixture", pgn: gameId },
+    engine: { stockfishVersion: "18", depth: 12, multiPv: 3 },
+    opening: { eco: "C50", name: "Italian Game", variation: "Giuoco Piano", matchedPly: 6, theoryUntilPly: 8 },
+    division: { middlePly: 4, endPly: 8, totalPlies: moves.length },
+    white: { color: "white", accuracy, phaseAccuracy: { opening: accuracy - 2, middlegame: accuracy }, classificationCounts: {} },
+    black: { color: "black", accuracy: accuracy + 1, phaseAccuracy: { opening: accuracy }, classificationCounts: {} },
+    moves,
+    criticalMoments: [],
+    createdAt: playedAt,
+  };
+  for (const item of moves) {
+    const counts = analysis[item.color].classificationCounts;
+    counts[item.classification] = (counts[item.classification] ?? 0) + 1;
+  }
+  return { gameId, title: `Ada game ${gameId}`, playedAt, playerColor: color, result, analysis };
+}
+
+describe("advanced multi-game study", () => {
+  it("aggregates canonical game Accuracy without recalculating it from moves", () => {
+    const report = buildAdvancedStudyReport([
+      game("g3", "2026-08-03T00:00:00.000Z", 90, "win", [move(1, "white", "opening", "best", 0)]),
+      game("g1", "2026-08-01T00:00:00.000Z", 70, "loss", [move(1, "white", "opening", "best", 0)]),
+      game("g2", "2026-08-02T00:00:00.000Z", 80, "draw", [move(1, "white", "opening", "best", 0)]),
+      game("g4", "2026-08-04T00:00:00.000Z", 100, "win", [move(1, "white", "opening", "best", 0)]),
+    ]);
+
+    expect(report.algorithmVersion).toBe(STUDY_ALGORITHM_VERSION);
+    expect(report.trends.games.map(({ gameId }) => gameId)).toEqual(["g1", "g2", "g3", "g4"]);
+    expect(report.trends.summary).toMatchObject({
+      gameCount: 4,
+      averageAccuracy: 85,
+      previousAccuracy: 75,
+      recentAccuracy: 95,
+      accuracyChange: 20,
+    });
+    expect(report.engineConfigurations).toEqual([{ stockfishVersion: "18", depth: 12, multiPv: 3, gameCount: 4 }]);
+  });
+
+  it("keeps repertoire color-specific and derives results and opening error rate", () => {
+    const report = buildAdvancedStudyReport([
+      game("g1", "2026-08-01T00:00:00.000Z", 70, "win", [
+        move(1, "white", "opening", "mistake", 15),
+        move(2, "black", "opening", "best", 0),
+      ]),
+      game("g2", "2026-08-02T00:00:00.000Z", 80, "draw", [move(1, "white", "opening", "best", 0)]),
+      game("g3", "2026-08-03T00:00:00.000Z", 85, "loss", [move(2, "black", "opening", "blunder", 25)], "black"),
+    ]);
+
+    expect(report.repertoire).toHaveLength(2);
+    expect(report.repertoire.find(({ color }) => color === "white")).toMatchObject({
+      gameCount: 2,
+      wins: 1,
+      draws: 1,
+      scoreRate: 75,
+      openingMoveCount: 2,
+      openingErrorCount: 1,
+      openingErrorRate: 50,
+    });
+    expect(report.repertoire.find(({ color }) => color === "black")?.gameCount).toBe(1);
+  });
+
+  it("emits only weaknesses repeated across two distinct games with traceable evidence", () => {
+    const report = buildAdvancedStudyReport([
+      game("g1", "2026-08-01T00:00:00.000Z", 70, "loss", [
+        move(1, "white", "opening", "blunder", 31),
+        move(3, "white", "middlegame", "missed_win", 35),
+      ]),
+      game("g2", "2026-08-02T00:00:00.000Z", 80, "loss", [
+        move(5, "white", "opening", "mistake", 17),
+        move(7, "white", "endgame", "missed_mate", 42),
+      ]),
+      game("g3", "2026-08-03T00:00:00.000Z", 90, "win", [move(9, "white", "endgame", "inaccuracy", 7)]),
+    ]);
+
+    expect(report.weaknesses.map(({ kind }) => kind)).toEqual(["missed-opportunities", "opening-decisions"]);
+    expect(report.weaknesses[0]).toMatchObject({ gameCount: 2, incidentCount: 2, averageWinPercentLoss: 38.5 });
+    expect(report.weaknesses[0]?.evidence).toEqual([
+      { gameId: "g2", ply: 7, san: "Nf3", phase: "endgame", classification: "missed_mate", winPercentLoss: 42 },
+      { gameId: "g1", ply: 3, san: "Nf3", phase: "middlegame", classification: "missed_win", winPercentLoss: 35 },
+    ]);
+    expect(report.weaknesses.some(({ kind }) => kind === "endgame-decisions")).toBe(false);
+  });
+});

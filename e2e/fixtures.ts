@@ -112,9 +112,9 @@ async function writeStores(page: Page, values: Record<string, Array<[IDBValidKey
   await page.goto("/");
   await page.evaluate(async ({ values }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 3);
+      const request = indexedDB.open("open-chess-review", 4);
       request.onupgradeneeded = () => {
-        for (const name of ["objective-analyses", "review-records", "platform-accounts", "synced-games", "platform-sync-state"]) {
+        for (const name of ["objective-analyses", "review-records", "platform-accounts", "synced-games", "platform-sync-state", "training-queue"]) {
           if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name);
         }
       };
@@ -139,6 +139,90 @@ export async function seedReview(page: Page, options: { visualLabels?: boolean }
     "objective-analyses": [[fixture.cacheKey, fixture.analysis]],
   });
   return fixture;
+}
+
+export async function seedAdvancedStudy(page: Page) {
+  const pgns = [
+    `[Event "Phase 7 study one"]\n[Date "2026.08.01"]\n[White "Ada"]\n[Black "Mikhail"]\n[Result "0-1"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 *`,
+    `[Event "Phase 7 study two"]\n[Date "2026.08.02"]\n[White "Ada"]\n[Black "Grace"]\n[Result "1/2-1/2"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 *`,
+    `[Event "Phase 7 study three"]\n[Date "2026.08.03"]\n[White "Ada"]\n[Black "Katherine"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 *`,
+  ];
+  const values: Record<string, Array<[IDBValidKey, unknown]>> = {
+    "review-records": [],
+    "objective-analyses": [],
+  };
+  const fixtures: Array<{ record: ReviewRecord; analysis: GameAnalysisV1 }> = [];
+
+  for (const [index, pgn] of pgns.entries()) {
+    const game = parsePgn(pgn!);
+    const fens = [game.initialFen, ...game.plies.map((move) => move.fenAfter)];
+    const analysis = buildGameAnalysis({
+      game,
+      positionAnalyses: fens.map((fen, positionIndex) => positionResult(fen, game.plies[positionIndex]?.uci, positionIndex)),
+      division: divideGame(game),
+      opening: { eco: "C50", name: "Italian Game", variation: "Giuoco Piano", matchedPly: 5, theoryUntilPly: 6 },
+      stockfishVersion: STOCKFISH_VERSION,
+      depth: DEPTH,
+      multiPv: MULTI_PV,
+      createdAt: `2026-08-0${index + 1}T12:00:00.000Z`,
+    });
+    const openingError = analysis.moves[0]!;
+    openingError.classification = index === 2 ? "blunder" : "mistake";
+    openingError.accuracy = index === 2 ? 35 : 55 + index * 5;
+    openingError.classificationReason = {
+      ...openingError.classificationReason,
+      precedenceRule: "phase-7-opening-fixture",
+      isEngineBest: false,
+      engineRank: 3,
+      centipawnLoss: index === 2 ? 240 : 150,
+      winPercentAfter: 30 + index * 4,
+      winPercentLoss: index === 2 ? 31 : 20 + index * 3,
+    };
+    const missedChance = analysis.moves[2]!;
+    if (index < 2) {
+      missedChance.classification = "missed_win";
+      missedChance.accuracy = 28 + index * 4;
+      missedChance.classificationReason = {
+        ...missedChance.classificationReason,
+        precedenceRule: "phase-7-missed-win-fixture",
+        isEngineBest: false,
+        engineRank: 3,
+        centipawnLoss: 280,
+        winPercentAfter: 40,
+        winPercentLoss: 36 + index * 2,
+      };
+    }
+    analysis.white.accuracy = 72 + index * 6;
+    analysis.white.phaseAccuracy.opening = 69 + index * 6;
+    analysis.white.classificationCounts = {
+      ...analysis.white.classificationCounts,
+      best: Math.max(0, (analysis.white.classificationCounts.best ?? 0) - (index < 2 ? 2 : 1)),
+      mistake: index < 2 ? 1 : 0,
+      blunder: index === 2 ? 1 : 0,
+      ...(index < 2 ? { missed_win: 1 } : {}),
+    };
+    const built = await buildReviewRecord("pgn", pgn!);
+    const record = {
+      ...built,
+      createdAt: `2026-08-0${index + 1}T13:00:00.000Z`,
+      updatedAt: `2026-08-0${index + 1}T13:00:00.000Z`,
+      preferredOrientation: "white" as const,
+    };
+    const cacheKey = await digest([
+      OBJECTIVE_ALGORITHM_VERSION,
+      STOCKFISH_VERSION,
+      DEPTH,
+      MULTI_PV,
+      game.initialFen,
+      game.pgn,
+    ].join("\u0000"));
+    values["review-records"]!.push([record.id, record]);
+    values["objective-analyses"]!.push([cacheKey, analysis]);
+    fixtures.push({ record, analysis });
+  }
+
+  await writeStores(page, values);
+  return fixtures;
 }
 
 export async function seedUnanalyzedReview(page: Page, pgn = SHORT_ANALYSIS_PGN) {
