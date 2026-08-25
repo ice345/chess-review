@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "Rules-only baseline capability for the mobile companion.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

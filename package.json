@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:local-ai": "node scripts/dev.mjs --services-only",
+    "dev:mobile": "pnpm --filter @chess-review/mobile dev",
     "dev:web": "pnpm --filter @chess-review/web dev",
     "dev:check": "node scripts/dev.mjs --check",
     "build": "pnpm -r --if-present run build",

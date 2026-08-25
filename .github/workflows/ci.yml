@@ -44,6 +44,18 @@ jobs:
       - run: uv sync --project services/local-ai --extra dev --locked
       - run: uv run --project services/local-ai --extra dev pytest services/local-ai/tests
 
+  mobile-host:
+    name: Mobile Tauri host
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/mobile/src-tauri -> target
+      - run: cargo test --locked --manifest-path apps/mobile/src-tauri/Cargo.toml
+
   browser-workflows:
     name: Browser workflow E2E
     runs-on: ubuntu-latest
