@@ -15,6 +15,7 @@ Stockfish is canonical for evaluation, mate, best move, candidate lines and obje
 
 - `apps/web`: Next.js route shell, import/history/settings UX and browser orchestration.
 - `apps/desktop`: Vite + React + Tauri 2 shell; it reuses shared packages and owns native file/process integration rather than chess semantics.
+- `apps/mobile`: Vite + React + Tauri 2 companion feasibility shell; it owns no chess semantics and exercises the shared mobile capability policy.
 - `packages/chess-core`: PGN/FEN normalization and deterministic chess primitives.
 - `packages/analysis`: score semantics, WinPercent, Accuracy, Divider, classification and evidence.
 - `packages/stockfish`: UCI parsing, browser worker transport and deterministic cache keys.
@@ -160,6 +161,23 @@ The arm64 macOS package is verified locally, and native CI runners have verified
 macOS arm64 app/DMG, Windows x64 NSIS and Linux x64 deb/AppImage artifacts. See
 `docs/adr/0001-tauri-2-desktop.md`.
 
+## Mobile companion direction
+
+Phase 8 selects Tauri Mobile over React Native for repository fit and implements
+an independent `apps/mobile` feasibility slice. Local PGN/FEN parsing and board
+navigation reuse `chess-core`; source routing comes from the tested
+`mobile-policy-v1` shared contract. Cached canonical analysis is preferred,
+on-device Stockfish remains conditional on a real mobile capability probe, and
+Maia/model-backed Coach work requires a secure authenticated paired endpoint.
+The endpoint advertises Stockfish, exact Maia tiers and Coach languages
+independently through `MobileEndpointManifestV1`, so no source is promoted into
+another role.
+
+The loopback desktop sidecar is not exposed to the LAN. Production pairing,
+Keychain/Keystore credential storage, generated native projects and store/device
+validation remain a later mobile product gate. See [`mobile.md`](mobile.md) and
+[`adr/0002-tauri-mobile-companion.md`](adr/0002-tauri-mobile-companion.md).
+
 ## Engineering verification
 
 Critical browser workflows use deterministic Playwright fixtures backed by the
@@ -167,12 +185,12 @@ real parser, analysis assembler and IndexedDB contracts. The local-ai boundary i
 mocked so CI never depends on Maia, Ollama or a cloud provider. Representative
 visual baselines cover the principal workspace states and the complete Move
 Quality Annotation System V3 fixture. GitHub Actions
-runs cached TypeScript, Python, build and browser-workflow jobs; see
+runs cached TypeScript, Python, mobile Tauri host, build and browser-workflow jobs; see
 [`testing.md`](testing.md).
 
 ## Current implementation status
 
-Phases 0–7 are complete. The independent Vite/React/Tauri 2 shell,
+Phases 0–8 are complete. The independent Vite/React/Tauri 2 desktop shell,
 shared-package imports, native PGN integration, managed Ollama, packaged
 local-ai ownership and the three-platform unsigned artifact matrix are
 implemented and verified. Signing, notarization, universal macOS binaries and a
@@ -180,3 +198,6 @@ versioned public release remain explicit release-operations follow-ups. Phase 7
 adds deterministic multi-game trends, color-specific opening repertoire,
 recurring weakness evidence and a persistent training queue without changing the
 canonical single-game algorithms.
+
+Phase 8 adds a mobile feasibility shell and an executable source-routing policy;
+it does not claim signed mobile artifacts or a deployed remote relay.

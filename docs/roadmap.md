@@ -321,10 +321,20 @@ change Accuracy, Divider, WinPercent, White-POV score handling, classification o
 Human Find Difficulty. Lc0 is intentionally not part of this product phase; it is
 not required by any advanced-study calculation.
 
-## Phase 8 — mobile companion exploration
+## Phase 8 — mobile companion exploration (complete)
 
-- [ ] evaluate Tauri Mobile versus React Native
-- [ ] define mobile capability boundaries
-- [ ] design a local/remote AI strategy
+- [x] evaluate Tauri Mobile versus React Native
+- [x] define mobile capability boundaries
+- [x] design a local/remote AI strategy
+
+Phase 8 completed on 2026-08-26 with an accepted Tauri Mobile decision, a
+mobile-compatible Vite/React/Tauri feasibility shell and the tested
+`mobile-policy-v1` resolver. The companion parses PGN/FEN and navigates imported
+games on-device, while a versioned endpoint manifest keeps cached Stockfish,
+conditional device Stockfish, remote Maia and grounded Coach lanes separate.
+Remote access requires explicit pairing, authentication and secure transport;
+the existing loopback desktop service is not exposed. Android/iOS generated
+projects, signing and device/store validation belong to a future production
+mobile gate rather than this exploration phase.
 
 Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phases 5–5.3 do not change Accuracy, Divider, WinPercent, score POV or objective classification semantics.

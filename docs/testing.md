@@ -6,6 +6,7 @@
 - `services/local-ai/tests` covers FastAPI schemas, Maia/provider behavior, Coach validation and deterministic grounding in Python.
 - Playwright workflow tests cover real uncached browser-Stockfish review (including checkmate and stalemate endings), import, canonical navigation, orientation, legal user variation moves with runtime Stockfish Move Quality badges, exact Stockfish/Maia candidate-row identity, shared destinations, unbiased Compare overlap, Return to Game, background Coach completion across Review/Moves/Study navigation, rapid source/Coach actions, explicit button types, PNG export, mocked Maia availability/offline/setup behavior, move-N versus position-N identity, model/Elo invalidation, IndexedDB restoration, matching Coach facts, progressive large-library rendering, multi-game study evidence, persistent training progress and exact-ply training deep links.
 - Playwright screenshot tests cover Home, White/Black board orientation, Brilliant/Blunder marks, a user variation, combined Stockfish/Maia evidence, deterministic grounded Study copy, Library composition and the complete 14-label Move Quality V3 fixture across four sizes/background families.
+- `packages/shared/src/mobile.test.ts` covers offline/cache/device/remote source routing, secure pairing requirements, exact Maia tier and Coach language compatibility, and untrusted mobile endpoint manifest rejection.
 
 `e2e/fixtures.ts` builds review data through the real parser and analysis assembler, can seed an unanalyzed record for an actual browser-Stockfish run, writes deterministic records to IndexedDB, and mocks the local-ai HTTP boundary. Tests must not require live Chess.com, Lichess, Maia, Ollama or cloud credentials.
 
@@ -26,6 +27,7 @@ pnpm build
 pnpm test:e2e
 uv run --project services/local-ai --extra dev pytest services/local-ai/tests
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo test --locked --manifest-path apps/mobile/src-tauri/Cargo.toml
 pnpm --filter @chess-review/desktop sidecar:build
 ```
 
@@ -35,11 +37,12 @@ The E2E web server uses `pnpm dev:web`, so browser workflows validate Browser Co
 
 ## CI
 
-`.github/workflows/ci.yml` has three independent, dependency-cached jobs:
+`.github/workflows/ci.yml` has four independent, dependency-cached jobs:
 
 1. TypeScript typecheck, lint, package tests and production build.
 2. Python local-ai tests through the locked uv environment.
-3. Chromium workflow E2E with Playwright-managed browser dependencies.
+3. Mobile-compatible Tauri host compilation/tests on macOS using the committed Cargo lock.
+4. Chromium workflow E2E with Playwright-managed browser dependencies.
 
 No CI job starts the managed local service or contacts a chess platform. Failure traces and screenshots from the E2E job are uploaded for diagnosis.
 

@@ -40,6 +40,7 @@ The pnpm workspace keeps those boundaries explicit:
 | `packages/ui` | Original Blue Bishop identity, geometric Move Quality Annotation System V3 and quieter human-difficulty marks |
 | `services/local-ai` | Optional FastAPI Maia and provider-neutral grounded Coach adapters |
 | `apps/desktop` | Phase 6 Vite/React/Tauri 2 native shell; it imports shared packages and owns no analysis semantics |
+| `apps/mobile` | Phase 8 Vite/React/Tauri 2 companion feasibility shell and mobile-policy consumer |
 
 See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/data-model.md) for the detailed contracts.
 
@@ -50,6 +51,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 | Browser Core | `pnpm dev:web` | PGN/FEN, Stockfish WASM, review, variations, Accuracy, openings, charts, library and exports |
 | Enhanced Local | `pnpm dev` | Browser Core plus managed/reused FastAPI, Maia-3, Ollama discovery and grounded local coaching |
 | Services only | `pnpm dev:local-ai` | Starts or reuses optional services for a separately running web app |
+| Mobile feasibility | `pnpm dev:mobile` | Local PGN/FEN, board navigation and capability-routing preview; no remote request |
 
 `pnpm dev` is the normal full-development entry point. It reuses healthy services, starts only missing executables, and stops only processes it owns. Ollama is started with `ollama serve`; no Ollama or Maia model is downloaded automatically. Maia-3 5M/23M/79M setup is an explicit Settings/Review action. `pnpm dev:check` reports runtime availability without starting anything.
 
@@ -127,3 +129,5 @@ Current implementation status and acceptance gates live in [docs/roadmap.md](doc
 
 The desktop foundation and native build commands are documented separately in
 [docs/desktop.md](docs/desktop.md).
+The completed mobile exploration, Tauri Mobile decision and production-device
+gate are documented in [docs/mobile.md](docs/mobile.md).
