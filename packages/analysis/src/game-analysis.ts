@@ -3,13 +3,17 @@ import type { NormalizedGame, NormalizedPly, ReplayedUciMove } from "@chess-revi
 import type {
   ClassificationReason,
   CriticalMoment,
+  EngineConsistencyEvidence,
   EngineScore,
-  GameAnalysisV1,
+  GameAnalysisV2,
   GameDivision,
-  MoveAnalysis,
+  MoveAnalysisV2,
+  MoveAnnotation,
   MoveClassification,
+  MoveQuality,
+  ObjectiveVerificationReason,
   OpeningInfo,
-  PlayerAnalysis,
+  PlayerAnalysisV2,
   PlayerColor,
   StockfishMoveAnalysis,
 } from "@chess-review/shared";
@@ -17,8 +21,12 @@ import { gameAccuracy, moveAccuracyFromWinPercents, phaseAccuracies, scoreToAccu
 import { classifyMove } from "./classification";
 import { divideGame, phaseForPly } from "./divider";
 import { detectSacrifice } from "./sacrifice";
+import { winPercentFromScore } from "./win-percent";
 
-export const OBJECTIVE_ALGORITHM_VERSION = "objective-v1-preview.3";
+export const OBJECTIVE_ALGORITHM_VERSION = "objective-v2.0";
+export const CLASSIFICATION_MULTI_PV = 3;
+export const VERIFICATION_POLICY_VERSION = "selective-verification-v1";
+export const ENGINE_CONSISTENCY_TOLERANCE_WIN_PERCENT = 5;
 
 const CLASSIFICATIONS: MoveClassification[] = [
   "brilliant",
@@ -37,6 +45,8 @@ const CLASSIFICATIONS: MoveClassification[] = [
   "missed_mate",
 ];
 
+const QUALITIES: MoveQuality[] = ["best", "excellent", "good", "inaccuracy", "mistake", "blunder"];
+
 export interface BuildGameAnalysisInput {
   game: NormalizedGame;
   positionAnalyses: StockfishMoveAnalysis[];
@@ -47,6 +57,9 @@ export interface BuildGameAnalysisInput {
   depth: number;
   multiPv: number;
   createdAt: string;
+  verifiedPlies?: ReadonlySet<number>;
+  verificationReasons?: ReadonlyMap<number, readonly ObjectiveVerificationReason[]>;
+  requireVerifiedSpecialAnnotations?: boolean;
 }
 
 export interface ClassifyExploratoryMoveInput {
@@ -57,6 +70,8 @@ export interface ClassifyExploratoryMoveInput {
 }
 
 export interface ExploratoryMoveClassification {
+  quality: MoveQuality;
+  annotations: MoveAnnotation[];
   classification: MoveClassification;
   classificationReason: ClassificationReason;
   playedMoveScore: EngineScore;
@@ -156,6 +171,8 @@ export function classifyExploratoryMove(input: ClassifyExploratoryMoveInput): Ex
   });
 
   return {
+    quality: result.quality,
+    annotations: result.annotations,
     classification: result.classification,
     classificationReason: result.reason,
     playedMoveScore,
@@ -171,15 +188,55 @@ function emptyCounts(): Record<MoveClassification, number> {
   return Object.fromEntries(CLASSIFICATIONS.map((classification) => [classification, 0])) as Record<MoveClassification, number>;
 }
 
+function emptyQualityCounts(): Record<MoveQuality, number> {
+  return Object.fromEntries(QUALITIES.map((quality) => [quality, 0])) as Record<MoveQuality, number>;
+}
+
+function engineConsistency(playedMoveScore: EngineScore, evaluationAfter: EngineScore): EngineConsistencyEvidence {
+  const winPercentDelta = Math.abs(winPercentFromScore(playedMoveScore) - winPercentFromScore(evaluationAfter));
+  const centipawnDelta = playedMoveScore.kind === "cp" && evaluationAfter.kind === "cp"
+    ? Math.abs(playedMoveScore.cp - evaluationAfter.cp)
+    : undefined;
+  return {
+    winPercentDelta,
+    ...(centipawnDelta === undefined ? {} : { centipawnDelta }),
+    toleranceWinPercent: ENGINE_CONSISTENCY_TOLERANCE_WIN_PERCENT,
+    consistent: winPercentDelta <= ENGINE_CONSISTENCY_TOLERANCE_WIN_PERCENT,
+  };
+}
+
+function verificationReasons(
+  classification: ReturnType<typeof classifyMove>,
+  consistency: EngineConsistencyEvidence,
+  depth: number,
+  extra: readonly ObjectiveVerificationReason[],
+): ObjectiveVerificationReason[] {
+  const reasons = new Set<ObjectiveVerificationReason>(extra);
+  if (classification.annotations.some((annotation) => (
+    ["critical", "brilliant", "missed_win", "missed_mate"] as MoveAnnotation[]
+  ).includes(annotation))) reasons.add("special-annotation");
+  if ([2, 5, 10, 20].some((threshold) => Math.abs(classification.reason.winPercentLoss - threshold) <= 1)) {
+    reasons.add("quality-threshold-boundary");
+  }
+  if (!consistency.consistent) reasons.add("played-score-inconsistency");
+  if (reasons.size > 0 && depth < 15) reasons.add("low-depth-evidence");
+  return [...reasons];
+}
+
 function playerAnalysis(
   color: PlayerColor,
   overall: { white: number; black: number } | null,
-  phases: { white: PlayerAnalysis["phaseAccuracy"]; black: PlayerAnalysis["phaseAccuracy"] },
-  moves: MoveAnalysis[],
-): PlayerAnalysis {
+  phases: { white: PlayerAnalysisV2["phaseAccuracy"]; black: PlayerAnalysisV2["phaseAccuracy"] },
+  moves: MoveAnalysisV2[],
+): PlayerAnalysisV2 {
   const counts = emptyCounts();
+  const qualityCounts = emptyQualityCounts();
+  const annotationCounts: Partial<Record<MoveAnnotation, number>> = {};
   for (const move of moves) {
-    if (move.color === color) counts[move.classification] += 1;
+    if (move.color !== color) continue;
+    counts[move.classification] += 1;
+    qualityCounts[move.quality] += 1;
+    for (const annotation of move.annotations) annotationCounts[annotation] = (annotationCounts[annotation] ?? 0) + 1;
   }
   const accuracy = overall?.[color];
   return {
@@ -187,19 +244,22 @@ function playerAnalysis(
     ...(accuracy === undefined ? {} : { accuracy }),
     phaseAccuracy: phases[color],
     classificationCounts: counts,
+    qualityCounts,
+    annotationCounts,
   };
 }
 
-function isCritical(move: MoveAnalysis): boolean {
-  return ["brilliant", "great", "mistake", "blunder", "miss", "missed_win", "missed_mate"].includes(move.classification)
+function isCritical(move: MoveAnalysisV2): boolean {
+  return move.annotations.some((annotation) => ["brilliant", "critical", "missed_win", "missed_mate"].includes(annotation))
+    || ["mistake", "blunder"].includes(move.quality)
     || move.classificationReason.winPercentLoss >= 15;
 }
 
-export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV1 {
+export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV2 {
   assertPositionSequence(input.game, input.positionAnalyses);
   const division = input.division ?? divideGame(input.game);
 
-  const moves: MoveAnalysis[] = input.game.plies.map((ply, index) => {
+  const moves: MoveAnalysisV2[] = input.game.plies.map((ply, index) => {
     const before = input.positionAnalyses[index];
     const after = input.positionAnalyses[index + 1];
     if (!before || !after) throw new Error(`Missing engine analysis for ply ${ply.ply}.`);
@@ -223,7 +283,7 @@ export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV1
       playedMoveScore,
       playedLine,
     });
-    const classification = classifyMove({
+    const classificationInput = {
       color: ply.color,
       scoreBefore: before.score,
       scoreAfter: playedMoveScore,
@@ -236,6 +296,29 @@ export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV1
       isTrivialCheckEscape: trivialCheckEscape(ply),
       playedMoveOutsideMultiPv,
       ...(sacrifice === undefined ? {} : { sacrifice }),
+      ...(input.requireVerifiedSpecialAnnotations === true
+        ? { specialAnnotationsVerified: input.verifiedPlies?.has(ply.ply) === true }
+        : {}),
+    } as const;
+    const baselineClassification = classifyMove(classificationInput);
+    const consistency = engineConsistency(playedMoveScore, after.score);
+    const reasons = verificationReasons(
+      baselineClassification,
+      consistency,
+      before.depth,
+      input.verificationReasons?.get(ply.ply) ?? [],
+    );
+    const classification = classifyMove({
+      ...classificationInput,
+      engineConsistency: consistency,
+      ...(reasons.length === 0 ? {} : {
+        verification: {
+          status: input.verifiedPlies?.has(ply.ply) ? "verified" as const : "baseline" as const,
+          depth: before.depth,
+          multiPv: before.lines.length,
+          reasons,
+        },
+      }),
     });
 
     return {
@@ -250,6 +333,9 @@ export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV1
       evaluationAfter: after.score,
       playedMoveScore,
       playedMoveOutsideMultiPv,
+      quality: classification.quality,
+      annotations: classification.annotations,
+      objectiveVersion: "move-quality-v2",
       classification: classification.classification,
       classificationReason: classification.reason,
       stockfish: before,
@@ -283,7 +369,7 @@ export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV1
   }));
 
   return {
-    version: 1,
+    version: 2,
     algorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
     game: {
       headers: input.game.headers,
@@ -294,6 +380,9 @@ export function buildGameAnalysis(input: BuildGameAnalysisInput): GameAnalysisV1
       stockfishVersion: input.stockfishVersion,
       depth: input.depth,
       multiPv: input.multiPv,
+      classificationMultiPv: input.multiPv,
+      verificationPolicyVersion: VERIFICATION_POLICY_VERSION,
+      verifiedMoveCount: input.verifiedPlies?.size ?? 0,
     },
     ...(input.opening === undefined ? {} : { opening: input.opening }),
     division,

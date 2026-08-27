@@ -1,7 +1,11 @@
 import type {
   ClassificationReason,
+  EngineConsistencyEvidence,
   EngineScore,
+  MoveAnnotation,
   MoveClassification,
+  MoveQuality,
+  ObjectiveVerificationEvidence,
   PlayerColor,
   SacrificeEvidence,
 } from "@chess-review/shared";
@@ -20,28 +24,33 @@ export interface ClassificationInput {
   isObviousRecapture?: boolean;
   isTrivialCheckEscape?: boolean;
   playedMoveOutsideMultiPv?: boolean;
-  hasTacticalBestLine?: boolean;
   sacrifice?: SacrificeEvidence;
+  engineConsistency?: EngineConsistencyEvidence;
+  verification?: ObjectiveVerificationEvidence;
+  /** Final product builds may suppress consequential annotations until re-searched. */
+  specialAnnotationsVerified?: boolean;
 }
 
 export interface ClassificationResult {
+  quality: MoveQuality;
+  annotations: MoveAnnotation[];
+  /** Compatibility projection for existing icon/export consumers. */
   classification: MoveClassification;
   reason: ClassificationReason;
 }
 
 export const CLASSIFICATION_THRESHOLDS = {
+  bestMaxWinPercentLoss: 0.5,
+  excellentMaxWinPercentLoss: 2,
+  goodMaxWinPercentLoss: 5,
+  inaccuracyMaxWinPercentLoss: 10,
+  mistakeMaxWinPercentLoss: 20,
   brilliantWinPercentLoss: 1,
-  greatSecondBestGapCp: 150,
-  greatSecondBestGapWinPercent: 10,
+  brilliantSecondBestGapWinPercent: 5,
+  criticalSecondBestGapWinPercent: 10,
   bookMaxWinPercentLoss: 3,
-  excellentCpLoss: 15,
-  interestingCpLoss: 30,
-  goodCpLoss: 60,
-  inaccuracyCpLoss: 120,
-  mistakeCpLoss: 250,
   missedWinChanceBefore: 92,
   missedWinDrop: 30,
-  missDrop: 25,
 } as const;
 
 function moverWinPercent(score: EngineScore, color: PlayerColor): number {
@@ -67,6 +76,8 @@ export function classifyMove(input: ClassificationInput): ClassificationResult {
   const isTrivialCheckEscape = input.isTrivialCheckEscape ?? false;
   const playedMoveOutsideMultiPv = input.playedMoveOutsideMultiPv ?? false;
   const exclusions: string[] = [];
+  const annotations: MoveAnnotation[] = [];
+  const retainConsequentialAnnotations = input.specialAnnotationsVerified !== false;
 
   if (isForced) exclusions.push("only-legal-move");
   if (isObviousRecapture) exclusions.push("obvious-recapture");
@@ -74,10 +85,91 @@ export function classifyMove(input: ClassificationInput): ClassificationResult {
   if (before >= 97 || before <= 3) exclusions.push("position-already-decided");
   if (input.sacrifice && !input.sacrifice.genuine) exclusions.push("sacrifice-not-verified");
 
-  const make = (classification: MoveClassification, precedenceRule: string): ClassificationResult => ({
+  const quality: MoveQuality = input.isCheckmate
+    || (isEngineBest && loss <= CLASSIFICATION_THRESHOLDS.bestMaxWinPercentLoss)
+    ? "best"
+    : loss <= CLASSIFICATION_THRESHOLDS.excellentMaxWinPercentLoss
+      ? "excellent"
+      : loss <= CLASSIFICATION_THRESHOLDS.goodMaxWinPercentLoss
+        ? "good"
+        : loss <= CLASSIFICATION_THRESHOLDS.inaccuracyMaxWinPercentLoss
+          ? "inaccuracy"
+          : loss <= CLASSIFICATION_THRESHOLDS.mistakeMaxWinPercentLoss
+            ? "mistake"
+            : "blunder";
+  const qualityRule = input.isCheckmate
+    ? "checkmate"
+    : quality === "best"
+      ? "engine-top-choice-negligible-loss"
+      : "win-percent-loss-ladder";
+
+  const lostMate = hasForcedMateFor(input.scoreBefore, input.color)
+    && !hasForcedMateFor(input.scoreAfter, input.color);
+  const missedWin = before >= CLASSIFICATION_THRESHOLDS.missedWinChanceBefore
+    && loss >= CLASSIFICATION_THRESHOLDS.missedWinDrop;
+  if (!retainConsequentialAnnotations && (lostMate || missedWin)) exclusions.push("special-annotation-not-verified");
+  if (lostMate && retainConsequentialAnnotations) annotations.push("missed_mate");
+  else if (missedWin && retainConsequentialAnnotations) annotations.push("missed_win");
+  if (input.isBook && loss <= CLASSIFICATION_THRESHOLDS.bookMaxWinPercentLoss) annotations.push("book");
+  if (isForced) annotations.push("forced");
+  if (input.sacrifice?.genuine === true) annotations.push("sacrifice");
+
+  const outcomeRelevantGap = (secondBestGapWinPercent ?? 0)
+    >= CLASSIFICATION_THRESHOLDS.criticalSecondBestGapWinPercent;
+  const critical = isEngineBest
+    && outcomeRelevantGap
+    && !isForced
+    && !isObviousRecapture
+    && !isTrivialCheckEscape;
+  if (critical && retainConsequentialAnnotations) annotations.push("critical");
+  else if (critical) exclusions.push("special-annotation-not-verified");
+
+  const brilliant = isEngineBest
+    && loss <= CLASSIFICATION_THRESHOLDS.brilliantWinPercentLoss
+    && (secondBestGapWinPercent ?? 0) >= CLASSIFICATION_THRESHOLDS.brilliantSecondBestGapWinPercent
+    && input.sacrifice?.genuine === true
+    && !isForced
+    && !isObviousRecapture
+    && !isTrivialCheckEscape
+    && before > 3
+    && before < 97;
+  if (brilliant && retainConsequentialAnnotations) annotations.push("brilliant");
+  else if (brilliant && !exclusions.includes("special-annotation-not-verified")) exclusions.push("special-annotation-not-verified");
+
+  const classification: MoveClassification = annotations.includes("missed_mate")
+    ? "missed_mate"
+    : annotations.includes("missed_win")
+      ? "missed_win"
+      : annotations.includes("book")
+        ? "book"
+        : annotations.includes("forced")
+          ? "forced"
+          : annotations.includes("brilliant")
+            ? "brilliant"
+            : annotations.includes("critical")
+              ? "great"
+              : quality;
+  const precedenceRule = annotations.includes("missed_mate")
+    ? "missed-forced-mate"
+    : annotations.includes("missed_win")
+      ? "missed-winning-position"
+      : annotations.includes("book")
+        ? "opening-book"
+        : annotations.includes("forced")
+          ? "only-legal-move"
+          : annotations.includes("brilliant")
+            ? "verified-nontrivial-sacrifice"
+            : annotations.includes("critical")
+              ? "outcome-critical-best-move"
+              : qualityRule;
+
+  return {
+    quality,
+    annotations,
     classification,
     reason: {
       precedenceRule,
+      qualityRule,
       isEngineBest,
       ...(input.playedMoveRank === undefined ? {} : { engineRank: input.playedMoveRank }),
       ...(centipawnLoss === undefined ? {} : { centipawnLoss }),
@@ -93,61 +185,10 @@ export function classifyMove(input: ClassificationInput): ClassificationResult {
       isObviousRecapture,
       isTrivialCheckEscape,
       playedMoveOutsideMultiPv,
+      ...(input.engineConsistency === undefined ? {} : { engineConsistency: input.engineConsistency }),
+      ...(input.verification === undefined ? {} : { verification: input.verification }),
       ...(input.sacrifice === undefined ? {} : { sacrifice: input.sacrifice }),
       exclusions,
     },
-  });
-
-  if (input.isCheckmate) return make("best", "checkmate");
-
-  if (hasForcedMateFor(input.scoreBefore, input.color) && !hasForcedMateFor(input.scoreAfter, input.color)) {
-    return make("missed_mate", "missed-forced-mate");
-  }
-
-  if (before >= CLASSIFICATION_THRESHOLDS.missedWinChanceBefore && loss >= CLASSIFICATION_THRESHOLDS.missedWinDrop) {
-    return make("missed_win", "missed-winning-position");
-  }
-
-  if (input.isBook && loss <= CLASSIFICATION_THRESHOLDS.bookMaxWinPercentLoss) {
-    return make("book", "opening-book");
-  }
-
-  if (isForced) return make("forced", "only-legal-move");
-
-  const brilliant = isEngineBest
-    && loss <= CLASSIFICATION_THRESHOLDS.brilliantWinPercentLoss
-    && input.sacrifice?.genuine === true
-    && !isObviousRecapture
-    && !isTrivialCheckEscape
-    && before > 3
-    && before < 97;
-  if (brilliant) return make("brilliant", "verified-nontrivial-sacrifice");
-
-  const criticalGap = (secondBestGapCp ?? 0) >= CLASSIFICATION_THRESHOLDS.greatSecondBestGapCp
-    || (secondBestGapWinPercent ?? 0) >= CLASSIFICATION_THRESHOLDS.greatSecondBestGapWinPercent;
-  if (isEngineBest && criticalGap && !isObviousRecapture && !isTrivialCheckEscape) {
-    return make("great", "critical-best-move");
-  }
-
-  if (isEngineBest) return make("best", "engine-top-choice");
-
-  if (centipawnLoss !== undefined) {
-    if (centipawnLoss <= CLASSIFICATION_THRESHOLDS.excellentCpLoss) return make("excellent", "centipawn-loss-ladder");
-    if (centipawnLoss <= CLASSIFICATION_THRESHOLDS.interestingCpLoss && (input.playedMoveRank ?? 99) > 2) {
-      return make("interesting", "near-equal-novel-candidate");
-    }
-    if (centipawnLoss <= CLASSIFICATION_THRESHOLDS.goodCpLoss) return make("good", "centipawn-loss-ladder");
-    if (centipawnLoss <= CLASSIFICATION_THRESHOLDS.inaccuracyCpLoss) return make("inaccuracy", "centipawn-loss-ladder");
-    if (centipawnLoss <= CLASSIFICATION_THRESHOLDS.mistakeCpLoss) return make("mistake", "centipawn-loss-ladder");
-  } else {
-    if (loss <= 1) return make("excellent", "win-percent-loss-ladder");
-    if (loss <= 3) return make("good", "win-percent-loss-ladder");
-    if (loss <= 8) return make("inaccuracy", "win-percent-loss-ladder");
-    if (loss <= 15) return make("mistake", "win-percent-loss-ladder");
-  }
-
-  if (loss >= CLASSIFICATION_THRESHOLDS.missDrop && input.hasTacticalBestLine) {
-    return make("miss", "missed-tactical-resource");
-  }
-  return make("blunder", "centipawn-or-win-percent-loss-ladder");
+  };
 }

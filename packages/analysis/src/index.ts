@@ -8,4 +8,6 @@ export * from "./human-difficulty";
 export * from "./sacrifice";
 export * from "./score";
 export * from "./study";
+export * from "./study-v2";
+export * from "./verification";
 export * from "./win-percent";

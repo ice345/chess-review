@@ -1,5 +1,5 @@
 import type {
-  GameAnalysisV1,
+  AnyGameAnalysis,
   GamePhase,
   MoveClassification,
   PlayerColor,
@@ -17,7 +17,15 @@ export interface StudyGameInput {
   playedAt: string;
   playerColor: PlayerColor;
   result: StudyGameResult;
-  analysis: GameAnalysisV1;
+  analysis: AnyGameAnalysis;
+  source?: {
+    accountId: string;
+    provider: "chesscom" | "lichess";
+    timeClass?: string;
+    rated?: boolean;
+    playerRating?: number;
+    opponentRating?: number;
+  };
 }
 
 export interface StudyTrendPoint {

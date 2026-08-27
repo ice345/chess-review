@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { COACH_PROMPT_VERSION } from "@chess-review/analysis";
-import type { GameAnalysisV1 } from "@chess-review/shared";
+import type { GameAnalysisV2 } from "@chess-review/shared";
 import { withoutStaleCoach } from "./analysis-cache";
 
-function cachedAnalysis(movePromptVersion: string, summaryPromptVersion: string): GameAnalysisV1 {
+function cachedAnalysis(movePromptVersion: string, summaryPromptVersion: string): GameAnalysisV2 {
   return {
     moves: [{ coach: { source: { promptVersion: movePromptVersion } } }],
     coachSummary: { source: { promptVersion: summaryPromptVersion } },
-  } as unknown as GameAnalysisV1;
+  } as unknown as GameAnalysisV2;
 }
 
 describe("coach cache invalidation", () => {

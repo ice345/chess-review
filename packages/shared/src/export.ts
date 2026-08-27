@@ -1,4 +1,4 @@
-import type { EngineScore, GameAnalysisV1, MoveAnalysis } from "./schema";
+import type { AnyGameAnalysis, EngineScore, MoveAnalysis } from "./schema";
 
 const STANDARD_INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const HEADER_ORDER = ["Event", "Site", "Date", "Round", "White", "Black", "Result"];
@@ -17,9 +17,13 @@ function safeComment(value: string): string {
 }
 
 function moveComment(move: MoveAnalysis): string {
+  const objectiveV2 = "quality" in move
+    ? move as MoveAnalysis & { quality: string; annotations: string[] }
+    : null;
   const evidence = [
     `[%eval ${scoreAnnotation(move.evaluationAfter)}]`,
-    move.classification.replaceAll("_", " "),
+    objectiveV2 ? `Quality ${objectiveV2.quality}` : move.classification.replaceAll("_", " "),
+    ...(objectiveV2?.annotations ?? []).map((annotation) => `Annotation ${annotation.replaceAll("_", " ")}`),
     `Accuracy ${move.accuracy.toFixed(1)}%`,
     `Win% loss ${move.classificationReason.winPercentLoss.toFixed(1)}`,
     `Rule ${move.classificationReason.precedenceRule}`,
@@ -30,7 +34,7 @@ function moveComment(move: MoveAnalysis): string {
   return `{ ${safeComment(evidence.join("; "))} }`;
 }
 
-function orderedHeaders(analysis: GameAnalysisV1): Array<[string, string]> {
+function orderedHeaders(analysis: AnyGameAnalysis): Array<[string, string]> {
   const headers: Record<string, string> = { ...analysis.game.headers };
   headers.Result ??= "*";
   headers.Annotator = `Open Chess Review ${analysis.algorithmVersion}`;
@@ -46,7 +50,7 @@ function orderedHeaders(analysis: GameAnalysisV1): Array<[string, string]> {
   return [...ordered, ...remaining];
 }
 
-function annotatedMovetext(analysis: GameAnalysisV1): string {
+function annotatedMovetext(analysis: AnyGameAnalysis): string {
   const fenFields = analysis.game.initialFen.split(" ");
   let moveNumber = Number(fenFields[5] ?? "1");
   if (!Number.isFinite(moveNumber) || moveNumber < 1) moveNumber = 1;
@@ -76,11 +80,11 @@ function annotatedMovetext(analysis: GameAnalysisV1): string {
   return lines.join("\n");
 }
 
-export function exportAnalysisJson(analysis: GameAnalysisV1): string {
+export function exportAnalysisJson(analysis: AnyGameAnalysis): string {
   return `${JSON.stringify(analysis, null, 2)}\n`;
 }
 
-export function exportAnnotatedPgn(analysis: GameAnalysisV1): string {
+export function exportAnnotatedPgn(analysis: AnyGameAnalysis): string {
   const tags = orderedHeaders(analysis).map(([name, value]) => `[${name} "${escapeTag(value)}"]`).join("\n");
   return `${tags}\n\n${annotatedMovetext(analysis)}\n`;
 }

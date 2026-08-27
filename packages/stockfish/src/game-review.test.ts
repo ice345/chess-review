@@ -57,6 +57,43 @@ class CheckmateSearcher implements StockfishSearcher {
   terminate(): void {}
 }
 
+/**
+ * Simulates a deeper re-search whose candidate order drifts: the replacement
+ * root for a verified ply no longer lists the played move of the following
+ * (unverified) ply among its MultiPV candidates.
+ */
+class UnstableVerificationSearcher implements StockfishSearcher {
+  static restrictedPlies: number[] = [];
+
+  async search(fen: string, options: SearchOptions): Promise<StockfishMoveAnalysis> {
+    if (options.searchMoves?.length) {
+      const move = options.searchMoves[0]!;
+      const ply = game.plies.find((candidate) => candidate.fenBefore === fen);
+      UnstableVerificationSearcher.restrictedPlies.push(ply?.ply ?? -1);
+      return {
+        fen,
+        score: { kind: "cp", cp: 10 },
+        bestMove: move,
+        searchMoves: [...options.searchMoves],
+        lines: [{ rank: 1, score: { kind: "cp", cp: 10 }, depth: options.depth, pv: [move] }],
+        depth: options.depth,
+      };
+    }
+    const ply = game.plies.find((candidate) => candidate.fenBefore === fen);
+    const deepRootDropsPlayedMove = (options.multiPv ?? 3) > 3 && ply?.ply === 3;
+    const pvMove = deepRootDropsPlayedMove ? "g2g3" : ply?.uci ?? "a2a3";
+    return {
+      fen,
+      score: { kind: "cp", cp: 20 },
+      bestMove: pvMove,
+      lines: [{ rank: 1, score: { kind: "cp", cp: 20 }, depth: options.depth, pv: [pvMove] }],
+      depth: options.depth,
+    };
+  }
+
+  terminate(): void {}
+}
+
 describe("BrowserStockfishPool", () => {
   it("bounds parallel root searches and restricts missing played moves", async () => {
     FakeSearcher.active = 0;
@@ -107,5 +144,30 @@ describe("BrowserStockfishPool", () => {
     });
     expect(CheckmateSearcher.searchedFens).not.toContain(checkmateGame.finalFen);
     expect(progress).toContain(`positions:${checkmateGame.plies.length + 1}/${checkmateGame.plies.length + 1}`);
+  });
+
+  it("selectively verifies requested roots/results and preserves restricted played-move evidence", async () => {
+    FakeSearcher.searches = [];
+    const pool = new BrowserStockfishPool(1, () => new FakeSearcher());
+    const result = await pool.verifyMoves(game, { depth: 18, multiPv: 5, plies: [2, 2] });
+
+    expect([...result.positionAnalyses.keys()]).toEqual([1, 2]);
+    expect(FakeSearcher.searches.filter(({ options }) => options.depth === 18 && options.multiPv === 5)).toHaveLength(2);
+    expect(result.playedMoveAnalyses.get(2)?.searchMoves).toEqual([game.plies[1]!.uci]);
+  });
+
+  it("supplies restricted evidence when a re-searched root drops an unverified successor move", async () => {
+    UnstableVerificationSearcher.restrictedPlies = [];
+    const pool = new BrowserStockfishPool(1, () => new UnstableVerificationSearcher());
+
+    const result = await pool.verifyMoves(game, { depth: 18, multiPv: 5, plies: [2] });
+
+    expect([...result.positionAnalyses.keys()].sort()).toEqual([1, 2]);
+    // The requested root still lists its own played move, so ply 2 needs no override.
+    expect(result.playedMoveAnalyses.has(2)).toBe(false);
+    // The replacement root for ply 2's resulting position is also the ROOT of
+    // the unplanned ply 3; its played move must regain restricted evidence.
+    expect(result.playedMoveAnalyses.get(3)?.searchMoves).toEqual([game.plies[2]!.uci]);
+    expect(UnstableVerificationSearcher.restrictedPlies).toEqual([3]);
   });
 });

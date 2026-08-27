@@ -31,6 +31,9 @@ export interface SyncedGame {
   accountColor: PlayerColor;
   analyzed: boolean;
   analysisId?: string;
+  analysisAlgorithmVersion?: string;
+  analysisDepth?: number;
+  analyzedAt?: string;
   syncedAt: string;
 }
 
@@ -120,6 +123,47 @@ export type MoveClassification =
   | "missed_win"
   | "missed_mate";
 
+/** Continuous objective quality. Special chess semantics never replace this value. */
+export type MoveQuality =
+  | "best"
+  | "excellent"
+  | "good"
+  | "inaccuracy"
+  | "mistake"
+  | "blunder";
+
+/** Deterministic secondary semantics attached to an objective quality result. */
+export type MoveAnnotation =
+  | "book"
+  | "forced"
+  | "critical"
+  | "brilliant"
+  | "sacrifice"
+  | "missed_win"
+  | "missed_mate";
+
+export type ObjectiveVerificationReason =
+  | "special-annotation"
+  | "quality-threshold-boundary"
+  | "played-score-inconsistency"
+  | "low-depth-evidence"
+  | "unstable-candidate-order";
+
+export interface EngineConsistencyEvidence {
+  /** Absolute difference between equivalent White-POV root/result evidence. */
+  winPercentDelta: number;
+  centipawnDelta?: number;
+  toleranceWinPercent: number;
+  consistent: boolean;
+}
+
+export interface ObjectiveVerificationEvidence {
+  status: "baseline" | "verified";
+  depth: number;
+  multiPv: number;
+  reasons: ObjectiveVerificationReason[];
+}
+
 export interface SacrificeEvidence {
   sacrificedMaterial: number;
   see: number;
@@ -131,6 +175,8 @@ export interface SacrificeEvidence {
 
 export interface ClassificationReason {
   precedenceRule: string;
+  /** V2 quality rule; absent on persisted V1 records. */
+  qualityRule?: string;
   isEngineBest: boolean;
   engineRank?: number;
   centipawnLoss?: number;
@@ -146,6 +192,8 @@ export interface ClassificationReason {
   isObviousRecapture: boolean;
   isTrivialCheckEscape: boolean;
   playedMoveOutsideMultiPv: boolean;
+  engineConsistency?: EngineConsistencyEvidence;
+  verification?: ObjectiveVerificationEvidence;
   sacrifice?: SacrificeEvidence;
   exclusions: string[];
 }
@@ -329,6 +377,8 @@ export interface CoachMoveFacts {
     san: string;
     uci: string;
     classification: MoveClassification;
+    quality?: MoveQuality;
+    annotations?: MoveAnnotation[];
     accuracy: number;
   };
   objective: {
@@ -363,6 +413,8 @@ export interface CoachGameMoveFacts {
   uci: string;
   phase: GamePhase;
   classification: MoveClassification;
+  quality?: MoveQuality;
+  annotations?: MoveAnnotation[];
   accuracy: number;
   winPercentLoss: number;
   humanProbability?: number;
@@ -477,11 +529,23 @@ export interface MoveAnalysis {
   coach?: CoachExplanation;
 }
 
+/** Phase 9 objective move contract. `classification` is a UI compatibility projection. */
+export interface MoveAnalysisV2 extends MoveAnalysis {
+  quality: MoveQuality;
+  annotations: MoveAnnotation[];
+  objectiveVersion: "move-quality-v2";
+}
+
 export interface PlayerAnalysis {
   color: PlayerColor;
   accuracy?: number;
   phaseAccuracy: Partial<Record<GamePhase, number>>;
   classificationCounts: Partial<Record<MoveClassification, number>>;
+}
+
+export interface PlayerAnalysisV2 extends PlayerAnalysis {
+  qualityCounts: Record<MoveQuality, number>;
+  annotationCounts: Partial<Record<MoveAnnotation, number>>;
 }
 
 export interface CriticalMoment {
@@ -507,6 +571,104 @@ export interface GameAnalysisV1 {
   criticalMoments: CriticalMoment[];
   coachSummary?: GameCoachSummary;
   createdAt: string;
+}
+
+export interface GameAnalysisV2 {
+  version: 2;
+  algorithmVersion: string;
+  game: GameMetadata;
+  engine: {
+    stockfishVersion: string;
+    depth: number;
+    /** Compatibility alias for classificationMultiPv. */
+    multiPv: number;
+    classificationMultiPv: number;
+    verificationPolicyVersion: string;
+    verifiedMoveCount: number;
+  };
+  opening?: OpeningInfo;
+  division: GameDivision;
+  white: PlayerAnalysisV2;
+  black: PlayerAnalysisV2;
+  moves: MoveAnalysisV2[];
+  criticalMoments: CriticalMoment[];
+  coachSummary?: GameCoachSummary;
+  createdAt: string;
+}
+
+export type AnyGameAnalysis = GameAnalysisV1 | GameAnalysisV2;
+
+export interface AnalysisCacheProjectionV1 {
+  version: 1;
+  cacheKey: string;
+  gameFingerprint: string;
+  algorithmVersion: string;
+  objectiveVersion: 2;
+  createdAt: string;
+  engine: GameAnalysisV2["engine"];
+  headers: Record<string, string>;
+  opening?: OpeningInfo;
+  division: GameDivision;
+  white: Pick<PlayerAnalysisV2, "accuracy" | "phaseAccuracy" | "qualityCounts" | "annotationCounts">;
+  black: Pick<PlayerAnalysisV2, "accuracy" | "phaseAccuracy" | "qualityCounts" | "annotationCounts">;
+  moveCount: number;
+  criticalMomentCount: number;
+  approximateBytes: number;
+  /**
+   * Header-independent game identity for library joins. PGN-string fingerprints
+   * break when serialization drifts between builds sharing persisted browser
+   * data; the initial FEN plus the played UCI sequence identifies the same
+   * chess game regardless of header normalization.
+   */
+  initialFen?: string;
+  uciMoves?: string[];
+}
+
+export type HistoryAnalysisJobStatus = "queued" | "running" | "paused" | "cancelled" | "failed" | "completed";
+export type HistoryAnalysisItemStatus = "queued" | "running" | "cached" | "completed" | "failed" | "cancelled";
+
+export interface HistoryAnalysisScopeV1 {
+  providers: ExternalPlatform[];
+  accountIds: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  timeClasses: string[];
+  rated: "all" | "rated" | "casual";
+  freshness: "all" | "unanalyzed" | "stale";
+}
+
+export interface HistoryAnalysisJobItemV1 {
+  gameId: string;
+  status: HistoryAnalysisItemStatus;
+  attempts: number;
+  analysisId?: string;
+  error?: string;
+  updatedAt: string;
+}
+
+/** A synced game that can never be analyzed because its PGN fails rules parsing. */
+export interface HistoryAnalysisJobExcludedItemV1 {
+  gameId: string;
+  reason: string;
+}
+
+/** Durable browser-owned work. Running means this tab currently owns it. */
+export interface HistoryAnalysisJobV1 {
+  version: 1;
+  id: string;
+  status: HistoryAnalysisJobStatus;
+  scope: HistoryAnalysisScopeV1;
+  objectiveAlgorithmVersion: string;
+  depth: number;
+  classificationMultiPv: number;
+  items: HistoryAnalysisJobItemV1[];
+  /** Structurally invalid games kept out of the queue instead of failing forever. */
+  excludedItems?: HistoryAnalysisJobExcludedItemV1[];
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
 }
 
 export type StudyWeaknessKind =
@@ -538,4 +700,18 @@ export interface TrainingQueueItemV1 {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+}
+
+export interface TrainingQueueProgressV2 {
+  reviewedPositionCount: number;
+  totalPositionCount: number;
+  lastReviewedAt?: string;
+  notes?: string;
+}
+
+/** V2 records progress only; it does not claim a spaced-repetition schedule. */
+export interface TrainingQueueItemV2 extends Omit<TrainingQueueItemV1, "version"> {
+  version: 2;
+  sourceReportVersion: "advanced-study-v2";
+  progress: TrainingQueueProgressV2;
 }

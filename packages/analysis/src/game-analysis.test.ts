@@ -41,7 +41,7 @@ function positionSequence(game: NormalizedGame): StockfishMoveAnalysis[] {
   });
 }
 
-describe("GameAnalysisV1 assembler", () => {
+describe("GameAnalysisV2 assembler", () => {
   it("reuses the canonical classifier for temporary analysis-board moves", () => {
     const game = parsePgn("1. e4");
     const move = game.plies[0]!;
@@ -61,13 +61,15 @@ describe("GameAnalysisV1 assembler", () => {
 
     const exploratory = classifyExploratoryMove({ move, rootAnalysis: root });
 
-    expect(exploratory).toEqual({
+    expect(exploratory).toMatchObject({
+      quality: canonical.quality,
+      annotations: canonical.annotations,
       classification: canonical.classification,
-      classificationReason: canonical.classificationReason,
       playedMoveScore: canonical.playedMoveScore,
       playedMoveOutsideMultiPv: canonical.playedMoveOutsideMultiPv,
       accuracy: canonical.accuracy,
     });
+    expect(exploratory.classificationReason.winPercentLoss).toBe(canonical.classificationReason.winPercentLoss);
   });
 
   it("requires matching restricted evidence for an exploratory move outside MultiPV", () => {
@@ -102,7 +104,7 @@ describe("GameAnalysisV1 assembler", () => {
       createdAt: "2026-08-22T14:00:00.000Z",
     });
 
-    expect(result.version).toBe(1);
+    expect(result.version).toBe(2);
     expect(result.algorithmVersion).toBe(OBJECTIVE_ALGORITHM_VERSION);
     expect(result.createdAt).toBe("2026-08-22T14:00:00.000Z");
     expect(result.moves).toHaveLength(4);
@@ -110,6 +112,8 @@ describe("GameAnalysisV1 assembler", () => {
       san: "e4",
       uci: "e2e4",
       classification: "best",
+      quality: "best",
+      objectiveVersion: "move-quality-v2",
       playedMoveOutsideMultiPv: false,
       evaluationBefore: { kind: "cp", cp: 15 },
     });
@@ -195,6 +199,33 @@ describe("GameAnalysisV1 assembler", () => {
         precedenceRule: "verified-nontrivial-sacrifice",
         sacrifice: { genuine: true, sacrificedMaterial: 230, survivesBestResponse: true },
       },
+    });
+  });
+
+  it("retains missed-mate as an annotation through the full-game assembler", () => {
+    const game = parsePgn("1. e4");
+    const root = engineAnalysis(game.initialFen, { kind: "mate", mateIn: 4 }, [
+      { move: "d2d4", score: { kind: "mate", mateIn: 4 } },
+      { move: "e2e4", score: { kind: "cp", cp: 0 } },
+    ]);
+    const after = engineAnalysis(game.finalFen, { kind: "cp", cp: 0 });
+
+    const result = buildGameAnalysis({
+      game,
+      positionAnalyses: [root, after],
+      stockfishVersion: "18",
+      depth: 18,
+      multiPv: 3,
+      createdAt: "2026-08-26T00:00:00.000Z",
+      verifiedPlies: new Set([1]),
+      verificationReasons: new Map([[1, ["special-annotation"]]]),
+    });
+
+    expect(result.moves[0]).toMatchObject({
+      quality: "blunder",
+      annotations: ["missed_mate"],
+      classification: "missed_mate",
+      classificationReason: { verification: { status: "verified" } },
     });
   });
 });
