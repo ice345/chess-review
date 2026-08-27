@@ -10,7 +10,7 @@ import type {
   CoachPracticalAlternativeFacts,
   CoachValidatedLine,
   EngineScore,
-  GameAnalysisV1,
+  AnyGameAnalysis,
   GameCoachSummary,
   MoveAnalysis,
   MoveClassification,
@@ -228,7 +228,7 @@ function replayMoveFacts(move: MoveAnalysis): { isCapture: boolean; givesCheck: 
   return { isCapture: played.isCapture(), givesCheck: board.inCheck() };
 }
 
-export function buildMoveCoachFacts(analysis: GameAnalysisV1, ply: number): CoachMoveFacts {
+export function buildMoveCoachFacts(analysis: AnyGameAnalysis, ply: number): CoachMoveFacts {
   const move = analysis.moves[ply - 1];
   if (!move || move.ply !== ply) throw new RangeError(`No canonical move analysis exists for ply ${ply}.`);
   const nextPosition = analysis.moves[ply]?.stockfish;
@@ -247,6 +247,7 @@ export function buildMoveCoachFacts(analysis: GameAnalysisV1, ply: number): Coac
       san: move.san,
       uci: move.uci,
       classification: move.classification,
+      ...("quality" in move ? { quality: move.quality, annotations: [...move.annotations] } : {}),
       accuracy: move.accuracy,
     },
     objective: {
@@ -288,7 +289,7 @@ export function buildMoveCoachFacts(analysis: GameAnalysisV1, ply: number): Coac
   };
 }
 
-export function buildGameCoachFacts(analysis: GameAnalysisV1): CoachGameFacts {
+export function buildGameCoachFacts(analysis: AnyGameAnalysis): CoachGameFacts {
   return {
     factsVersion: 1,
     headers: { ...analysis.game.headers },
@@ -304,6 +305,7 @@ export function buildGameCoachFacts(analysis: GameAnalysisV1): CoachGameFacts {
         uci: move.uci,
         phase: move.phase,
         classification: move.classification,
+        ...("quality" in move ? { quality: move.quality, annotations: [...move.annotations] } : {}),
         accuracy: move.accuracy,
         winPercentLoss: move.classificationReason.winPercentLoss,
         ...(human === undefined ? {} : { humanProbability: human.playedMoveProbability }),
