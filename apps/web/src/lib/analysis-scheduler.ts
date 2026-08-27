@@ -26,8 +26,9 @@ function abortError(): Error {
 /**
  * A deliberately small in-browser resource policy. It bounds concurrently
  * active analysis jobs and chooses current-position work before variations,
- * then background game review. Running work cooperates through AbortSignal;
- * queued work can be cancelled without creating an engine worker.
+ * then background game review. Two background jobs may run together so a
+ * history import is not needlessly serial; the total engine-task capacity is
+ * still bounded, and interactive work keeps the higher queue priority.
  */
 export class AnalysisScheduler {
   private active = 0;
@@ -35,8 +36,14 @@ export class AnalysisScheduler {
   private sequence = 0;
   private readonly queue: Array<QueuedJob<unknown>> = [];
 
-  constructor(readonly capacity = 2) {
+  constructor(
+    readonly capacity = 2,
+    readonly backgroundCapacity = Math.min(2, capacity),
+  ) {
     if (!Number.isInteger(capacity) || capacity < 1) throw new Error("Analysis scheduler capacity must be positive.");
+    if (!Number.isInteger(backgroundCapacity) || backgroundCapacity < 1 || backgroundCapacity > capacity) {
+      throw new Error("Background analysis capacity must be between one and the scheduler capacity.");
+    }
   }
 
   run<T>(priority: AnalysisJobPriority, task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -81,7 +88,7 @@ export class AnalysisScheduler {
     ));
     while (this.active < this.capacity) {
       const nextIndex = this.queue.findIndex((candidate) => (
-        candidate.priority !== "background-game" || this.activeBackground === 0
+        candidate.priority !== "background-game" || this.activeBackground < this.backgroundCapacity
       ));
       if (nextIndex < 0) return;
       const [job] = this.queue.splice(nextIndex, 1);
@@ -104,4 +111,4 @@ export class AnalysisScheduler {
   }
 }
 
-export const analysisScheduler = new AnalysisScheduler(2);
+export const analysisScheduler = new AnalysisScheduler(2, 2);

@@ -1,5 +1,5 @@
 import type { RecurringWeakness } from "@chess-review/analysis";
-import type { TrainingQueueItemV1, TrainingQueueStatus } from "@chess-review/shared";
+import type { TrainingQueueItemV1, TrainingQueueItemV2, TrainingQueueStatus } from "@chess-review/shared";
 import { openReviewDatabase, TRAINING_QUEUE_STORE } from "./browser-storage";
 
 export function trainingQueueItemId(playerKey: string, weakness: RecurringWeakness["kind"]): string {
@@ -10,41 +10,46 @@ export function createTrainingQueueItem(
   playerKey: string,
   weakness: RecurringWeakness,
   now = new Date().toISOString(),
-): TrainingQueueItemV1 {
+): TrainingQueueItemV2 {
   return {
-    version: 1,
+    version: 2,
     id: trainingQueueItemId(playerKey, weakness.kind),
     playerKey,
     weaknessKind: weakness.kind,
     status: "queued",
     priority: weakness.priority,
     evidence: weakness.evidence.slice(0, 5),
+    sourceReportVersion: "advanced-study-v2",
+    progress: {
+      reviewedPositionCount: 0,
+      totalPositionCount: Math.min(5, weakness.evidence.length),
+    },
     createdAt: now,
     updatedAt: now,
   };
 }
 
 export function transitionTrainingQueueItem(
-  item: TrainingQueueItemV1,
+  item: TrainingQueueItemV1 | TrainingQueueItemV2,
   status: TrainingQueueStatus,
   now = new Date().toISOString(),
-): TrainingQueueItemV1 {
+): TrainingQueueItemV1 | TrainingQueueItemV2 {
   const next = { ...item, status, updatedAt: now };
   if (status === "completed") return { ...next, completedAt: now };
   delete next.completedAt;
   return next;
 }
 
-export async function listTrainingQueue(playerKey?: string): Promise<TrainingQueueItemV1[]> {
+export async function listTrainingQueue(playerKey?: string): Promise<Array<TrainingQueueItemV1 | TrainingQueueItemV2>> {
   const database = await openReviewDatabase();
   try {
-    const items = await new Promise<TrainingQueueItemV1[]>((resolve, reject) => {
+    const items = await new Promise<Array<TrainingQueueItemV1 | TrainingQueueItemV2>>((resolve, reject) => {
       const request = database.transaction(TRAINING_QUEUE_STORE, "readonly").objectStore(TRAINING_QUEUE_STORE).getAll();
-      request.onsuccess = () => resolve(request.result as TrainingQueueItemV1[]);
+      request.onsuccess = () => resolve(request.result as Array<TrainingQueueItemV1 | TrainingQueueItemV2>);
       request.onerror = () => reject(request.error ?? new Error("Unable to load the training queue."));
     });
     return items
-      .filter((item) => item.version === 1 && (playerKey === undefined || item.playerKey === playerKey))
+      .filter((item) => (item.version === 1 || item.version === 2) && (playerKey === undefined || item.playerKey === playerKey))
       .sort((left, right) => {
         const statusOrder: Record<TrainingQueueStatus, number> = { "in-progress": 0, queued: 1, completed: 2 };
         return statusOrder[left.status] - statusOrder[right.status]
@@ -56,7 +61,7 @@ export async function listTrainingQueue(playerKey?: string): Promise<TrainingQue
   }
 }
 
-export async function saveTrainingQueueItem(item: TrainingQueueItemV1): Promise<void> {
+export async function saveTrainingQueueItem(item: TrainingQueueItemV1 | TrainingQueueItemV2): Promise<void> {
   const database = await openReviewDatabase();
   try {
     await new Promise<void>((resolve, reject) => {

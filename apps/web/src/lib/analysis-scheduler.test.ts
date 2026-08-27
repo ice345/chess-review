@@ -51,7 +51,7 @@ describe("AnalysisScheduler", () => {
     expect(maximum).toBe(2);
   });
 
-  it("reserves capacity by running at most one background game", async () => {
+  it("runs two background games in parallel when capacity allows it", async () => {
     const scheduler = new AnalysisScheduler(2);
     const first = deferred();
     const second = deferred();
@@ -66,14 +66,28 @@ describe("AnalysisScheduler", () => {
     const one = runBackground(first);
     const two = runBackground(second);
 
+    expect(scheduler.activeCount).toBe(2);
+    expect(scheduler.pendingCount).toBe(0);
+    first.resolve();
+    await one;
+    second.resolve();
+    await two;
+    expect(maximumBackground).toBe(2);
+  });
+
+  it("can reserve a slot for interactive work when configured", async () => {
+    const scheduler = new AnalysisScheduler(2, 1);
+    const first = deferred();
+    const second = deferred();
+    const one = scheduler.run("background-game", () => first.promise);
+    const two = scheduler.run("background-game", () => second.promise);
+
     expect(scheduler.activeCount).toBe(1);
     expect(scheduler.pendingCount).toBe(1);
     first.resolve();
     await one;
-    expect(scheduler.activeCount).toBe(1);
     second.resolve();
     await two;
-    expect(maximumBackground).toBe(1);
   });
 
   it("removes an aborted queued job without running it", async () => {
