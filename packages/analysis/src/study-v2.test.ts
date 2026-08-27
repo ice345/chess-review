@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { GameAnalysisV2, MoveAnalysisV2, PlayerColor } from "@chess-review/shared";
 import {
   buildAdvancedStudyReportV2,
+  performanceRatingFromSample,
+  ratingTargets,
   STUDY_ALGORITHM_V2,
   type StudyGameInputV2,
 } from "./study-v2";
@@ -155,6 +157,49 @@ describe("advanced-study-v2", () => {
     )), FILTERS);
 
     expect(report.ratings[0]).toMatchObject({ confidence: "medium", currentRating: 1540, nextTarget: 1600 });
+  });
+
+  it("uses the matched result/opponent sample for performance evidence", () => {
+    const games = Array.from({ length: 6 }, (_, index) => game(
+      `matched-${index}`,
+      "chesscom",
+      "rapid",
+      `2026-08-0${index + 1}T00:00:00.000Z`,
+      index < 3 ? "win" : "loss",
+      1390 + index,
+    ));
+    // The last two games have no opponent rating. They still count toward the
+    // report score, but must not change the performance estimate's population.
+    games[4]!.source = { ...games[4]!.source!, playerRating: 1430 };
+    games[5]!.source = { ...games[5]!.source!, playerRating: 1431 };
+    delete games[4]!.source!.opponentRating;
+    delete games[5]!.source!.opponentRating;
+
+    const report = buildAdvancedStudyReportV2(games, FILTERS);
+    expect(report.ratings[0]).toMatchObject({ performanceSampleSize: 4, scoreRate: 50 });
+    expect(report.ratings[0]?.performanceRating).toBeUndefined();
+  });
+
+  it("uses a useful stabilize/next-target pair near a milestone", () => {
+    expect(ratingTargets(1398)).toEqual({ stabilizeTarget: 1400, nextTarget: 1500 });
+    expect(ratingTargets(1328)).toEqual({ nextTarget: 1400 });
+    expect(performanceRatingFromSample([1400, 1400, 1400, 1400, 1400], 50)).toBe(1400);
+  });
+
+  it("keeps draw-heavy and strength-of-opposition estimates honest", () => {
+    const draws = Array.from({ length: 6 }, (_, index) => game(`draw-${index}`, "chesscom", "rapid", `2026-08-0${index + 1}T00:00:00.000Z`, "draw", 1500));
+    const drawReport = buildAdvancedStudyReportV2(draws, FILTERS);
+    expect(drawReport.ratings[0]).toMatchObject({ scoreRate: 50, performanceRating: 1520, performanceSampleSize: 6 });
+
+    const strongOpposition = Array.from({ length: 6 }, (_, index) => game(`strong-${index}`, "chesscom", "rapid", `2026-08-0${index + 1}T00:00:00.000Z`, index < 5 ? "win" : "draw", 1500));
+    strongOpposition.forEach((item) => { item.source = { ...item.source!, opponentRating: 1900 }; });
+    const strongReport = buildAdvancedStudyReportV2(strongOpposition, FILTERS);
+    expect(strongReport.ratings[0]?.performanceRating).toBeGreaterThan(1900);
+
+    const weakOpposition = Array.from({ length: 6 }, (_, index) => game(`weak-${index}`, "chesscom", "rapid", `2026-08-0${index + 1}T00:00:00.000Z`, index < 1 ? "win" : "loss", 1500));
+    weakOpposition.forEach((item) => { item.source = { ...item.source!, opponentRating: 1100 }; });
+    const weakReport = buildAdvancedStudyReportV2(weakOpposition, FILTERS);
+    expect(weakReport.ratings[0]?.performanceRating).toBeLessThan(1100);
   });
 
   it("does not fabricate rating evidence when Elo metadata is missing", () => {

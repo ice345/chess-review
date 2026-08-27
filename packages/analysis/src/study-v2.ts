@@ -57,7 +57,11 @@ export interface RatingBandV2 {
   recentRange?: { low: number; high: number };
   scoreRate?: number;
   performanceRating?: number;
+  /** Number of games with both an opponent rating and a known result. */
+  performanceSampleSize: number;
   confidence: "low" | "medium" | "high";
+  /** The nearest 100-point milestone when the current rating is close to it. */
+  stabilizeTarget?: number;
   nextTarget?: number;
 }
 
@@ -177,6 +181,30 @@ function confidence(sampleSize: number): "low" | "medium" | "high" {
   return "low";
 }
 
+/**
+ * Invert the standard Elo expected-score curve for a matched sample. The
+ * result is deliberately bounded: a small streak must not manufacture an
+ * extreme performance rating from a 0%/100% score.
+ */
+export function performanceRatingFromSample(
+  opponentRatings: readonly number[],
+  scoreRate: number,
+): number | undefined {
+  if (opponentRatings.length < 5 || !Number.isFinite(scoreRate) || !opponentRatings.every(Number.isFinite)) return undefined;
+  const averageOpponent = opponentRatings.reduce((sum, value) => sum + value, 0) / opponentRatings.length;
+  const probability = Math.max(0.05, Math.min(0.95, scoreRate / 100));
+  const delta = 400 * Math.log10(probability / (1 - probability));
+  return Math.round(averageOpponent + Math.max(-400, Math.min(400, delta)));
+}
+
+export function ratingTargets(currentRating: number): { stabilizeTarget?: number; nextTarget: number } {
+  const milestone = Math.floor(currentRating / 100) * 100 + 100;
+  if (milestone - currentRating <= 25) {
+    return { stabilizeTarget: milestone, nextTarget: milestone + 100 };
+  }
+  return { nextTarget: milestone };
+}
+
 export function studyGameMatchesFilters(game: StudyGameInputV2, filters: StudyReportFiltersV2): boolean {
   if (filters.providers.length > 0 && (!game.source || !filters.providers.includes(game.source.provider))) return false;
   if (filters.timeClasses.length > 0 && (!game.source?.timeClass || !filters.timeClasses.includes(game.source.timeClass))) return false;
@@ -245,12 +273,27 @@ function ratingBands(games: StudyGameInputV2[], minimumSampleSize: number): Rati
     const recentRatings = rated.slice(-10).map((game) => game.source!.playerRating!);
     const outcomes = ordered.map((game) => score(game.result)).filter((value): value is number => value !== undefined);
     const scoreRate = outcomes.length === 0 ? undefined : rounded(outcomes.reduce((sum, value) => sum + value, 0) / outcomes.length * 100);
-    const opponentRatings = ordered.map((game) => game.source?.opponentRating).filter((value): value is number => value !== undefined);
-    const performanceRating = opponentRatings.length >= 5 && scoreRate !== undefined
-      ? Math.round(opponentRatings.reduce((sum, value) => sum + value, 0) / opponentRatings.length + Math.max(-400, Math.min(400, (scoreRate - 50) * 8)))
-      : undefined;
+    // Performance must use one and the same population for the opponent Elo
+    // and the result. A missing result or opponent rating excludes that game
+    // from both sides of the estimate.
+    const performanceGames = ordered.filter((game) => (
+      score(game.result) !== undefined
+      && game.source?.opponentRating !== undefined
+      && Number.isFinite(game.source.opponentRating)
+    ));
+    const performanceOutcomes = performanceGames
+      .map((game) => score(game.result))
+      .filter((value): value is number => value !== undefined);
+    const performanceScoreRate = performanceOutcomes.length === 0
+      ? undefined
+      : rounded(performanceOutcomes.reduce((sum, value) => sum + value, 0) / performanceOutcomes.length * 100);
+    const opponentRatings = performanceGames.map((game) => game.source!.opponentRating!);
+    const performanceRating = performanceScoreRate === undefined
+      ? undefined
+      : performanceRatingFromSample(opponentRatings, performanceScoreRate);
     const currentRating = rated.at(-1)?.source?.playerRating;
     const bandConfidence = confidence(Math.min(ordered.length, rated.length));
+    const targets = currentRating === undefined || bandConfidence === "low" ? undefined : ratingTargets(currentRating);
     return {
       key,
       provider: ordered[0]!.source!.provider,
@@ -260,10 +303,9 @@ function ratingBands(games: StudyGameInputV2[], minimumSampleSize: number): Rati
       ...(recentRatings.length === 0 ? {} : { recentRange: { low: Math.min(...recentRatings), high: Math.max(...recentRatings) } }),
       ...(scoreRate === undefined ? {} : { scoreRate }),
       ...(performanceRating === undefined ? {} : { performanceRating }),
+      performanceSampleSize: performanceGames.length,
       confidence: bandConfidence,
-      ...(currentRating === undefined || bandConfidence === "low"
-        ? {}
-        : { nextTarget: Math.ceil((currentRating + 1) / 100) * 100 }),
+      ...(targets === undefined ? {} : targets),
     };
   }).sort((left, right) => left.provider.localeCompare(right.provider) || left.timeClass.localeCompare(right.timeClass));
 }
