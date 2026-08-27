@@ -56,16 +56,16 @@ export function SettingsPage() {
   return (
     <main className="page-scroll utility-page">
       <AppHeader />
-      <section className="utility-heading"><span className="kicker">Application</span><h1>Settings</h1><p>Choose defaults without mixing engine truth, human modeling and coach generation.</p></section>
+      <section className="utility-heading"><h1>Settings</h1></section>
       <div className="settings-grid">
         <section className="settings-card">
           <div><span className="kicker">Review defaults</span><h2>Objective analysis</h2></div>
           <label>Depth<select value={settings.reviewDepth} onChange={(event) => update({ ...settings, reviewDepth: Number(event.target.value) as AppSettings["reviewDepth"] })}><option value={10}>10 · Fast</option><option value={12}>12 · Balanced</option><option value={15}>15 · Thorough</option></select></label>
-          <label>MultiPV<select value={settings.reviewMultiPv} onChange={(event) => update({ ...settings, reviewMultiPv: Number(event.target.value) as AppSettings["reviewMultiPv"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label>Engine Lab lines<select value={settings.reviewMultiPv} onChange={(event) => update({ ...settings, reviewMultiPv: Number(event.target.value) as AppSettings["reviewMultiPv"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>Continuation lines<select value={settings.continuationLines} onChange={(event) => update({ ...settings, continuationLines: Number(event.target.value) as AppSettings["continuationLines"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>Moves shown per line<select value={settings.continuationLength} onChange={(event) => update({ ...settings, continuationLength: Number(event.target.value) as AppSettings["continuationLength"] })}>{[6, 8, 10, 12, 16].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>After account sync<select value={settings.autoAnalyzeImported} onChange={(event) => update({ ...settings, autoAnalyzeImported: Number(event.target.value) as AppSettings["autoAnalyzeImported"] })}><option value={0}>Off · choose each game</option><option value={1}>Analyze newest 1</option><option value={3}>Analyze newest 3</option><option value={5}>Analyze newest 5</option></select></label>
-          <small>Depth and MultiPV affect deterministic cache identity. Displayed continuation length does not rerun Stockfish. Automatic account analysis is off by default; the optional newest 1/3/5 policy runs once after a completed sync, sequentially, and never starts Maia or Coach.</small>
+          <small>Depth affects full-review cache identity. Full-game classification always uses canonical 3PV plus selective verification; Engine Lab lines only controls the current position and branches. Full-history imports automatically queue objective Stockfish analysis. This setting only controls optional newest-game analysis during “Sync newest”; it never starts Maia or Coach.</small>
         </section>
         <section className="settings-card">
           <div><span className="kicker">Human defaults</span><h2>Maia prediction</h2></div>
@@ -90,6 +90,13 @@ export function SettingsPage() {
             {ollamaModels.map((model) => <option value={model} key={model}>{model}</option>)}
           </select></label>
           <small>{ollamaModels.length > 0 ? `${ollamaModels.length} installed Ollama model${ollamaModels.length === 1 ? "" : "s"} detected. The selected model is passed explicitly to every request.` : "Start Ollama and check the local runtime to discover installed models."}</small>
+        </section>
+        <section className="settings-card">
+          <div><span className="kicker">Board feedback</span><h2>Chess sounds</h2></div>
+          <label className="sound-enabled-setting"><span>Sound effects</span><input type="checkbox" checked={settings.soundEnabled} onChange={(event) => update({ ...settings, soundEnabled: event.target.checked })} /></label>
+          <label>Volume · {Math.round(settings.soundVolume * 100)}<input type="range" min={0} max={100} step={1} value={Math.round(settings.soundVolume * 100)} onChange={(event) => update({ ...settings, soundVolume: Number(event.target.value) / 100 })} /></label>
+          <label>Sound theme<select value={settings.soundTheme} onChange={() => update({ ...settings, soundTheme: "wintrchess" })}><option value="wintrchess">WintrChess</option></select></label>
+          <small>Move feedback follows legal board transitions. Checkmate, check, castle, promotion, capture and quiet moves use the WintrChess sound set. Use the board control for quick mute.</small>
         </section>
         <section className="settings-card runtime-card">
           <div><span className="kicker">Runtime boundary</span><h2>Local capabilities</h2></div>

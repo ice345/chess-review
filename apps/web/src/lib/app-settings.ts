@@ -1,5 +1,6 @@
 import type { CoachLanguage } from "@chess-review/shared";
 import type { CoachRequestProvider, MaiaModel } from "./local-ai";
+import type { ChessSoundTheme } from "./chess-sound";
 
 export interface AppSettings {
   coachProvider: CoachRequestProvider;
@@ -12,6 +13,9 @@ export interface AppSettings {
   humanTargetElo: number;
   humanModel: MaiaModel;
   autoAnalyzeImported: 0 | 1 | 3 | 5;
+  soundEnabled: boolean;
+  soundVolume: number;
+  soundTheme: ChessSoundTheme;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -25,9 +29,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   humanTargetElo: 1400,
   humanModel: "maia3-5m",
   autoAnalyzeImported: 0,
+  soundEnabled: true,
+  soundVolume: 0.35,
+  soundTheme: "wintrchess",
 };
 
 const STORAGE_KEY = "open-chess-review-settings-v1";
+export const APP_SETTINGS_EVENT = "open-chess-review-settings";
 
 export function loadAppSettings(): AppSettings {
   if (typeof window === "undefined") return DEFAULT_APP_SETTINGS;
@@ -36,7 +44,17 @@ export function loadAppSettings(): AppSettings {
     const humanModel = stored.humanModel === "maia3-23m" || stored.humanModel === "maia3-79m"
       ? stored.humanModel
       : "maia3-5m";
-    return { ...DEFAULT_APP_SETTINGS, ...stored, humanModel };
+    const soundVolume = typeof stored.soundVolume === "number" && Number.isFinite(stored.soundVolume)
+      ? Math.max(0, Math.min(1, stored.soundVolume))
+      : DEFAULT_APP_SETTINGS.soundVolume;
+    return {
+      ...DEFAULT_APP_SETTINGS,
+      ...stored,
+      humanModel,
+      soundEnabled: stored.soundEnabled !== false,
+      soundVolume,
+      soundTheme: "wintrchess",
+    };
   } catch {
     return DEFAULT_APP_SETTINGS;
   }
@@ -44,7 +62,7 @@ export function loadAppSettings(): AppSettings {
 
 export function saveAppSettings(settings: AppSettings): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  window.dispatchEvent(new CustomEvent("open-chess-review-settings", { detail: settings }));
+  window.dispatchEvent(new CustomEvent(APP_SETTINGS_EVENT, { detail: settings }));
 }
 
 export function savePreferredHumanTargetElo(targetElo: number): AppSettings {
