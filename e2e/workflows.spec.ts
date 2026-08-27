@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { SAMPLE_PGN, mockLocalAi, seedAdvancedStudy, seedConnectedLibrary, seedReview, seedUnanalyzedReview } from "./fixtures";
+import { SAMPLE_PGN, mockLocalAi, seedAdvancedStudy, seedConnectedLibrary, seedPartialHistoryJob, seedPausedHistoryJob, seedReview, seedUnanalyzedReview } from "./fixtures";
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -206,7 +206,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
 
   await expect.poll(async () => page.evaluate(async (key) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 4);
+      const request = indexedDB.open("open-chess-review", 5);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -314,25 +314,123 @@ test("renders a large connected Library progressively", async ({ page }) => {
   await expect(page.locator(".history-game")).toHaveCount(84);
 });
 
+test("offers first-run whole-history analysis and persists bulk cancellation", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedConnectedLibrary(page, 2);
+  await seedPausedHistoryJob(page, ["chesscom:fixture-0", "chesscom:fixture-1"]);
+  await page.goto("/training");
+
+  await expect(page.getByRole("button", { name: "Analyze my history" })).toBeVisible();
+  await expect(page.getByText("2 synced games match this scope.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator(".history-job-list")).toContainText("cancelled");
+  await page.reload();
+  await expect(page.locator(".history-job-list")).toContainText("cancelled");
+  await expect(page.getByRole("button", { name: "Resume" })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
+test("shows successful history items and the exact reason for failed items", async ({ page }) => {
+  await seedPartialHistoryJob(page);
+  await page.goto("/training");
+
+  await expect(page.locator(".study-overview")).toContainText("Games");
+  await expect(page.locator(".study-overview .study-metrics article").filter({ hasText: "Games" }).locator("strong")).toHaveText("1");
+  await page.getByRole("button", { name: "Coverage" }).click();
+  await expect(page.locator(".history-job-list")).toContainText("1/2 complete · 0 analyzed · 1 cache reused");
+  await page.getByText("Why 1 game failed", { exact: true }).click();
+  await expect(page.locator(".history-job-details").first()).toContainText("Stockfish worker exited before returning a completed line.");
+  await page.getByText("Successful analyses (1)", { exact: true }).click();
+  await expect(page.locator(".history-job-details").last()).toContainText("Loaded from objective cache.");
+});
+
+test("starts objective analysis automatically after full-history import", async ({ page }) => {
+  await seedConnectedLibrary(page, 1);
+  await seedReview(page);
+  const account = {
+    id: "chesscom:hikaru",
+    provider: "chesscom",
+    username: "Hikaru",
+    displayName: "Hikaru Nakamura",
+    authMode: "public-username",
+    verified: false,
+    linkedAt: "2026-08-20T00:00:00.000Z",
+    lastSyncAt: "2026-08-23T00:00:00.000Z",
+    ratings: { rapid: 2810, blitz: 2901 },
+  };
+  await page.route("**/api/platforms/chesscom/sync", async (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    json: { provider: "chesscom", account, games: [], done: true, progress: { completed: 1, total: 1 } },
+  }));
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Import full history" }).click();
+  await expect(page.getByRole("status")).toContainText("Background Stockfish analysis", { timeout: 10_000 });
+  await page.goto("/training");
+  await expect(page.locator(".study-player-select select")).toHaveValue("account:chesscom:hikaru", { timeout: 10_000 });
+  await expect(page.locator(".study-overview .study-metrics article").filter({ hasText: "Games" }).locator("strong")).toHaveText("1", { timeout: 10_000 });
+});
+
+test("resumes a persisted whole-history job to completion", async ({ page }) => {
+  await seedConnectedLibrary(page, 1);
+  await seedReview(page);
+  await seedPausedHistoryJob(page, ["chesscom:fixture-0"]);
+  await page.goto("/training");
+
+  await page.getByRole("button", { name: "Coverage" }).click();
+  await page.getByRole("button", { name: "Resume" }).click();
+  await expect(page.locator(".history-job-list")).toContainText("completed", { timeout: 45_000 });
+  await expect(page.locator(".history-job-list")).toContainText("1/1 complete");
+  await page.reload();
+  await page.getByRole("button", { name: "Coverage" }).click();
+  await expect(page.locator(".history-job-list")).toContainText("completed");
+});
+
 test("builds advanced study evidence and persists an actionable training queue", async ({ page }) => {
   const fixtures = await seedAdvancedStudy(page);
   await page.goto("/training");
 
-  await expect(page.getByRole("heading", { name: "Progress and training" })).toBeVisible();
-  await expect(page.getByLabel("Study player")).toHaveValue("ada");
+  await expect(page.getByRole("heading", { name: "Training" })).toBeVisible();
+  await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await expect(page.locator(".study-metrics")).toContainText("3");
+
+  await page.getByLabel("Color").selectOption("black");
+  await expect(page.locator(".study-overview .study-metrics article").filter({ hasText: "Games" }).locator("strong")).toHaveText("0");
+  await page.getByLabel("Color").selectOption("all");
+
+  await page.getByRole("button", { name: "Openings" }).click();
   await expect(page.getByText("Italian Game", { exact: true })).toBeVisible();
+  await page.getByLabel("Minimum sample").selectOption("5");
+  await expect(page.getByText("No recognized openings.")).toBeVisible();
+  await page.getByLabel("Minimum sample").selectOption("1");
+  const openingEvidence = page.locator(".repertoire-list .training-sources a").first();
+  const openingHref = await openingEvidence.getAttribute("href");
+  expect(openingHref).toMatch(/^\/review\/[a-f0-9]+\/moves\?ply=\d+$/);
+  await openingEvidence.click();
+  await expect(page).toHaveURL(new RegExp(`${openingHref!.replace(/[?]/g, "\\?")}$`));
+
+  await page.goto("/training");
+  await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
+  await page.getByRole("button", { name: "Highlights" }).click();
+  await page.getByRole("link", { name: "Ply 5 →" }).click();
+  await expect(page).toHaveURL(new RegExp(`/review/${fixtures[0]!.record.id}/moves\\?ply=5$`));
+
+  await page.goto("/training");
+  await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
+  await page.getByRole("button", { name: "Plan" }).click();
   await expect(page.getByText("Opening decisions", { exact: true })).toBeVisible();
   await expect(page.getByText("Missed opportunities", { exact: true })).toBeVisible();
 
   const missedCard = page.locator(".weakness-grid > article").filter({ hasText: "Missed opportunities" });
-  await missedCard.getByRole("button", { name: "Add to training queue" }).click();
+  await missedCard.getByRole("button", { name: "Add to queue" }).click();
   await expect(page.getByRole("status")).toContainText("added to the training queue");
   await expect(page.locator(".training-list")).toContainText("Missed opportunities");
 
   await page.locator(".training-list").getByRole("button", { name: "Start" }).click();
   await expect(page.locator(".training-list")).toContainText("in progress");
   await page.reload();
+  await page.getByRole("button", { name: "Plan" }).click();
   await expect(page.locator(".training-list")).toContainText("in progress");
 
   await page.locator(".training-sources a").first().click();

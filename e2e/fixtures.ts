@@ -1,9 +1,9 @@
 import type { Page } from "@playwright/test";
 import { buildGameAnalysis, divideGame, OBJECTIVE_ALGORITHM_VERSION } from "../packages/analysis/src/index";
 import { parsePgn } from "../packages/chess-core/src/index";
-import type { GameAnalysisV1, PlatformAccount, PlatformSyncState, StockfishMoveAnalysis, SyncedGame } from "../packages/shared/src/index";
+import type { GameAnalysisV2, HistoryAnalysisJobV1, PlatformAccount, PlatformSyncState, StockfishMoveAnalysis, SyncedGame } from "../packages/shared/src/index";
 import { STOCKFISH_VERSION } from "../packages/stockfish/src/index";
-import { buildReviewRecord, type ReviewRecord } from "../apps/web/src/lib/review-library";
+import { buildReviewRecord, buildReviewRecordFromSyncedGame, type ReviewRecord } from "../apps/web/src/lib/review-library";
 
 export const SAMPLE_PGN = `[Event "Phase 5.1 E2E"]
 [White "Ada"]
@@ -55,7 +55,7 @@ async function digest(value: string): Promise<string> {
 
 export async function reviewFixture({ visualLabels = false } = {}): Promise<{
   record: ReviewRecord;
-  analysis: GameAnalysisV1;
+  analysis: GameAnalysisV2;
   cacheKey: string;
 }> {
   const game = parsePgn(SAMPLE_PGN);
@@ -74,9 +74,13 @@ export async function reviewFixture({ visualLabels = false } = {}): Promise<{
   if (visualLabels) {
     const brilliant = analysis.moves[0];
     const blunder = analysis.moves[1];
-    if (brilliant) brilliant.classification = "brilliant";
+    if (brilliant) {
+      brilliant.classification = "brilliant";
+      brilliant.annotations = ["sacrifice", "critical", "brilliant"];
+    }
     if (blunder) {
       blunder.classification = "blunder";
+      blunder.quality = "blunder";
       blunder.classificationReason = {
         ...blunder.classificationReason,
         precedenceRule: "visual-fixture-blunder",
@@ -89,7 +93,9 @@ export async function reviewFixture({ visualLabels = false } = {}): Promise<{
     }
     analysis.criticalMoments = blunder ? [{ ply: 2, classification: "blunder", winPercentSwing: 28 }] : [];
     analysis.white.classificationCounts = { ...analysis.white.classificationCounts, brilliant: 1, best: Math.max(0, (analysis.white.classificationCounts.best ?? 0) - 1) };
+    analysis.white.annotationCounts = { ...analysis.white.annotationCounts, brilliant: 1, critical: 1, sacrifice: 1 };
     analysis.black.classificationCounts = { ...analysis.black.classificationCounts, blunder: 1, best: Math.max(0, (analysis.black.classificationCounts.best ?? 0) - 1) };
+    analysis.black.qualityCounts = { ...analysis.black.qualityCounts, blunder: 1, best: Math.max(0, analysis.black.qualityCounts.best - 1) };
   }
   const record = {
     ...await buildReviewRecord("pgn", SAMPLE_PGN),
@@ -112,9 +118,9 @@ async function writeStores(page: Page, values: Record<string, Array<[IDBValidKey
   await page.goto("/");
   await page.evaluate(async ({ values }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 4);
+      const request = indexedDB.open("open-chess-review", 5);
       request.onupgradeneeded = () => {
-        for (const name of ["objective-analyses", "review-records", "platform-accounts", "synced-games", "platform-sync-state", "training-queue"]) {
+        for (const name of ["objective-analyses", "objective-analysis-index", "review-records", "platform-accounts", "synced-games", "platform-sync-state", "training-queue", "history-analysis-jobs"]) {
           if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name);
         }
       };
@@ -151,7 +157,7 @@ export async function seedAdvancedStudy(page: Page) {
     "review-records": [],
     "objective-analyses": [],
   };
-  const fixtures: Array<{ record: ReviewRecord; analysis: GameAnalysisV1 }> = [];
+  const fixtures: Array<{ record: ReviewRecord; analysis: GameAnalysisV2 }> = [];
 
   for (const [index, pgn] of pgns.entries()) {
     const game = parsePgn(pgn!);
@@ -168,6 +174,7 @@ export async function seedAdvancedStudy(page: Page) {
     });
     const openingError = analysis.moves[0]!;
     openingError.classification = index === 2 ? "blunder" : "mistake";
+    openingError.quality = index === 2 ? "blunder" : "mistake";
     openingError.accuracy = index === 2 ? 35 : 55 + index * 5;
     openingError.classificationReason = {
       ...openingError.classificationReason,
@@ -181,6 +188,8 @@ export async function seedAdvancedStudy(page: Page) {
     const missedChance = analysis.moves[2]!;
     if (index < 2) {
       missedChance.classification = "missed_win";
+      missedChance.quality = "blunder";
+      missedChance.annotations = ["missed_win"];
       missedChance.accuracy = 28 + index * 4;
       missedChance.classificationReason = {
         ...missedChance.classificationReason,
@@ -192,6 +201,21 @@ export async function seedAdvancedStudy(page: Page) {
         winPercentLoss: 36 + index * 2,
       };
     }
+    if (index === 0) {
+      const critical = analysis.moves[4]!;
+      critical.classification = "great";
+      critical.annotations = ["critical"];
+      critical.classificationReason = {
+        ...critical.classificationReason,
+        precedenceRule: "phase-10-verified-critical-fixture",
+        verification: {
+          status: "verified",
+          depth: 18,
+          multiPv: 5,
+          reasons: ["special-annotation"],
+        },
+      };
+    }
     analysis.white.accuracy = 72 + index * 6;
     analysis.white.phaseAccuracy.opening = 69 + index * 6;
     analysis.white.classificationCounts = {
@@ -200,6 +224,17 @@ export async function seedAdvancedStudy(page: Page) {
       mistake: index < 2 ? 1 : 0,
       blunder: index === 2 ? 1 : 0,
       ...(index < 2 ? { missed_win: 1 } : {}),
+    };
+    analysis.white.qualityCounts = {
+      ...analysis.white.qualityCounts,
+      best: Math.max(0, analysis.white.qualityCounts.best - (index < 2 ? 2 : 1)),
+      mistake: index < 2 ? 1 : 0,
+      blunder: index === 2 ? 1 : index < 2 ? 1 : 0,
+    };
+    analysis.white.annotationCounts = {
+      ...analysis.white.annotationCounts,
+      ...(index < 2 ? { missed_win: 1 } : {}),
+      ...(index === 0 ? { critical: 1 } : {}),
     };
     const built = await buildReviewRecord("pgn", pgn!);
     const record = {
@@ -231,7 +266,7 @@ export async function seedUnanalyzedReview(page: Page, pgn = SHORT_ANALYSIS_PGN)
   return record;
 }
 
-export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<void> {
+export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<{ account: PlatformAccount; games: SyncedGame[] }> {
   const account: PlatformAccount = {
     id: "chesscom:hikaru",
     provider: "chesscom",
@@ -280,6 +315,75 @@ export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<
     "platform-sync-state": [[account.id, sync]],
     "synced-games": games.map((game) => [game.id, game]),
   });
+  return { account, games };
+}
+
+export async function seedPausedHistoryJob(page: Page, gameIds: string[]): Promise<HistoryAnalysisJobV1> {
+  const job: HistoryAnalysisJobV1 = {
+    version: 1,
+    id: "history-job-fixture",
+    status: "paused",
+    scope: { providers: [], accountIds: [], timeClasses: [], rated: "all", freshness: "all" },
+    objectiveAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
+    depth: DEPTH,
+    classificationMultiPv: MULTI_PV,
+    items: gameIds.map((gameId) => ({ gameId, status: "queued", attempts: 1, updatedAt: "2026-08-23T00:00:00.000Z" })),
+    createdAt: "2026-08-23T00:00:00.000Z",
+    updatedAt: "2026-08-23T00:00:00.000Z",
+  };
+  await writeStores(page, { "history-analysis-jobs": [[job.id, job]] });
+  return job;
+}
+
+export async function seedPartialHistoryJob(page: Page): Promise<void> {
+  const connected = await seedConnectedLibrary(page, 2);
+  const fixture = await reviewFixture();
+  const successfulGame = connected.games[0]!;
+  const successfulRecord = await buildReviewRecordFromSyncedGame(successfulGame);
+  const analyzedGame: SyncedGame = {
+    ...successfulGame,
+    analyzed: true,
+    analysisId: successfulRecord.id,
+    analysisAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
+    analysisDepth: DEPTH,
+    analyzedAt: "2026-08-24T00:00:00.000Z",
+  };
+  await writeStores(page, {
+    "objective-analyses": [[fixture.cacheKey, fixture.analysis]],
+    "synced-games": [[analyzedGame.id, analyzedGame]],
+  });
+  const job = await seedPausedHistoryJob(page, ["chesscom:fixture-0", "chesscom:fixture-1"]);
+  await page.evaluate(async ({ jobId, analysisId }) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("open-chess-review", 5);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction("history-analysis-jobs", "readwrite");
+    const store = transaction.objectStore("history-analysis-jobs");
+    const current = await new Promise<HistoryAnalysisJobV1>((resolve, reject) => {
+      const request = store.get(jobId);
+      request.onsuccess = () => resolve(request.result as HistoryAnalysisJobV1);
+      request.onerror = () => reject(request.error);
+    });
+    const timestamp = "2026-08-24T00:00:00.000Z";
+    store.put({
+      ...current,
+      status: "failed",
+      error: "Some games failed. Retry only the failed items.",
+      updatedAt: timestamp,
+      completedAt: timestamp,
+      items: [
+        { ...current.items[0], status: "cached", attempts: 1, analysisId, updatedAt: timestamp },
+        { ...current.items[1], status: "failed", attempts: 2, error: "Stockfish worker exited before returning a completed line.", updatedAt: timestamp },
+      ],
+    }, jobId);
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    database.close();
+  }, { jobId: job.id, analysisId: successfulRecord.id });
 }
 
 export async function mockLocalAi(
