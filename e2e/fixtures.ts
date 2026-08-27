@@ -348,8 +348,13 @@ export async function seedPartialHistoryJob(page: Page): Promise<void> {
     analysisDepth: DEPTH,
     analyzedAt: "2026-08-24T00:00:00.000Z",
   };
+  // The real background path writes a connected review record before the
+  // engine request completes. Keep a failed record here as well: it shares
+  // the successful game's PGN and must not be promoted by that cache.
+  const failedRecord = await buildReviewRecordFromSyncedGame(connected.games[1]!);
   await writeStores(page, {
     "objective-analyses": [[fixture.cacheKey, fixture.analysis]],
+    "review-records": [[failedRecord.id, failedRecord]],
     "synced-games": [[analyzedGame.id, analyzedGame]],
   });
   const job = await seedPausedHistoryJob(page, ["chesscom:fixture-0", "chesscom:fixture-1"]);

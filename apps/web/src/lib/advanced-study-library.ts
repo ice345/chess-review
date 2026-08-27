@@ -5,6 +5,7 @@ import type {
   AnalysisCacheProjectionV1,
   AnyGameAnalysis,
   GameAnalysisV2,
+  HistoryAnalysisJobV1,
   PlatformAccount,
   PlayerColor,
   SyncedGame,
@@ -15,6 +16,7 @@ import {
   listAnalysisCacheProjections,
 } from "./analysis-cache";
 import { listPlatformAccounts, listSyncedGames, markSyncedGameAnalyzed, syncedGameHasAnalysis } from "./platform-library";
+import { listHistoryAnalysisJobs } from "./history-analysis-jobs";
 import {
   buildReviewRecordFromSyncedGame,
   listReviewRecords,
@@ -168,7 +170,7 @@ export function buildStudyPlayerLibraries(
   accounts: PlatformAccount[] = [],
 ): StudyPlayerLibrary[] {
   const latest = latestAnalysesIndex(analyses);
-  const syncedById = new Map(syncedGames.map((game) => [game.id, game]));
+  const syncedByExternalKey = new Map(syncedGames.map((game) => [syncedGameKey(game), game]));
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const players = new Map<string, StudyPlayerLibrary>();
 
@@ -188,7 +190,7 @@ export function buildStudyPlayerLibraries(
       };
       if (library.games.some(({ gameId }) => gameId === record.id)) continue;
       const synced = record.external
-        ? syncedById.get(`${record.external.provider}:${record.external.externalGameId}`)
+        ? syncedByExternalKey.get(`${record.external.provider}:${record.external.accountId}:${record.external.externalGameId}`)
         : undefined;
       library.games.push({
         gameId: record.id,
@@ -280,32 +282,71 @@ function recordExternalKey(record: ReviewRecord): string | null {
  * though the cached projection exists. Repair those durable links from the
  * synced-game identity and current cache index before building summaries.
  *
- * A cache projection for the current objective version IS completion evidence:
- * it exists only after an analysis finished successfully. Repair therefore
- * accepts marker-less games too, and rejects only games whose durable marker
- * names a different objective version. The operation is idempotent.
+ * A cache projection for the current objective version is completion evidence
+ * for legacy cache-only data. When a durable history item exists, its per-game
+ * status wins: only cached/completed items may repair a missing link, so a
+ * duplicate PGN cannot make a failed item look successful. The operation is
+ * idempotent.
  */
 async function ensureConnectedReviewRecords(
   records: ReviewRecord[],
   projections: AnalysisCacheProjectionV1[],
   syncedGames: SyncedGame[],
+  jobs: readonly HistoryAnalysisJobV1[] = [],
 ): Promise<ReviewRecord[]> {
   const latestByFingerprint = new Map<string, AnalysisCacheProjectionV1>();
-  const projectedIdentities = new Set<string>();
+  const latestByIdentity = new Map<string, AnalysisCacheProjectionV1>();
   for (const projection of projections) {
     const prior = latestByFingerprint.get(projection.gameFingerprint);
     if (!prior || projection.createdAt.localeCompare(prior.createdAt) > 0) {
       latestByFingerprint.set(projection.gameFingerprint, projection);
     }
     const identity = projectionAnalysisIdentity(projection);
-    if (identity !== null) projectedIdentities.add(identity);
+    if (identity !== null) {
+      const priorIdentity = latestByIdentity.get(identity);
+      if (!priorIdentity || projection.createdAt.localeCompare(priorIdentity.createdAt) > 0) {
+        latestByIdentity.set(identity, projection);
+      }
+    }
   }
-  const projectedFingerprints = new Set(latestByFingerprint.keys());
   const recordsByExternalKey = new Map(records.flatMap((record) => {
     const key = recordExternalKey(record);
     return key === null ? [] : [[key, record] as const];
   }));
-  const knownExternalKeys = new Set(recordsByExternalKey.keys());
+  const historyStatesByGame = new Map<string, Set<HistoryAnalysisJobV1["items"][number]["status"]>>();
+  const successfulHistoryByGame = new Map<string, HistoryAnalysisJobV1["items"][number]>();
+  for (const job of jobs) {
+    for (const item of job.items) {
+      const states = historyStatesByGame.get(item.gameId) ?? new Set<HistoryAnalysisJobV1["items"][number]["status"]>();
+      states.add(item.status);
+      historyStatesByGame.set(item.gameId, states);
+      if (item.status === "cached" || item.status === "completed") {
+        const prior = successfulHistoryByGame.get(item.gameId);
+        if (!prior || item.updatedAt.localeCompare(prior.updatedAt) > 0) {
+          successfulHistoryByGame.set(item.gameId, item);
+        }
+      }
+    }
+  }
+  const syncedByExternalKey = new Map(syncedGames.map((game) => [syncedGameKey(game), game]));
+  // analyzeSyncedGame creates the external review record before Stockfish
+  // runs. Do not let that pending/failed shell consume a shared PGN cache in
+  // Training; it becomes eligible only after its own synced marker or a
+  // successful history item is present. The record remains in IndexedDB so
+  // History can still offer a retry.
+  const retainedRecords = records.filter((record) => {
+    const key = recordExternalKey(record);
+    if (key === null) return true;
+    const game = syncedByExternalKey.get(key);
+    if (!game) return true;
+    if (syncedGameHasAnalysis(game)) return true;
+    const states = historyStatesByGame.get(game.id);
+    return states?.has("cached") === true || states?.has("completed") === true;
+  });
+  const knownExternalKeys = new Set(retainedRecords.flatMap((record) => {
+    const key = recordExternalKey(record);
+    return key === null ? [] : [key];
+  }));
   const candidates = new Map<string, { game: SyncedGame; projection: AnalysisCacheProjectionV1 }>();
   for (const game of syncedGames) {
     const key = syncedGameKey(game);
@@ -320,6 +361,24 @@ async function ensureConnectedReviewRecords(
           ...(game.analyzedAt === undefined ? {} : { analyzedAt: game.analyzedAt }),
         });
       }
+      const successfulHistory = successfulHistoryByGame.get(game.id);
+      if (!syncedGameHasAnalysis(game) && successfulHistory) {
+        try {
+          const parsed = parsePgn(game.pgn);
+          const fingerprint = await analysisGameFingerprint(parsed);
+          const projection = latestByFingerprint.get(fingerprint) ?? latestByIdentity.get(gameAnalysisIdentity(parsed));
+          if (projection) {
+            await markSyncedGameAnalyzed(game.id, existingRecord.id, {
+              algorithmVersion: projection.algorithmVersion,
+              depth: projection.engine.depth,
+              analyzedAt: projection.createdAt,
+            });
+          }
+        } catch {
+          // The successful history item will remain visible only if its
+          // canonical projection can be paired below; do not invent a marker.
+        }
+      }
       continue;
     }
     if (knownExternalKeys.has(key) || candidates.has(key)) continue;
@@ -329,18 +388,25 @@ async function ensureConnectedReviewRecords(
     // markers are rejected outright; marker-less games fall through to the
     // fingerprint gate below.
     if (game.analysisAlgorithmVersion !== undefined && game.analysisAlgorithmVersion !== OBJECTIVE_ALGORITHM_VERSION) continue;
+    const historyStates = historyStatesByGame.get(game.id);
+    const hasSuccessfulHistoryItem = historyStates?.has("cached") || historyStates?.has("completed");
+    // A cache entry is not proof that this particular synced game finished: a
+    // duplicate PGN may belong to a different game item whose engine request
+    // failed or was cancelled. Legacy cache-only games without any job record
+    // are still repairable, but an explicitly unfinished/failed item must wait
+    // for its own successful job item.
+    if (historyStates && !hasSuccessfulHistoryItem) continue;
     try {
       const parsed = parsePgn(game.pgn);
       const fingerprint = await analysisGameFingerprint(parsed);
-      if (projectedFingerprints.has(fingerprint) || projectedIdentities.has(gameAnalysisIdentity(parsed))) {
-        candidates.set(key, { game, projection: latestByFingerprint.get(fingerprint) });
-      }
+      const projection = latestByFingerprint.get(fingerprint) ?? latestByIdentity.get(gameAnalysisIdentity(parsed));
+      if (projection) candidates.set(key, { game, projection });
     } catch {
       // An invalid legacy PGN remains visible in Coverage but cannot be a
       // canonical review record; the analysis job will expose its own error.
     }
   }
-  if (candidates.size === 0) return records;
+  if (candidates.size === 0) return retainedRecords;
   const additions: ReviewRecord[] = [];
   for (const [key, { game, projection }] of candidates) {
     const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game));
@@ -356,17 +422,18 @@ async function ensureConnectedReviewRecords(
     additions.push(record);
     knownExternalKeys.add(key);
   }
-  return [...records, ...additions];
+  return [...retainedRecords, ...additions];
 }
 
 export async function loadStudyPlayerSummaries(): Promise<StudyPlayerSummary[]> {
-  const [records, projections, accounts, syncedGames] = await Promise.all([
+  const [records, projections, accounts, syncedGames, jobs] = await Promise.all([
     listReviewRecords(),
     listAnalysisCacheProjections(),
     listPlatformAccounts(),
     listSyncedGames(),
+    listHistoryAnalysisJobs(),
   ]);
-  const effectiveRecords = await ensureConnectedReviewRecords(records, projections, syncedGames);
+  const effectiveRecords = await ensureConnectedReviewRecords(records, projections, syncedGames, jobs);
   const pairs = await recordProjectionPairs(effectiveRecords, projections);
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const summaries = new Map<string, StudyPlayerSummary>();
@@ -392,13 +459,14 @@ export async function loadStudyPlayerSummaries(): Promise<StudyPlayerSummary[]> 
 }
 
 export async function loadStudyPlayerLibrary(key: string): Promise<StudyPlayerLibrary | null> {
-  const [records, projections, syncedGames, accounts] = await Promise.all([
+  const [records, projections, syncedGames, accounts, jobs] = await Promise.all([
     listReviewRecords(),
     listAnalysisCacheProjections(),
     listSyncedGames(),
     listPlatformAccounts(),
+    listHistoryAnalysisJobs(),
   ]);
-  const effectiveRecords = await ensureConnectedReviewRecords(records, projections, syncedGames);
+  const effectiveRecords = await ensureConnectedReviewRecords(records, projections, syncedGames, jobs);
   const pairs = await recordProjectionPairs(effectiveRecords, projections);
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const selected = pairs.filter(({ record, projection: item }) => {

@@ -35,8 +35,11 @@ export async function analyzeSyncedGame(
   syncedGame: SyncedGame,
   options: { depth: 10 | 12 | 15; multiPv?: 1 | 2 | 3 | 4 | 5; signal?: AbortSignal },
 ): Promise<AnalyzeSyncedGameResult> {
-  const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(syncedGame));
   const game = parsePgn(syncedGame.pgn);
+  // Parse before creating the external review shell. A provider-side invalid
+  // PGN should remain a visible sync/job error, not leave an orphan review
+  // record that can later be paired with another game's shared cache.
+  const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(syncedGame));
   const cacheOptions = { depth: options.depth, multiPv: CLASSIFICATION_MULTI_PV };
   let analysis = await getCachedAnalysis(game, cacheOptions).catch(() => null);
   const cached = analysis !== null;
