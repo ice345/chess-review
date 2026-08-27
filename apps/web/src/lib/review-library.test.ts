@@ -39,7 +39,7 @@ describe("review library records", () => {
   });
 
   it("keeps platform metadata and account-aware orientation outside canonical analysis", async () => {
-    const record = await buildReviewRecordFromSyncedGame({
+    const first = await buildReviewRecordFromSyncedGame({
       id: "lichess:abc123",
       external: { provider: "lichess", externalGameId: "abc123", accountId: "lichess:ada", username: "Ada", importedAt: "2026-08-23T00:00:00.000Z" },
       pgn: `[White "Mikhail"]\n[Black "Ada"]\n\n1. e4 e5 *`,
@@ -52,10 +52,24 @@ describe("review library records", () => {
       syncedAt: "2026-08-23T00:00:00.000Z",
     });
 
-    expect(record.preferredOrientation).toBe("black");
-    expect(record.playedAt).toBe("2026-08-23T00:00:00.000Z");
-    expect(record.sourceTimeClass).toBe("rapid");
-    expect(record.sourceResult).toBe("loss");
-    expect(record.external?.externalGameId).toBe("abc123");
+    const second = await buildReviewRecordFromSyncedGame({
+      id: "lichess:def456",
+      external: { provider: "lichess", externalGameId: "def456", accountId: "lichess:ada", username: "Ada", importedAt: "2026-08-23T00:00:00.000Z" },
+      pgn: `[White "Mikhail"]\n[Black "Ada"]\n\n1. e4 e5 *`,
+      playedAt: "2026-08-23T00:00:00.000Z",
+      timeClass: "rapid",
+      white: { username: "Mikhail", result: "win" },
+      black: { username: "Ada", result: "loss" },
+      accountColor: "black",
+      analyzed: false,
+      syncedAt: "2026-08-23T00:00:00.000Z",
+    });
+
+    expect(first.preferredOrientation).toBe("black");
+    expect(first.playedAt).toBe("2026-08-23T00:00:00.000Z");
+    expect(first.sourceTimeClass).toBe("rapid");
+    expect(first.sourceResult).toBe("loss");
+    expect(first.external?.externalGameId).toBe("abc123");
+    expect(first.id).not.toBe(second.id);
   });
 });

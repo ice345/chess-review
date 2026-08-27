@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExternalPlatform, SyncedGame } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
-import { listSyncedGames, markSyncedGameAnalyzed } from "../lib/platform-library";
+import { listSyncedGames } from "../lib/platform-library";
 import { buildReviewRecordFromSyncedGame, listReviewRecords, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 
 type ProviderFilter = "all" | "manual" | ExternalPlatform;
@@ -33,9 +33,12 @@ export function HistoryPage() {
   }, []);
 
   const timeClasses = useMemo(() => [...new Set((games ?? []).map((game) => game.timeClass).filter((value): value is string => Boolean(value)))].sort(), [games]);
+  const syncedById = new Map((games ?? []).map((game) => [game.id, game]));
   const reviewedRecords = (records ?? []).filter((record) => {
     const recordProvider: ProviderFilter = record.external?.provider ?? "manual";
-    return (provider === "all" || provider === recordProvider)
+    const linkedGame = record.external ? syncedById.get(`${record.external.provider}:${record.external.externalGameId}`) : undefined;
+    return (record.external === undefined || linkedGame === undefined || linkedGame.analyzed === true)
+      && (provider === "all" || provider === recordProvider)
       && analysisState !== "not-reviewed"
       && (timeClass === "all" || record.sourceTimeClass === timeClass)
       && (result === "all" || record.sourceResult === result)
@@ -62,7 +65,6 @@ export function HistoryPage() {
     setWorking(game.id);
     try {
       const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game));
-      await markSyncedGameAnalyzed(game.id, record.id);
       window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(`/review/${record.id}`);
     } finally {
@@ -77,7 +79,7 @@ export function HistoryPage() {
   return (
     <main className="page-scroll utility-page">
       <AppHeader />
-      <section className="utility-heading"><span className="kicker">Your library</span><h1>Games and reviews</h1><p>Synced games stay lightweight until you choose to analyze them.</p></section>
+      <section className="utility-heading"><h1>Games and reviews</h1></section>
       <section className="history-filters" aria-label="History filters">
         <label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Player or event" /></label>
         <label><span>Source</span><select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)}><option value="all">All sources</option><option value="manual">Manual import</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select></label>

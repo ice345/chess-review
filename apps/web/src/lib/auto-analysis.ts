@@ -1,11 +1,12 @@
-import { buildGameAnalysis, divideGame } from "@chess-review/analysis";
+import { CLASSIFICATION_MULTI_PV, divideGame } from "@chess-review/analysis";
 import { parsePgn } from "@chess-review/chess-core";
 import { recognizeOpening } from "@chess-review/openings";
-import type { SyncedGame } from "@chess-review/shared";
-import { BrowserStockfishPool, STOCKFISH_VERSION } from "@chess-review/stockfish";
+import type { GameAnalysisV2, SyncedGame } from "@chess-review/shared";
+import { BrowserStockfishPool } from "@chess-review/stockfish";
 import { getCachedAnalysis, putCachedAnalysis } from "./analysis-cache";
 import { analysisScheduler } from "./analysis-scheduler";
 import { markSyncedGameAnalyzed } from "./platform-library";
+import { analyzeObjectiveGame } from "./objective-game-analysis";
 import { buildReviewRecordFromSyncedGame, saveReviewRecord } from "./review-library";
 
 /**
@@ -18,34 +19,50 @@ export async function autoAnalyzeSyncedGames(
 ): Promise<number> {
   let completed = 0;
   for (const syncedGame of games) {
-    const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(syncedGame));
-    const game = parsePgn(syncedGame.pgn);
-    const cached = await getCachedAnalysis(game, options).catch(() => null);
-    if (!cached) {
-      const pool = new BrowserStockfishPool(1);
-      try {
-        const division = divideGame(game);
-        const opening = recognizeOpening(game) ?? undefined;
-        const engineFacts = await analysisScheduler.run(
-          "background-game",
-          () => pool.analyzeGame(game, options),
-        );
-        const analysis = buildGameAnalysis({
-          game,
-          ...engineFacts,
-          ...(opening === undefined ? {} : { opening }),
-          division,
-          stockfishVersion: STOCKFISH_VERSION,
-          ...options,
-          createdAt: new Date().toISOString(),
-        });
-        await putCachedAnalysis(game, options, analysis);
-      } finally {
-        pool.terminate();
-      }
-    }
-    await markSyncedGameAnalyzed(syncedGame.id, record.id);
+    await analyzeSyncedGame(syncedGame, options);
     completed += 1;
   }
   return completed;
+}
+
+export interface AnalyzeSyncedGameResult {
+  analysis: GameAnalysisV2;
+  analysisId: string;
+  cached: boolean;
+}
+
+export async function analyzeSyncedGame(
+  syncedGame: SyncedGame,
+  options: { depth: 10 | 12 | 15; multiPv?: 1 | 2 | 3 | 4 | 5; signal?: AbortSignal },
+): Promise<AnalyzeSyncedGameResult> {
+  const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(syncedGame));
+  const game = parsePgn(syncedGame.pgn);
+  const cacheOptions = { depth: options.depth, multiPv: CLASSIFICATION_MULTI_PV };
+  let analysis = await getCachedAnalysis(game, cacheOptions).catch(() => null);
+  const cached = analysis !== null;
+  if (!analysis) {
+    const pool = new BrowserStockfishPool(1);
+    try {
+      const division = divideGame(game);
+      const opening = recognizeOpening(game) ?? null;
+      analysis = await analysisScheduler.run(
+        "background-game",
+        () => analyzeObjectiveGame(game, pool, {
+          depth: options.depth,
+          division,
+          opening,
+          ...(options.signal === undefined ? {} : { signal: options.signal }),
+        }),
+        options.signal,
+      );
+      await putCachedAnalysis(game, cacheOptions, analysis);
+    } finally {
+      pool.terminate();
+    }
+  }
+  await markSyncedGameAnalyzed(syncedGame.id, record.id, {
+    algorithmVersion: analysis.algorithmVersion,
+    depth: options.depth,
+  });
+  return { analysis, analysisId: record.id, cached };
 }

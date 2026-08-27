@@ -23,8 +23,19 @@ export interface ReviewRecord {
 }
 
 export async function buildReviewRecordFromSyncedGame(game: SyncedGame): Promise<ReviewRecord> {
+  const base = await buildReviewRecord("pgn", game.pgn);
   return {
-    ...await buildReviewRecord("pgn", game.pgn),
+    ...base,
+    // A connected game is a distinct library item even when an identical PGN
+    // was imported manually or from another account. Keep manual PGN IDs
+    // stable while making the external identity part of synced-game records.
+    id: await reviewId([
+      "synced",
+      game.external.provider,
+      game.external.accountId,
+      game.external.externalGameId,
+      base.id,
+    ].join("\u0000")),
     playedAt: game.playedAt,
     external: game.external,
     preferredOrientation: game.accountColor,

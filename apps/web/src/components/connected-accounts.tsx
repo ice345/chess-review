@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import type { PlatformAccount, PlatformSyncState, SyncedGame } from "@chess-review/shared";
 import { chessComProvider, lichessProvider, PlatformRequestError } from "../lib/platforms/provider";
 import { retryAt, type PlatformSyncMode } from "../lib/platform-sync";
+import { loadAppSettings } from "../lib/app-settings";
+import { HISTORY_ANALYSIS_CONCURRENCY, queueAutomaticHistoryAnalysis } from "../lib/history-analysis-jobs";
 import {
   listPlatformAccounts,
   listPlatformSyncStates,
@@ -188,7 +190,29 @@ export function ConnectedAccounts({
 
       const complete = stateFor("complete", { lastSyncAt: currentAccount.lastSyncAt ?? new Date().toISOString() });
       await persistState(complete);
-      setNotice(`${importedCount} new game${importedCount === 1 ? "" : "s"} imported. No bulk Maia or Coach work was started.`);
+      // Every completed sync — incremental or full-history — hands its newly
+      // unanalyzed games to the durable background queue. The scope selects
+      // never-analyzed games only, so repeat calls are no-ops when nothing is
+      // waiting. Importing history therefore fills Training without any
+      // manual per-game step.
+      let analysisNotice = "";
+      try {
+        const queued = await queueAutomaticHistoryAnalysis(account.id, loadAppSettings().reviewDepth);
+        if (queued.job?.status === "paused") {
+          analysisNotice = " An existing analysis is paused; resume it from Training.";
+        } else if (queued.queuedCount > 0) {
+          analysisNotice = ` Background Stockfish analysis started for ${queued.queuedCount} game${queued.queuedCount === 1 ? "" : "s"} (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
+        } else if (queued.job?.status === "running" || queued.job?.status === "queued") {
+          analysisNotice = ` Background Stockfish analysis is already running (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
+        } else if (!queued.reused) {
+          analysisNotice = "";
+        } else {
+          analysisNotice = " All imported games already have current objective analysis.";
+        }
+      } catch (error) {
+        analysisNotice = ` History was imported, but background analysis could not be queued: ${error instanceof Error ? error.message : "unknown error"}`;
+      }
+      setNotice(`${importedCount} new game${importedCount === 1 ? "" : "s"} imported.${analysisNotice}`);
       await load();
       if (newestImported.length > 0) await onGamesUpdated?.(newestImported);
     } catch (error) {
@@ -232,7 +256,7 @@ export function ConnectedAccounts({
     <section className={`connected-accounts ${compact ? "compact" : ""}`} id="connected-accounts">
       <header>
         <div><span className="kicker">Connected games</span><h2>{compact ? "Your chess identities" : "Accounts"}</h2></div>
-        <p>{compact ? "Profiles stay lightweight here; account setup and full-history tools live in Settings." : "Sync metadata stays separate from analysis. Every batch has a persistent, resumable checkpoint."}</p>
+        <p>{compact ? "Profiles stay lightweight here; account setup and full-history tools live in Settings." : "Sync metadata stays separate from analysis. Full-history imports queue objective Stockfish work after syncing, and every batch has a persistent, resumable checkpoint."}</p>
       </header>
       {!compact && <div className="account-link-grid">
         <div className="account-link-card chesscom-link" id="chesscom-link">

@@ -13,7 +13,7 @@ import {
   type ReviewRecordKind,
   buildReviewRecordFromSyncedGame,
 } from "../lib/review-library";
-import { listSyncedGames, markSyncedGameAnalyzed } from "../lib/platform-library";
+import { listSyncedGames } from "../lib/platform-library";
 import type { SyncedGame } from "@chess-review/shared";
 import { loadAppSettings } from "../lib/app-settings";
 import { autoAnalyzeSyncedGames } from "../lib/auto-analysis";
@@ -73,7 +73,6 @@ export function HomeWorkspace() {
     setError(null);
     try {
       const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game));
-      await markSyncedGameAnalyzed(game.id, record.id);
       window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(`/review/${record.id}`);
     } catch (requestError) {
@@ -140,7 +139,7 @@ export function HomeWorkspace() {
       <ConnectedAccounts compact onGamesUpdated={applySyncAnalysisPolicy} />
 
       {syncedGames.length > 0 && <section className="synced-games-section">
-        <div><span className="kicker">From your accounts</span><h2>Recent games</h2><p>Syncing does not spend engine time. Choose a game when you are ready.</p></div>
+        <div><span className="kicker">From your accounts</span><h2>Recent games</h2><p>Sync imports games first. Full-history analysis runs in the background from Settings.</p></div>
         <div className="synced-game-grid">{syncedGames.map((game) => <article key={game.id}>
           <span className={`platform-label ${game.external.provider}`}>{game.external.provider === "chesscom" ? "Chess.com" : "Lichess"}</span>
           <strong>{game.white.username} <i>vs</i> {game.black.username}</strong>

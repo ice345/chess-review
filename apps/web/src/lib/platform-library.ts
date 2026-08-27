@@ -32,6 +32,31 @@ function readOne<T>(database: IDBDatabase, storeName: string, key: string): Prom
   });
 }
 
+/**
+ * A synced game is review-ready only when the durable link to its canonical
+ * objective analysis is present. Older builds briefly set `analyzed` when a
+ * review record was opened, before Stockfish/cache work existed; treating that
+ * legacy shape as pending lets the next full-history job repair it.
+ */
+export function syncedGameHasAnalysis(game: SyncedGame): boolean {
+  return game.analyzed
+    && typeof game.analysisId === "string"
+    && game.analysisId.length > 0
+    && typeof game.analysisAlgorithmVersion === "string"
+    && game.analysisAlgorithmVersion.length > 0
+    && typeof game.analysisDepth === "number";
+}
+
+function normalizeSyncedGame(game: SyncedGame): SyncedGame {
+  if (!game.analyzed || syncedGameHasAnalysis(game)) return game;
+  const repaired = { ...game, analyzed: false };
+  delete repaired.analysisId;
+  delete repaired.analysisAlgorithmVersion;
+  delete repaired.analysisDepth;
+  delete repaired.analyzedAt;
+  return repaired;
+}
+
 export async function listPlatformAccounts(): Promise<PlatformAccount[]> {
   const database = await openReviewDatabase();
   try {
@@ -78,7 +103,7 @@ export async function removePlatformAccount(accountId: string): Promise<void> {
 export async function listSyncedGames(filters: { provider?: ExternalPlatform; analyzed?: boolean } = {}): Promise<SyncedGame[]> {
   const database = await openReviewDatabase();
   try {
-    const games = await readAll<SyncedGame>(database, SYNCED_GAME_STORE);
+    const games = (await readAll<SyncedGame>(database, SYNCED_GAME_STORE)).map(normalizeSyncedGame);
     return games
       .filter((game) => filters.provider === undefined || game.external.provider === filters.provider)
       .filter((game) => filters.analyzed === undefined || game.analyzed === filters.analyzed)
@@ -91,7 +116,8 @@ export async function listSyncedGames(filters: { provider?: ExternalPlatform; an
 export async function getSyncedGame(gameId: string): Promise<SyncedGame | null> {
   const database = await openReviewDatabase();
   try {
-    return await readOne<SyncedGame>(database, SYNCED_GAME_STORE, gameId);
+    const game = await readOne<SyncedGame>(database, SYNCED_GAME_STORE, gameId);
+    return game ? normalizeSyncedGame(game) : null;
   } finally {
     database.close();
   }
@@ -107,7 +133,14 @@ export async function saveSyncedGames(games: SyncedGame[]): Promise<SyncedGame[]
       const store = transaction.objectStore(SYNCED_GAME_STORE);
       for (const game of games) {
         const prior = existing.get(game.id);
-        store.put({ ...game, analyzed: prior?.analyzed ?? game.analyzed, ...(prior?.analysisId ? { analysisId: prior.analysisId } : {}) }, game.id);
+        store.put({
+          ...game,
+          analyzed: prior?.analyzed ?? game.analyzed,
+          ...(prior?.analysisId ? { analysisId: prior.analysisId } : {}),
+          ...(prior?.analysisAlgorithmVersion ? { analysisAlgorithmVersion: prior.analysisAlgorithmVersion } : {}),
+          ...(prior?.analysisDepth === undefined ? {} : { analysisDepth: prior.analysisDepth }),
+          ...(prior?.analyzedAt ? { analyzedAt: prior.analyzedAt } : {}),
+        }, game.id);
       }
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error("Unable to store synced games."));
@@ -119,7 +152,11 @@ export async function saveSyncedGames(games: SyncedGame[]): Promise<SyncedGame[]
   }
 }
 
-export async function markSyncedGameAnalyzed(id: string, analysisId: string): Promise<void> {
+export async function markSyncedGameAnalyzed(
+  id: string,
+  analysisId: string,
+  metadata?: { algorithmVersion: string; depth: number; analyzedAt?: string },
+): Promise<void> {
   const database = await openReviewDatabase();
   try {
     const game = await new Promise<SyncedGame | undefined>((resolve, reject) => {
@@ -127,7 +164,16 @@ export async function markSyncedGameAnalyzed(id: string, analysisId: string): Pr
       request.onsuccess = () => resolve(request.result as SyncedGame | undefined);
       request.onerror = () => reject(request.error ?? new Error("Unable to read synced game."));
     });
-    if (game) await write(database, SYNCED_GAME_STORE, id, { ...game, analyzed: true, analysisId });
+    if (game) await write(database, SYNCED_GAME_STORE, id, {
+      ...game,
+      analyzed: true,
+      analysisId,
+      ...(metadata === undefined ? {} : {
+        analysisAlgorithmVersion: metadata.algorithmVersion,
+        analysisDepth: metadata.depth,
+        analyzedAt: metadata.analyzedAt ?? new Date().toISOString(),
+      }),
+    });
   } finally {
     database.close();
   }
