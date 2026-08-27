@@ -32,12 +32,21 @@ connected identity.
 
 Ratings are grouped by `provider + timeClass`. Chess.com rapid, Chess.com blitz
 and Lichess rapid are separate bands and are never averaged together. Each band
-reports the latest known rating, the last-ten-game observed range, result score,
-sample size and confidence (`low <5`, `medium 5–14`, `high >=15`). Performance
-rating is shown only with at least five opponent ratings. A conservative next
-target is the next 100-point rating milestone and is shown only at medium/high
-confidence; otherwise the UI says the sample is insufficient. Accuracy is never
-converted into a rating estimate.
+reports the latest known platform rating, the last-ten-game observed range, result
+score, sample size and confidence (`low <5`, `medium 5–14`, `high >=15`). The
+label **Estimated recent performance** is an Elo expected-score inversion using
+the same games for both known result and opponent rating; it is shown only with
+at least five matched games and is bounded to avoid extreme small-sample claims.
+Missing result, player rating or opponent rating metadata is excluded from the
+relevant estimate rather than silently mixed with another population. Accuracy is
+never converted into a rating estimate.
+
+Targets are deterministic and intentionally modest. With medium/high confidence,
+the next 100-point milestone is shown; when the current rating is within 25 points
+of that milestone, the UI shows **Stabilize** at the milestone and moves the
+longer-term next target to the following 100-point milestone (for example,
+1398 → stabilize 1400 → next target 1500). Low-confidence bands do not receive a
+target.
 
 ## Openings and phases
 
@@ -46,8 +55,10 @@ entry reports population share, W/D/L, score, overall/recent Accuracy, average
 WinPercent loss, error rate, representative games and up to three exact problem
 positions.
 
-Middlegame and endgame profiles report move count, Accuracy, recent Accuracy,
-error rate and average WinPercent loss. Advantage preservation means a move that
+Middlegame and endgame profiles share deterministic phase evidence but use
+different emphasis: Middlegame highlights decision errors, average WinPercent
+loss and missed opportunities; Endgame highlights winning-chance conversion,
+defensive holds and missed wins/mates. Advantage preservation means a move that
 started at least 70 mover WinPercent and remained at least 65. A defensive hold
 means a move starting at most 30 that lost no more than two WinPercent points.
 These are bounded decision metrics, not tablebase claims. Syzygy is not currently
@@ -91,9 +102,19 @@ An explicit “Import full history” action also creates (or reuses) an
 `unanalyzed` job for that connected account and starts it without waiting for
 the Settings page to stay mounted. Training polls the durable record while the
 job is active, so completed games and cache hits become report data
-incrementally. A failed item keeps its exact error text and can be retried on
-its own; duplicate jobs with the same scope and game set are collapsed in the
-Training list.
+incrementally. Incremental Home syncs keep their separate newest-game setting
+and do not create a duplicate full-history run. A failed item keeps its exact
+error text and can be retried on its own; duplicate jobs with the same scope
+and game set are collapsed in the Training list.
+
+The Training page keeps the latest active/error run visible and nests older
+finished runs under **Past analysis runs**. Successful game lists are collapsed by
+default because the reports themselves are the useful result. Finished, failed
+and cancelled run records can be removed with **Remove from history**, or in one
+scoped **Clear finished runs** action. These operations delete only entries in
+`history-analysis-jobs`; synced games, review records, Stockfish payloads,
+projections and all Training aggregates remain intact. Active jobs must be
+cancelled before their run record can be removed.
 
 ## Storage and large libraries
 
@@ -104,10 +125,11 @@ records are backfilled one payload at a time. The Training player list reads onl
 review records plus projections; selecting a player then loads only matching
 canonical analyses. Thousands of full records are therefore not eagerly mounted
 to discover identities or coverage. On read, Training also repairs legacy
-completed synced games whose cache and `SyncedGame` success marker exist but
-whose external review record was not persisted, so an older bulk run is not
-silently omitted from Overview. Pending or failed games are not promoted merely
-because an identical PGN happens to share a cache entry.
+completed synced games whose cache projection exists but whose external review
+record was not persisted, using a successful history item when one is available
+(or the legacy cache-only path when no job record exists). Pending or failed
+games are not promoted merely because an identical PGN happens to share a cache
+entry.
 
 Connected-player coverage is always scoped to that exact account even when the
 bulk-analysis control is set to analyze all accounts. Opening is unavailable for

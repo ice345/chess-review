@@ -465,3 +465,45 @@ computing after browser shutdown.
 - [x] add empty/partial/full Training and bulk-control browser workflows
 - [x] inspect intentional visual changes before updating representative baselines
 - [x] pass full TypeScript, Python, build and E2E validation
+
+## Phase 10.1 — Training release-readiness refinement
+
+Phase 10.1 is a focused product/data pass on the completed Phase 10 surface. It
+keeps the objective-analysis algorithms stable while making the durable result
+of whole-history analysis visible and maintainable.
+
+### Milestone A — connected-data continuity
+
+- [x] repair legacy cache-only connected games into durable review links
+- [x] join projections by header-independent initial-FEN plus UCI identity when
+  PGN serialization has drifted
+- [x] keep successful items in Training and Overview when another item in the
+  same batch fails
+- [x] explain the common outside-MultiPV failure as incomplete engine evidence,
+  not an illegal provider game
+
+### Milestone B — quiet Training hierarchy
+
+- [x] formalize Paper Card, Wash Card and Ink Row surface tokens
+- [x] collapse advanced scope controls behind a concise population summary
+- [x] promote player profile, form, phase signal, focus, highlights and coverage
+  on Overview
+- [x] keep successful game lists collapsed and nest older finished runs
+- [x] add responsive/reduced-motion styling for the refined hierarchy
+
+### Milestone C — run lifecycle and rating truth
+
+- [x] remove only finished/cancelled/failed history-job records
+- [x] clear finished run records with confirmation while protecting games,
+  reviews, objective cache and Training data
+- [x] protect active runs from deletion until cancelled
+- [x] calculate estimated performance from one matched result/opponent sample
+- [x] expose stabilize/next-target milestones near 100-point boundaries
+- [x] add deterministic unit and browser coverage for the above behavior
+
+### Follow-ups still outside this pass
+
+- [ ] add Settings-level scoped deletion for objective cache, individual review
+  records, imported account data and full local reset
+- [ ] close the remaining P1 service-authentication, SSRF, export, cursor and
+  persistence findings in `docs/audits/full-product-audit.md`

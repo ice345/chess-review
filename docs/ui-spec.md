@@ -137,6 +137,20 @@ Plan and Coverage tabs. The trend chart links back to each review. Weakness,
 highlight and queue evidence links include the exact canonical ply so Review
 opens on the source decision.
 
+The Overview is a player-development profile before it is a report viewer: the
+selected player, observed platform rating, current form, coverage, phase signal,
+current focus and restrained highlight counts lead the page. Detailed tabs remain
+available below that profile. Advanced filters are kept in one shared population
+scope disclosure (`All platforms · ... · N games`); opening it reveals the full
+filter set without changing the report population.
+
+Whole-history run history is secondary to the resulting data. Active/error runs
+and the latest useful terminal run remain visible; older terminal runs sit under
+`Past analysis runs`, and successful item lists start collapsed. `Remove from
+history` and `Clear finished runs` delete only batch-job records. They never delete
+synced games, review records, objective cache or Training data, and an active run
+must be cancelled before removal.
+
 No weakness is presented as recurring until the deterministic signal occurs in
 at least two distinct games. Move-quality icons and labels reuse the shared V3
 system. Training status supports queued, in progress and completed, remains in
