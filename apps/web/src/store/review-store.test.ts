@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { replayUciLine } from "@chess-review/chess-core";
-import type { CoachExplanation, GameAnalysisV1, GameCoachSummary, HumanAnalysis } from "@chess-review/shared";
+import type { CoachExplanation, GameAnalysisV2, GameCoachSummary, HumanAnalysis } from "@chess-review/shared";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { useReviewStore } from "./review-store";
 
@@ -83,7 +83,7 @@ describe("review analysis branch store", () => {
       algorithmVersion: "objective-unchanged",
       moves: [{ ply: 1, classification: "best", human, coach }],
       coachSummary: summary,
-    } as unknown as GameAnalysisV1;
+    } as unknown as GameAnalysisV2;
     useReviewStore.getState().setAnalysis(analysis);
 
     const updated = useReviewStore.getState().invalidateHumanAnalysis("maia3-23m", 1600);

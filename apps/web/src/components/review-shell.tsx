@@ -16,6 +16,7 @@ import { MoveTransport } from "./review/move-transport";
 import { PlayerStrip } from "./review/player-strip";
 import { usePlayerIdentities } from "../hooks/use-player-identities";
 import { useBranchMoveQuality } from "../hooks/use-branch-move-quality";
+import { useChessSounds } from "../hooks/use-chess-sounds";
 import { useReviewAnalysis } from "../hooks/use-review-analysis";
 import { useReviewCoach } from "../hooks/use-review-coach";
 import { useReviewHuman } from "../hooks/use-review-human";
@@ -44,6 +45,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const gameId = params.gameId;
   const state = useReviewStore();
   const settings = useMemo(() => loadAppSettings(), []);
+  const soundRuntime = useChessSounds({
+    game: state.game,
+    currentPly: state.currentPly,
+    branch: state.branch,
+  });
   const analysisRuntime = useReviewAnalysis({
     gameId,
     positionFen: state.positionFen,
@@ -377,7 +383,24 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         <div className="review-workspace">
           <div className="analysis-column">
             <section className="position-workspace" aria-label="Persistent board workspace">
-              <div className="board-toolbar"><BoardFlipButton onFlip={flipBoard} /></div>
+              <div className="board-toolbar">
+                <button
+                  type="button"
+                  className="sound-toggle-button"
+                  aria-label={soundRuntime.soundEnabled ? "Mute chess sounds" : "Unmute chess sounds"}
+                  aria-pressed={!soundRuntime.soundEnabled}
+                  title={soundRuntime.soundEnabled ? "Mute chess sounds" : "Unmute chess sounds"}
+                  onClick={soundRuntime.toggleMuted}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 9v6h4l5 4V5L9 9H5Z" />
+                    {soundRuntime.soundEnabled
+                      ? <><path d="M17 9.2c.8.75 1.2 1.68 1.2 2.8s-.4 2.05-1.2 2.8" /><path d="M19.2 7c1.35 1.35 2.05 3 2.05 5s-.7 3.65-2.05 5" /></>
+                      : <><path d="m17 9 4 6" /><path d="m21 9-4 6" /></>}
+                  </svg>
+                </button>
+                <BoardFlipButton onFlip={flipBoard} />
+              </div>
               <PlayerStrip player={orderedPlayers.top} />
               <div className="board-stage">
                 <EvaluationBar

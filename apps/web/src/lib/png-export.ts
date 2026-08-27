@@ -1,4 +1,4 @@
-import type { EngineScore, GameAnalysisV1, MoveAnalysis } from "@chess-review/shared";
+import type { AnyGameAnalysis, EngineScore, MoveAnalysis } from "@chess-review/shared";
 import { QUALITY_META } from "@chess-review/ui";
 
 const PIECES: Record<string, string> = {
@@ -230,7 +230,7 @@ function toBlob(element: HTMLCanvasElement): Promise<Blob> {
 }
 
 export async function renderPositionCard(
-  analysis: GameAnalysisV1,
+  analysis: AnyGameAnalysis,
   move: MoveAnalysis,
   orientation: "white" | "black",
 ): Promise<Blob> {
@@ -279,7 +279,7 @@ function graphValue(score: EngineScore): number {
   return Math.max(-6, Math.min(6, score.cp / 100));
 }
 
-export async function renderGameReviewCard(analysis: GameAnalysisV1): Promise<Blob> {
+export async function renderGameReviewCard(analysis: AnyGameAnalysis): Promise<Blob> {
   const [element, context] = canvas();
   const white = analysis.game.headers.White ?? "White";
   const black = analysis.game.headers.Black ?? "Black";
@@ -351,7 +351,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function reviewFilename(analysis: GameAnalysisV1, suffix: string): string {
+export function reviewFilename(analysis: AnyGameAnalysis, suffix: string): string {
   const white = analysis.game.headers.White ?? "white";
   const black = analysis.game.headers.Black ?? "black";
   const base = `${white}-${black}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "chess-review";

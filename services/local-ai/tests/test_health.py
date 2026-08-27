@@ -157,6 +157,47 @@ def test_local_development_port_is_allowed_by_cors() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:4317"
 
 
+def test_explicit_model_download_requires_trusted_origin_and_json_confirmation() -> None:
+    app.dependency_overrides[get_maia_provider] = lambda: AvailableMaia()
+    response = TestClient(app).post(
+        "/maia/models/maia3-23m/download",
+        headers={"Origin": "http://localhost:3000"},
+        json={"confirm": True},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"model": "maia3-23m", "status": "cached"}
+
+
+@pytest.mark.parametrize("origin", [None, "https://attacker.example", "null"])
+def test_model_download_rejects_untrusted_browser_origins(origin: str | None) -> None:
+    app.dependency_overrides[get_maia_provider] = lambda: AvailableMaia()
+    headers = {} if origin is None else {"Origin": origin}
+    response = TestClient(app).post(
+        "/maia/models/maia3-79m/download",
+        headers=headers,
+        json={"confirm": True},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "trusted-local-origin-required"
+
+
+def test_model_download_rejects_simple_form_and_missing_confirmation() -> None:
+    app.dependency_overrides[get_maia_provider] = lambda: AvailableMaia()
+    response = TestClient(app).post(
+        "/maia/models/maia3-79m/download",
+        headers={"Origin": "http://127.0.0.1:3000"},
+        data={"confirm": "true"},
+    )
+    assert response.status_code == 422
+
+    response = TestClient(app).post(
+        "/maia/models/maia3-79m/download",
+        headers={"Origin": "http://127.0.0.1:3000"},
+        json={},
+    )
+    assert response.status_code == 422
+
+
 def test_move_review_response_preserves_policy_rank_probability_and_played_wdl() -> None:
     app.dependency_overrides[get_maia_provider] = lambda: AvailableMaia()
     response = TestClient(app).post(

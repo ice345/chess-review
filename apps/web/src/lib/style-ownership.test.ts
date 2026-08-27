@@ -20,7 +20,6 @@ const ownership = {
   ".eval-bar": "review-semantics.css",
   ".board-quality-badge": "review-semantics.css",
   ".dual-verdict": "review-semantics.css",
-  ".route-heading": "review-panels.css",
   ".overview-tab": "review-panels.css",
   ".service-dot": "review-panels.css",
   ".engine-config": "review-panels.css",

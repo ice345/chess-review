@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { EngineScore, GameAnalysisV1, MoveAnalysis } from "@chess-review/shared";
+import type { AnyGameAnalysis, EngineScore, MoveAnalysis } from "@chess-review/shared";
 import { QUALITY_META, QualityIcon } from "./quality-icon";
 
 export interface EvaluationGraphProps {
-  analysis: GameAnalysisV1;
+  analysis: AnyGameAnalysis;
   currentPly: number;
   onSelectPly: (ply: number) => void;
 }

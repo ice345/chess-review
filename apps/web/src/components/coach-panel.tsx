@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type {
-  GameAnalysisV1,
+  GameAnalysisV2,
   MoveAnalysis,
 } from "@chess-review/shared";
 import { coachProviderReady, coachServiceText } from "../hooks/use-review-coach";
@@ -13,7 +13,7 @@ export function CoachPanel({
   move,
   onSelectPly,
 }: {
-  analysis: GameAnalysisV1;
+  analysis: GameAnalysisV2;
   move: MoveAnalysis | null;
   onSelectPly: (ply: number) => void;
 }) {

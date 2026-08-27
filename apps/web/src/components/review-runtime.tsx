@@ -3,7 +3,7 @@
 import { createContext, useContext, type Dispatch, type SetStateAction } from "react";
 import type {
   CoachLanguage,
-  GameAnalysisV1,
+  GameAnalysisV2,
   HumanAnalysis,
   MaiaModel,
   MaiaMoveReview,
@@ -77,7 +77,7 @@ export interface ReviewRuntimeValue {
   navigateToPly: (ply: number) => void;
   playContinuation: (identity: StockfishCandidateIdentity, result?: StockfishMoveAnalysis | null) => void;
   playHumanCandidate: (identity: HumanCandidateIdentity) => void;
-  persistEnrichedAnalysis: (analysis: GameAnalysisV1 | null) => void;
+  persistEnrichedAnalysis: (analysis: GameAnalysisV2 | null) => void;
 }
 
 const ReviewRuntimeContext = createContext<ReviewRuntimeValue | null>(null);

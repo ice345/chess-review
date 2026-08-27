@@ -126,6 +126,11 @@ class MaiaModelSetupResponse(BaseModel):
     status: MaiaModelState
 
 
+class MaiaModelSetupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: Literal[True]
+
+
 def to_camel(value: str) -> str:
     first, *rest = value.split("_")
     return first + "".join(part.capitalize() for part in rest)
@@ -174,8 +179,23 @@ class CoachSacrificeFacts(CoachModel):
     genuine: bool
 
 
+class CoachEngineConsistencyFacts(CoachModel):
+    win_percent_delta: float = Field(ge=0)
+    centipawn_delta: int | None = Field(default=None, ge=0)
+    tolerance_win_percent: float = Field(ge=0)
+    consistent: bool
+
+
+class CoachObjectiveVerificationFacts(CoachModel):
+    status: Literal["baseline", "verified"]
+    depth: int = Field(ge=1)
+    multi_pv: int = Field(ge=1)
+    reasons: list[str]
+
+
 class CoachClassificationReason(CoachModel):
     precedence_rule: str
+    quality_rule: str | None = None
     is_engine_best: bool
     engine_rank: int | None = None
     centipawn_loss: int | None = None
@@ -191,6 +211,8 @@ class CoachClassificationReason(CoachModel):
     is_obvious_recapture: bool
     is_trivial_check_escape: bool
     played_move_outside_multi_pv: bool
+    engine_consistency: CoachEngineConsistencyFacts | None = None
+    verification: CoachObjectiveVerificationFacts | None = None
     sacrifice: CoachSacrificeFacts | None = None
     exclusions: list[str]
 
@@ -311,6 +333,8 @@ class CoachMoveIdentity(CoachModel):
     san: str
     uci: str
     classification: str
+    quality: str | None = None
+    annotations: list[str] = Field(default_factory=list)
     accuracy: float = Field(ge=0, le=100)
 
 
@@ -401,6 +425,8 @@ class CoachPlayerFacts(CoachModel):
     accuracy: float | None = None
     phase_accuracy: dict[str, float]
     classification_counts: dict[str, int]
+    quality_counts: dict[str, int] | None = None
+    annotation_counts: dict[str, int] | None = None
 
 
 class CoachDivisionFacts(CoachModel):
@@ -416,6 +442,8 @@ class CoachGameMoveFacts(CoachModel):
     uci: str
     phase: Literal["opening", "middlegame", "endgame"]
     classification: str
+    quality: str | None = None
+    annotations: list[str] = Field(default_factory=list)
     accuracy: float = Field(ge=0, le=100)
     win_percent_loss: float = Field(ge=0)
     human_probability: float | None = Field(default=None, ge=0, le=1)

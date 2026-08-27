@@ -109,7 +109,6 @@ export function ObjectiveRoutePanel() {
   const move = branch || currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   return (
     <div className="route-panel objective-route">
-      <div className="route-heading"><span className="kicker">Objective review</span><h1>What happened?</h1><p>Engine truth first; interpretation comes later.</p></div>
       {move && <CurrentMoveVerdict move={move} />}
       <section className="game-summary-section" aria-label="Game summary">
         <div className="section-heading"><span className="kicker">Game summary</span><h2>Accuracy, phases and Move Quality</h2></div>
@@ -129,10 +128,9 @@ export function MovesRoutePanel() {
   const move = currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   return (
     <div className="route-panel moves-route">
-      <div className="route-heading"><span className="kicker">Move explorer</span><h1>Every decision, in context</h1></div>
       <div className="move-filters" aria-label="Move filters">{(["all", "critical", "errors"] as const).map((value) => <button type="button" className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div>
       <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} filter={filter} />
-      {move && <section className="move-evidence"><div><QualityIcon classification={move.classification} size={28} /><span><strong>{move.san} · {QUALITY_META[move.classification].label}</strong><small>{move.phase} · Accuracy {move.accuracy.toFixed(1)}</small></span></div><dl><div><dt>Rule</dt><dd>{move.classificationReason.precedenceRule.replaceAll("-", " ")}</dd></div><div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div><div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div><div><dt>Legal choices</dt><dd>{move.classificationReason.legalMoveCount}</dd></div></dl>{move.classificationReason.exclusions.length > 0 && <small>Exclusions · {move.classificationReason.exclusions.join(", ")}</small>}</section>}
+      {move && <section className="move-evidence"><div><QualityIcon classification={move.classification} size={28} /><span><strong>{move.san} · {QUALITY_META[move.quality].label}</strong><small>{move.annotations.length > 0 ? `Annotations · ${move.annotations.map((annotation) => annotation.replaceAll("_", " ")).join(", ")} · ` : ""}{move.phase} · Accuracy {move.accuracy.toFixed(1)}</small></span></div><dl><div><dt>Quality rule</dt><dd>{(move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule).replaceAll("-", " ")}</dd></div><div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div><div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div><div><dt>Verification</dt><dd>{move.classificationReason.verification?.status ?? "not required"}</dd></div></dl>{move.classificationReason.exclusions.length > 0 && <small>Exclusions · {move.classificationReason.exclusions.join(", ")}</small>}</section>}
     </div>
   );
 }
@@ -145,7 +143,6 @@ export function CoachRoutePanel() {
   const move = currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   return (
     <div className="route-panel coach-route">
-      <div className="route-heading"><span className="kicker">Study</span><h1>What should you learn from this game?</h1><p>Whole-game lessons come first; current-move teaching stays grounded in the position preserved on the board.</p></div>
       <CoachPanel analysis={analysis} move={move} onSelectPly={runtime.navigateToPly} />
     </div>
   );
@@ -158,8 +155,7 @@ export function EngineRoutePanel() {
   const result = runtime.engineResult ?? analysis?.moves[currentPly]?.stockfish ?? null;
   return (
     <div className="route-panel engine-route">
-      <div className="route-heading"><span className="kicker">Advanced</span><h1>Engine Lab</h1><p>Raw Stockfish controls and diagnostics, kept outside the ordinary review flow.</p></div>
-      <section className="engine-config"><label>Depth<select value={runtime.reviewDepth} disabled={runtime.reviewState === "running"} onChange={(event) => runtime.setReviewDepth(Number(event.target.value) as 10 | 12 | 15)}><option value={10}>10</option><option value={12}>12</option><option value={15}>15</option></select></label><label>MultiPV<select value={runtime.reviewMultiPv} disabled={runtime.reviewState === "running"} onChange={(event) => runtime.setReviewMultiPv(Number(event.target.value) as 1 | 2 | 3 | 4 | 5)}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label></section>
+      <section className="engine-config"><label>Depth<select value={runtime.reviewDepth} disabled={runtime.reviewState === "running"} onChange={(event) => runtime.setReviewDepth(Number(event.target.value) as 10 | 12 | 15)}><option value={10}>10</option><option value={12}>12</option><option value={15}>15</option></select></label><label>Engine Lab lines<select value={runtime.reviewMultiPv} onChange={(event) => runtime.setReviewMultiPv(Number(event.target.value) as 1 | 2 | 3 | 4 | 5)}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label></section>
       <div className="engine-actions"><button type="button" className="primary" disabled={runtime.engineState === "running"} onClick={() => void runtime.analyzePosition()}>{runtime.engineState === "running" ? "Analyzing position…" : "Analyze current position"}</button>{runtime.record.kind === "pgn" && (runtime.reviewState === "running" ? <button type="button" className="secondary" onClick={runtime.cancelFullGame}>Cancel game review</button> : <button type="button" className="secondary" onClick={() => void runtime.analyzeFullGame()}>Re-analyze full game</button>)}</div>
       {(runtime.engineError || runtime.reviewError) && <p className="error">{runtime.engineError ?? runtime.reviewError}</p>}
       {runtime.reviewState === "running" && <div className="progress-card"><progress value={runtime.reviewProgress?.completed ?? 0} max={Math.max(1, runtime.reviewProgress?.total ?? 1)} /><span>{runtime.reviewProgress?.stage ?? "positions"} · {runtime.reviewProgress?.completed ?? 0}/{runtime.reviewProgress?.total ?? "?"}</span></div>}

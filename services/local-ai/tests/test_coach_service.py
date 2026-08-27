@@ -150,6 +150,40 @@ def test_move_coach_validates_lines_and_removes_ungrounded_notation() -> None:
     assert response.confidence == "low"
 
 
+def test_move_coach_accepts_objective_v2_quality_and_verification_evidence() -> None:
+    facts = move_facts()
+    move = facts["move"]
+    objective = facts["objective"]
+    assert isinstance(move, dict)
+    assert isinstance(objective, dict)
+    reason = objective["classificationReason"]
+    assert isinstance(reason, dict)
+
+    move["quality"] = "best"
+    move["annotations"] = ["critical"]
+    reason["qualityRule"] = "win-percent-loss"
+    reason["engineConsistency"] = {
+        "winPercentDelta": 0.2,
+        "centipawnDelta": 7,
+        "toleranceWinPercent": 1,
+        "consistent": True,
+    }
+    reason["verification"] = {
+        "status": "verified",
+        "depth": 18,
+        "multiPv": 5,
+        "reasons": ["special-annotation"],
+    }
+
+    request = CoachExplainRequest.model_validate({"factsVersion": 1, "facts": facts})
+
+    assert request.facts.move.quality == "best"
+    assert request.facts.move.annotations == ["critical"]
+    assert request.facts.objective.classification_reason.quality_rule == "win-percent-loss"
+    assert request.facts.objective.classification_reason.verification is not None
+    assert request.facts.objective.classification_reason.verification.multi_pv == 5
+
+
 def test_move_coach_rejects_json_that_does_not_match_the_contract() -> None:
     provider = FakeCoachProvider({"headline": "Missing required fields"})
     service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
@@ -259,6 +293,29 @@ def test_game_summary_filters_unknown_moments_and_ungrounded_moves() -> None:
     assert "a2a4" in response.grounding.removed_move_mentions
     assert "a2a4" not in response.summary
     assert response.confidence == "low"
+
+
+def test_game_summary_accepts_objective_v2_quality_and_annotation_counts() -> None:
+    facts = game_facts()
+    players = facts["players"]
+    moves = facts["moves"]
+    assert isinstance(players, dict)
+    assert isinstance(moves, list)
+    white = players["white"]
+    assert isinstance(white, dict)
+    first_move = moves[0]
+    assert isinstance(first_move, dict)
+
+    white["qualityCounts"] = {"best": 1}
+    white["annotationCounts"] = {"critical": 1}
+    first_move["quality"] = "best"
+    first_move["annotations"] = ["critical"]
+
+    request = CoachGameSummaryRequest.model_validate({"factsVersion": 1, "facts": facts})
+
+    assert request.facts.players.white.quality_counts == {"best": 1}
+    assert request.facts.players.white.annotation_counts == {"critical": 1}
+    assert request.facts.moves[0].annotations == ["critical"]
 
 
 def test_game_summary_rejects_a_provider_that_ignores_requested_chinese() -> None:

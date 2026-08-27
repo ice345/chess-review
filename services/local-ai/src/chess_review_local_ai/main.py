@@ -1,6 +1,7 @@
+import re
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from .coach_provider import CoachGenerationError, CoachUnavailableError
@@ -20,6 +21,7 @@ from .schemas import (
     CoachHealth,
     HealthResponse,
     MaiaModelName,
+    MaiaModelSetupRequest,
     MaiaModelSetupResponse,
     MaiaMoveReviewRequest,
     MaiaMoveReviewResponse,
@@ -36,6 +38,8 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
+
+_TRUSTED_BROWSER_ORIGIN = re.compile(r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$")
 
 
 @lru_cache(maxsize=1)
@@ -80,6 +84,25 @@ def _run_maia(operation):
         ) from exc
 
 
+def require_trusted_browser_origin(request: Request) -> None:
+    """Protect explicit local mutations from cross-site browser requests.
+
+    CORS prevents an untrusted page from reading a response; it is not CSRF
+    protection by itself. Model setup additionally requires an allowed Origin
+    and a JSON confirmation body, so a simple cross-origin form cannot trigger
+    a checkpoint download.
+    """
+    origin = request.headers.get("origin")
+    if origin is None or _TRUSTED_BROWSER_ORIGIN.fullmatch(origin) is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "trusted-local-origin-required",
+                "message": "Model download requires confirmation from the local Open Chess Review UI.",
+            },
+        )
+
+
 @app.post("/maia/move-review", response_model=MaiaMoveReviewResponse)
 def maia_move_review(
     request: MaiaMoveReviewRequest,
@@ -99,6 +122,8 @@ def maia_position_analysis(
 @app.post("/maia/models/{model}/download", response_model=MaiaModelSetupResponse)
 def maia_model_download(
     model: MaiaModelName,
+    _confirmation: MaiaModelSetupRequest,
+    _trusted_origin: None = Depends(require_trusted_browser_origin),
     provider: MaiaProvider = Depends(get_maia_provider),
 ) -> MaiaModelSetupResponse:
     model_status = _run_maia(lambda: provider.prepare_model(model))

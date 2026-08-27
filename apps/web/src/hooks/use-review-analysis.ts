@@ -1,19 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildGameAnalysis } from "@chess-review/analysis";
+import { CLASSIFICATION_MULTI_PV } from "@chess-review/analysis";
 import type { NormalizedGame } from "@chess-review/chess-core";
-import type { GameAnalysisV1, GameDivision, OpeningInfo, StockfishMoveAnalysis } from "@chess-review/shared";
+import type { GameAnalysisV2, GameDivision, OpeningInfo, StockfishMoveAnalysis } from "@chess-review/shared";
 import {
   BrowserStockfish,
   BrowserStockfishPool,
-  STOCKFISH_VERSION,
   type GameReviewProgress,
 } from "@chess-review/stockfish";
 import type { ReviewRunState } from "../components/review-runtime";
 import { getCachedAnalysis, putCachedAnalysis } from "../lib/analysis-cache";
 import { analysisScheduler } from "../lib/analysis-scheduler";
 import type { AppSettings } from "../lib/app-settings";
+import { analyzeObjectiveGame } from "../lib/objective-game-analysis";
+import { markSyncedGameAnalyzed } from "../lib/platform-library";
+import { getReviewRecord } from "../lib/review-library";
 import { useReviewStore } from "../store/review-store";
 
 type ReviewAnalysisSettings = Pick<
@@ -59,48 +61,50 @@ export function useReviewAnalysis({
     division: GameDivision,
     opening: OpeningInfo | null,
     depth: number,
-    multiPv: number,
   ) => {
     if (reviewAbort.current) return;
-    const cacheOptions = { depth, multiPv };
+    const cacheOptions = { depth, multiPv: CLASSIFICATION_MULTI_PV };
     setReviewState("running");
     setReviewError(null);
     setReviewProgress(null);
     const controller = new AbortController();
     reviewAbort.current = controller;
     try {
+      const markCurrent = async (analysis: GameAnalysisV2) => {
+        const record = await getReviewRecord(gameId).catch(() => null);
+        if (!record?.external) return;
+        await markSyncedGameAnalyzed(
+          `${record.external.provider}:${record.external.externalGameId}`,
+          record.id,
+          { algorithmVersion: analysis.algorithmVersion, depth: analysis.engine.depth },
+        ).catch(() => undefined);
+      };
       const cached = await getCachedAnalysis(game, cacheOptions).catch(() => null);
       if (controller.signal.aborted) return;
       if (cached) {
         useReviewStore.getState().setAnalysis(cached);
+        await markCurrent(cached);
         setReviewState("cached");
         return;
       }
       useReviewStore.getState().setAnalysis(null);
-      // One background worker leaves the scheduler's second slot available for
-      // the current board or branch, instead of letting a game pool consume all
-      // browser analysis capacity.
+      // This full-game pool owns one worker. The shared scheduler caps the
+      // total engine workload at two tasks and prioritizes current-board work.
       const pool = new BrowserStockfishPool(1);
       reviewPool.current = pool;
-      const engineFacts = await analysisScheduler.run(
+      const analysis = await analysisScheduler.run(
         "background-game",
-        () => pool.analyzeGame(game, {
-          ...cacheOptions,
+        () => analyzeObjectiveGame(game, pool, {
+          depth,
+          division,
+          opening,
           signal: controller.signal,
           onProgress: setReviewProgress,
         }),
         controller.signal,
       );
-      const analysis = buildGameAnalysis({
-        game,
-        ...engineFacts,
-        ...(opening === null ? {} : { opening }),
-        division,
-        stockfishVersion: STOCKFISH_VERSION,
-        ...cacheOptions,
-        createdAt: new Date().toISOString(),
-      });
       await putCachedAnalysis(game, cacheOptions, analysis).catch(() => undefined);
+      await markCurrent(analysis);
       if (controller.signal.aborted) return;
       useReviewStore.getState().setAnalysis(analysis);
       setReviewState("complete");
@@ -116,7 +120,7 @@ export function useReviewAnalysis({
       reviewPool.current = null;
       reviewAbort.current = null;
     }
-  }, []);
+  }, [gameId]);
 
   useEffect(() => {
     engine.current = new BrowserStockfish();
@@ -148,8 +152,8 @@ export function useReviewAnalysis({
   const analyzeFullGame = useCallback(async () => {
     const review = useReviewStore.getState();
     if (!review.game || !review.division) return;
-    await runFullGame(review.game, review.division, review.opening, reviewDepth, reviewMultiPv);
-  }, [reviewDepth, reviewMultiPv, runFullGame]);
+    await runFullGame(review.game, review.division, review.opening, reviewDepth);
+  }, [reviewDepth, runFullGame]);
 
   const cancelFullGame = useCallback(() => {
     reviewAbort.current?.abort();
@@ -227,7 +231,7 @@ export function useReviewAnalysis({
     setContinuationError(error instanceof Error ? error.message : "Engine line could not be validated.");
   }, []);
 
-  const persistEnrichedAnalysis = useCallback((analysis: GameAnalysisV1 | null) => {
+  const persistEnrichedAnalysis = useCallback((analysis: GameAnalysisV2 | null) => {
     const game = useReviewStore.getState().game;
     if (!analysis || !game) return;
     void putCachedAnalysis(game, {

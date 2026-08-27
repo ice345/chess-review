@@ -7,7 +7,7 @@ import {
   buildGameCoachFacts,
   buildMoveCoachFacts,
 } from "@chess-review/analysis";
-import type { GameAnalysisV1 } from "@chess-review/shared";
+import type { GameAnalysisV2 } from "@chess-review/shared";
 import type { AppSettings } from "../lib/app-settings";
 import {
   explainCoachMove,
@@ -59,7 +59,7 @@ export function coachServiceText(
     : "OpenAI-compatible provider is not configured; deterministic fallback remains available.";
 }
 
-function sameMoveFacts(analysis: GameAnalysisV1 | null, ply: number, serializedFacts: string): boolean {
+function sameMoveFacts(analysis: GameAnalysisV2 | null, ply: number, serializedFacts: string): boolean {
   if (!analysis) return false;
   try {
     return JSON.stringify(buildMoveCoachFacts(analysis, ply)) === serializedFacts;
@@ -68,13 +68,13 @@ function sameMoveFacts(analysis: GameAnalysisV1 | null, ply: number, serializedF
   }
 }
 
-function sameGameFacts(analysis: GameAnalysisV1 | null, serializedFacts: string): boolean {
+function sameGameFacts(analysis: GameAnalysisV2 | null, serializedFacts: string): boolean {
   return analysis ? JSON.stringify(buildGameCoachFacts(analysis)) === serializedFacts : false;
 }
 
 export function useReviewCoach(
   settings: CoachSettings,
-  persistEnrichedAnalysis: (analysis: GameAnalysisV1 | null) => void,
+  persistEnrichedAnalysis: (analysis: GameAnalysisV2 | null) => void,
 ) {
   const localAi = useLocalAiHealth();
   const [task, setTask] = useState<ReviewCoachTask | null>(null);

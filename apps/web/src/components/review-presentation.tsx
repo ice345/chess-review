@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { GameAnalysisV1, GamePhase, MoveClassification } from "@chess-review/shared";
+import type { GameAnalysisV2, GamePhase, MoveAnnotation, MoveQuality } from "@chess-review/shared";
 import { QualityIcon, QUALITY_META } from "@chess-review/ui";
 
 const PHASES: Array<{ key: GamePhase; label: string }> = [
@@ -10,22 +10,17 @@ const PHASES: Array<{ key: GamePhase; label: string }> = [
   { key: "endgame", label: "Endgame" },
 ];
 
-const CLASSIFICATION_ORDER: MoveClassification[] = [
-  "brilliant",
-  "great",
-  "best",
-  "excellent",
-  "good",
-  "book",
-  "interesting",
-  "forced",
-  "inaccuracy",
-  "mistake",
-  "blunder",
-  "miss",
-  "missed_win",
-  "missed_mate",
-];
+const QUALITY_ORDER: MoveQuality[] = ["best", "excellent", "good", "inaccuracy", "mistake", "blunder"];
+const ANNOTATION_ORDER: MoveAnnotation[] = ["brilliant", "critical", "book", "forced", "sacrifice", "missed_win", "missed_mate"];
+const ANNOTATION_LABEL: Record<MoveAnnotation, string> = {
+  brilliant: "Brilliant",
+  critical: "Critical",
+  book: "Book",
+  forced: "Forced",
+  sacrifice: "Sacrifice",
+  missed_win: "Missed win",
+  missed_mate: "Missed mate",
+};
 
 function accuracy(value: number | undefined): string {
   return value === undefined ? "—" : value.toFixed(1);
@@ -36,14 +31,19 @@ export function ReviewOverview({
   onSelectPly,
   allMomentsHref,
 }: {
-  analysis: GameAnalysisV1;
+  analysis: GameAnalysisV2;
   onSelectPly: (ply: number) => void;
   allMomentsHref?: string;
 }) {
-  const counts = CLASSIFICATION_ORDER.flatMap((classification) => {
-    const white = analysis.white.classificationCounts[classification] ?? 0;
-    const black = analysis.black.classificationCounts[classification] ?? 0;
-    return white + black > 0 ? [{ classification, white, black }] : [];
+  const counts = QUALITY_ORDER.flatMap((quality) => {
+    const white = analysis.white.qualityCounts[quality];
+    const black = analysis.black.qualityCounts[quality];
+    return white + black > 0 ? [{ quality, white, black }] : [];
+  });
+  const annotations = ANNOTATION_ORDER.flatMap((annotation) => {
+    const white = analysis.white.annotationCounts[annotation] ?? 0;
+    const black = analysis.black.annotationCounts[annotation] ?? 0;
+    return white + black > 0 ? [{ annotation, white, black }] : [];
   });
 
   return (
@@ -69,15 +69,21 @@ export function ReviewOverview({
       <div className="classification-summary">
         <div className="eyebrow">MOVE QUALITY</div>
         <div className="classification-heading"><span /><span /><strong>White</strong><strong>Black</strong></div>
-        {counts.map(({ classification, white, black }) => (
-          <div className="classification-count" key={classification}>
-            <QualityIcon classification={classification} size={23} />
-            <span>{QUALITY_META[classification].label}</span>
+        {counts.map(({ quality, white, black }) => (
+          <div className="classification-count" key={quality}>
+            <QualityIcon classification={quality} size={23} />
+            <span>{QUALITY_META[quality].label}</span>
             <strong>{white}</strong>
             <strong>{black}</strong>
           </div>
         ))}
       </div>
+
+      {annotations.length > 0 && <div className="annotation-summary">
+        <div className="eyebrow">ANNOTATIONS</div>
+        <div className="annotation-heading"><span /><strong>White</strong><strong>Black</strong></div>
+        {annotations.map(({ annotation, white, black }) => <div className="annotation-count" key={annotation}><span>{ANNOTATION_LABEL[annotation]}</span><strong>{white}</strong><strong>{black}</strong></div>)}
+      </div>}
 
       {analysis.division.middlePly === undefined && (
         <p className="phase-note">This game never crossed the structural middlegame boundary, so phase Accuracy is intentionally omitted.</p>
@@ -110,17 +116,18 @@ export function ReviewMoves({
   onSelectPly,
   filter = "all",
 }: {
-  analysis: GameAnalysisV1;
+  analysis: GameAnalysisV2;
   currentPly: number;
   onSelectPly: (ply: number) => void;
   filter?: "all" | "critical" | "errors";
 }) {
   const criticalPlies = new Set(analysis.criticalMoments.map((moment) => moment.ply));
-  const errorClasses: MoveClassification[] = ["inaccuracy", "mistake", "blunder", "miss", "missed_win", "missed_mate"];
   const moves = analysis.moves.filter((move) => (
     filter === "all"
     || (filter === "critical" && criticalPlies.has(move.ply))
-    || (filter === "errors" && errorClasses.includes(move.classification))
+    || (filter === "errors" && (["inaccuracy", "mistake", "blunder"] as MoveQuality[]).includes(move.quality)
+      || move.annotations.includes("missed_win")
+      || move.annotations.includes("missed_mate"))
   ));
   return (
     <div className="review-move-list">
@@ -130,7 +137,7 @@ export function ReviewMoves({
           <span className="move-number">{Math.ceil(move.ply / 2)}{move.color === "white" ? "." : "…"}</span>
           <QualityIcon classification={move.classification} size={24} />
           <strong>{move.san}</strong>
-          <span className="move-quality">{QUALITY_META[move.classification].label}</span>
+          <span className="move-quality" title={move.annotations.length === 0 ? "No special annotations" : `Annotations: ${move.annotations.map((annotation) => ANNOTATION_LABEL[annotation]).join(", ")}`}>{QUALITY_META[move.quality].label}</span>
           <small>{move.accuracy.toFixed(0)}</small>
         </button>
       ))}

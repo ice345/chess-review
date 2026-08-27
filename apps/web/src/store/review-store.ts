@@ -10,7 +10,7 @@ import { divideGame, matchesHumanAnalysisIdentity } from "@chess-review/analysis
 import { recognizeOpening } from "@chess-review/openings";
 import type {
   CoachExplanation,
-  GameAnalysisV1,
+  GameAnalysisV2,
   GameCoachSummary,
   GameDivision,
   HumanAnalysis,
@@ -32,7 +32,7 @@ interface ReviewState {
   game: NormalizedGame | null;
   division: GameDivision | null;
   opening: OpeningInfo | null;
-  analysis: GameAnalysisV1 | null;
+  analysis: GameAnalysisV2 | null;
   currentPly: number;
   positionFen: string;
   orientation: "white" | "black";
@@ -41,7 +41,7 @@ interface ReviewState {
   loadPgn: (pgn: string) => void;
   loadFen: (fen: string) => void;
   goToPly: (ply: number) => void;
-  setAnalysis: (analysis: GameAnalysisV1 | null) => void;
+  setAnalysis: (analysis: GameAnalysisV2 | null) => void;
   setOrientation: (orientation: "white" | "black") => void;
   startEngineLine: (rank: number, moves: ReplayedUciMove[]) => void;
   playAnalysisMove: (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
@@ -49,10 +49,10 @@ interface ReviewState {
   stepBranch: (delta: number) => void;
   setBranchMoveQuality: (nodeId: string, quality: AnalysisBranchMoveQuality) => void;
   returnToGame: () => void;
-  setMoveHuman: (ply: number, human: HumanAnalysis) => GameAnalysisV1 | null;
-  invalidateHumanAnalysis: (model: MaiaModel, targetElo: number) => GameAnalysisV1 | null;
-  setMoveCoach: (ply: number, coach: CoachExplanation) => GameAnalysisV1 | null;
-  setGameCoachSummary: (coachSummary: GameCoachSummary) => GameAnalysisV1 | null;
+  setMoveHuman: (ply: number, human: HumanAnalysis) => GameAnalysisV2 | null;
+  invalidateHumanAnalysis: (model: MaiaModel, targetElo: number) => GameAnalysisV2 | null;
+  setMoveCoach: (ply: number, coach: CoachExplanation) => GameAnalysisV2 | null;
+  setGameCoachSummary: (coachSummary: GameCoachSummary) => GameAnalysisV2 | null;
 }
 
 const initialFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

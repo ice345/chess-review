@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { CLASSIFICATION_MULTI_PV } from "@chess-review/analysis";
 import type { NormalizedGame } from "@chess-review/chess-core";
 import type { GameDivision, OpeningInfo } from "@chess-review/shared";
 import type { ReviewRunState } from "../components/review-runtime";
@@ -14,7 +15,6 @@ type RunFullGame = (
   division: GameDivision,
   opening: OpeningInfo | null,
   depth: number,
-  multiPv: number,
 ) => Promise<void>;
 
 export function useReviewRecord({
@@ -60,7 +60,7 @@ export function useReviewRecord({
         window.sessionStorage.removeItem(`open-chess-review:auto:${gameId}`);
         const cached = await getCachedAnalysis(review.game, {
           depth: settings.reviewDepth,
-          multiPv: settings.reviewMultiPv,
+          multiPv: CLASSIFICATION_MULTI_PV,
         }).catch(() => null);
         if (!active) return;
         if (cached) {
@@ -73,7 +73,6 @@ export function useReviewRecord({
             review.division,
             review.opening,
             settings.reviewDepth,
-            settings.reviewMultiPv,
           );
           void saveReviewRecord(loaded).catch(() => undefined);
           return;

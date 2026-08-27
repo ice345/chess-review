@@ -1,8 +1,5 @@
 /* Canonical route, objective-review, Coach and Engine Lab panels. */
 
-.route-heading { margin: 2px 0 24px; }
-
-.route-heading h1,
 .analysis-gate h1 {
   margin: 7px 0 8px;
   color: #294653;
@@ -10,7 +7,6 @@
   letter-spacing: -.035em;
 }
 
-.route-heading p,
 .analysis-gate p {
   max-width: 520px;
   margin: 0;
@@ -126,7 +122,8 @@
 }
 
 .overview-opening,
-.classification-summary {
+.classification-summary,
+.annotation-summary {
   padding: 11px;
   border: 1px solid #d7e0dd;
   border-radius: 10px;
@@ -175,6 +172,10 @@
 .classification-heading { margin-top: 7px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
 .classification-count { margin-top: 5px; font-size: 9px; }
 .classification-heading strong, .classification-count strong { text-align: right; }
+.annotation-heading { margin-top: 7px; display: grid; grid-template-columns: 1fr 30px 30px; gap: 5px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
+.annotation-heading strong { text-align: right; }
+.annotation-count { margin-top: 5px; display: grid; grid-template-columns: 1fr 30px 30px; gap: 5px; font-size: 9px; }
+.annotation-count strong { text-align: right; }
 
 .critical-list { display: grid; gap: 5px; }
 

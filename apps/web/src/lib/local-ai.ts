@@ -214,6 +214,8 @@ export async function analyzeMaiaPosition(
 export async function downloadMaiaModel(model: MaiaModel, signal?: AbortSignal): Promise<MaiaModelState> {
   const response = await fetch(`${LOCAL_AI_URL}/maia/models/${model}/download`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
     ...(signal === undefined ? {} : { signal }),
   });
   const body = await responseJson(response);
