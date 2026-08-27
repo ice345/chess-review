@@ -1,6 +1,8 @@
 # Canonical data model
 
-The source of truth is `packages/shared/src/schema.ts`. Persisted analysis uses `GameAnalysisV1` with both `version` and `algorithmVersion` so schema compatibility and product-algorithm compatibility are not conflated.
+The source of truth is `packages/shared/src/schema.ts`. Current persisted analysis
+uses `GameAnalysisV2` with both `version` and `algorithmVersion`; V1 is retained
+only as a readable stale shape and is never accepted as current objective data.
 
 Engine scores are a discriminated union:
 
@@ -12,28 +14,54 @@ type EngineScore =
 
 Stored engine scores are White POV. A positive mate means White has the forced mate; a negative mate means Black does. Raw worker scores are normalized once at the Stockfish boundary.
 
-Each move stores SAN/UCI, before/after FEN, phase, Stockfish MultiPV, accuracy, classification and `ClassificationReason`. It preserves three distinct White-POV scores:
+Each move stores SAN/UCI, before/after FEN, phase, Stockfish MultiPV, Accuracy,
+continuous `quality`, independent `annotations`, a compatibility `classification`
+and `ClassificationReason`. It preserves three distinct White-POV scores:
 
 - `evaluationBefore`: best evaluation at the root before the move.
 - `playedMoveScore`: root evaluation for the chosen move, from MultiPV or a restricted `searchmoves` search.
 - `evaluationAfter`: best evaluation of the resulting position.
 
-`playedMoveOutsideMultiPv` records why the restricted search was needed. These fields must not be substituted for one another. Human analysis and coach prose are optional enrichments and cannot overwrite objective fields.
+`playedMoveOutsideMultiPv` records why the restricted search was needed. These
+fields must not be substituted. `engineConsistency` records their WinPercent/cp
+difference, tolerance and consistency result. `verification` records baseline or
+verified status, depth, MultiPV and reasons. Human analysis and coach prose are
+optional enrichments and cannot overwrite objective fields.
 
 `MoveAnalysis.human`, when requested from Enhanced Local Mode, is the `human-v2` move-review enrichment. It stores Maia model identity, target/self/opponent Elo, raw candidate policy plus exact policy ranks, displayed probability mass, exact played-move probability/rank, expected human move, played-move WDL and `modelPrediction: true`. It can be built only when the response `fenBefore` and played UCI match that canonical move. `HumanFindDifficulty` is a nested experimental object with a 0–100 score, label and every input/adjustment used by the deterministic heuristic. Neither field changes Stockfish scores, Accuracy or classification.
 
-Phase 4 derives `CoachMoveFacts` and `CoachGameFacts` from this canonical record. The facts are versioned independently and contain no provider-generated chess truth. Phase 5.1 expands move facts with deterministic before/after position indicators, a bounded post-move consequence PV and an optional practical alternative backed by matching Stockfish and Maia candidates. The position indicators describe directly calculable board state rather than semantic prose. `MoveAnalysis.coach` and `GameAnalysisV1.coachSummary` are optional enrichments. Each response includes validated lines, a grounding report and `CoachSource` metadata (`provider`, `model`, `promptVersion`, `generatedAt`, and a fallback reason when deterministic copy was used).
+Phase 4 derives `CoachMoveFacts` and `CoachGameFacts` from this canonical record. The facts are versioned independently and contain no provider-generated chess truth. Phase 5.1 expands move facts with deterministic before/after position indicators, a bounded post-move consequence PV and an optional practical alternative backed by matching Stockfish and Maia candidates. The position indicators describe directly calculable board state rather than semantic prose. `MoveAnalysis.coach` and `GameAnalysisV2.coachSummary` are optional enrichments. Each response includes validated lines, a grounding report and `CoachSource` metadata (`provider`, `model`, `promptVersion`, `generatedAt`, and a fallback reason when deterministic copy was used).
 
 `CoachValidatedLine` contains UCI/SAN pairs produced by the rules layer after the provider line matches a canonical PV prefix. `CoachFutureConsequenceFacts` is restricted to one to four plies beginning at `fenAfter`; the local service verifies it against `afterCandidates` again. `CoachPracticalAlternativeFacts` stores its Stockfish rank/score, Maia probability, objective-best reference and canonical win-percent cost so the claim can be audited without an LLM. `CoachGrounding` records removed move mentions, unsupported sections and the accepted line count. A cached coach enrichment whose prompt version differs from the current `COACH_PROMPT_VERSION` is discarded without invalidating the objective analysis.
 
-The browser persists completed, human-enriched and coach-enriched `GameAnalysisV1` objects in IndexedDB. Cache identity includes the objective algorithm version, Stockfish version, depth, MultiPV, initial FEN and PGN, so an algorithm or engine configuration change cannot silently reuse stale objective facts. Human enrichment has its own identity `(human-v2, Maia model, target Elo, move fenBefore, played UCI)`; changing model or Elo removes only incompatible human/Coach-dependent enrichment and does not invalidate objective analysis.
+The browser persists completed, human-enriched and coach-enriched `GameAnalysisV2`
+objects in IndexedDB. Cache identity includes the objective algorithm version,
+Stockfish version, depth, canonical classification MultiPV, initial FEN and PGN.
+The user's Engine Lab line count is not a full-game classification input. A
+separate `AnalysisCacheProjectionV1` stores a game hash, compact summaries,
+provenance/counts and approximate payload bytes for coverage and identity lookup.
+Human enrichment has its own identity `(human-v2, Maia model, target Elo, move
+fenBefore, played UCI)`; changing it invalidates only Human/Coach-dependent data.
 
-External imports remain outside `GameAnalysisV1`. `PlatformAccount` records provider identity, authentication mode, public avatar/rating metadata and sync timestamps; `ExternalGameReference` records provider/game/account identifiers; `SyncedGame` stores PGN plus import-facing player, result and time-control metadata. `PlatformSyncState` records incremental/full-history mode, an opaque provider cursor, batch/provider progress, pause/rate-limit/error state and retry time. These records live in separate IndexedDB stores and never imply that a game has objective analysis. `SyncedGame.analyzed` becomes true only after a deterministic review record/cache is prepared.
+External imports remain outside `GameAnalysisV2`. `PlatformAccount` records provider identity, authentication mode, public avatar/rating metadata and sync timestamps; `ExternalGameReference` records provider/game/account identifiers; `SyncedGame` stores PGN plus import-facing player, result and time-control metadata. `PlatformSyncState` records incremental/full-history mode, an opaque provider cursor, batch/provider progress, pause/rate-limit/error state and retry time. These records live in separate IndexedDB stores and never imply that a game has objective analysis. `SyncedGame.analyzed` becomes true only after a deterministic review record/cache is prepared. Its optional `analysisAlgorithmVersion`, `analysisDepth` and `analyzedAt` fields make stale history explicit. A legacy record with `analyzed: true` but no canonical link, algorithm or depth metadata is read as pending so full-history analysis can repair it.
+
+When Training loads, a synced game with a compatible cache projection but no
+external review record is repaired idempotently from its provider/account/game
+identity. A current-version cache projection is completion evidence on its own:
+older runs could write caches without leaving any link behind, so the repair
+accepts marker-less games whose game fingerprint matches a projection and
+rejects only games whose durable marker names a different objective version.
+The projection carries an additional header-independent identity
+(`initialFen` plus played UCI sequence) so library joins survive PGN
+serialization drift between builds sharing persisted browser data; older
+projections are regenerated by the index backfill. A shared PGN cache alone is
+still not enough to promote a queued or failed game into the player report, and
+structurally invalid provider PGNs never become review records.
 
 Lichess access tokens are deliberately absent from all shared schemas and IndexedDB. The Next.js server encrypts them into an HttpOnly session cookie. A future Tauri client must replace that web-session mechanism with operating-system credential storage.
 
 Interactive engine exploration is not canonical analysis. The web runtime owns
-an analysis tree separate from `GameAnalysisV1`.
+an analysis tree separate from `GameAnalysisV2`.
 Its durable contract is:
 
 - an explicit canonical root ply and root FEN;
@@ -61,13 +89,22 @@ Accuracy, classification or an engine score from that metadata.
 
 `ClassificationReason.sacrifice` uses centipawns for material and compensation. `see` is signed from the mover's perspective, so a negative value means the opponent can gain material by accepting the offer. `survivesBestResponse` requires an opponent reply in the Stockfish root PV plus evaluation preservation; `recoveredWithinPv` reports material recovered after the largest observed PV deficit.
 
-Phase 7 does not add cross-game fields to `GameAnalysisV1`. The analysis package
+Cross-game facts do not get written into `GameAnalysisV2`. The analysis package
 accepts a selected-player projection of multiple canonical records and produces a
-runtime `AdvancedStudyReport`. This keeps one-game cache identity independent of
-study presentation. Persisted training progress uses `TrainingQueueItemV1` in a
+runtime `AdvancedStudyReportV2`. This keeps one-game cache identity independent of
+study presentation. Its provenance carries provider, time-control, rated state,
+player-color, recognized-opening, date-range and minimum-sample filters; one
+filtered population feeds every deterministic section. Persisted training progress uses `TrainingQueueItemV2` in a
 separate IndexedDB store. Each item records a deterministic player/weakness ID,
 status, priority and up to five `TrainingEvidenceReference` objects containing
 `gameId`, ply, SAN, phase, canonical classification and WinPercent loss. It stores
-no Coach prose and never mutates the source analysis.
+no Coach prose and never mutates the source analysis. `HistoryAnalysisJobV1` is a
+separate browser-owned record with explicit scope, status, per-game attempts and
+timestamps; `running` means an open tab currently owns the job. An explicit
+full-history account import automatically creates or reuses an `unanalyzed` job
+for that account. The job is objective Stockfish work only; Maia and Coach
+enrichment remain on-demand. Completed and cached item states are persisted
+independently, allowing Training to show partial results while the
+browser-owned worker continues.
 
 `GameDivision.middlePly` and `endPly` are zero-based indices into positions immediately before moves, matching the selected Divider port. Public move records use one-based `ply`. `phaseForPly()` is the canonical conversion.

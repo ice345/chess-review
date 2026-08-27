@@ -12,12 +12,13 @@ Queued jobs are stable within a priority and can be removed with an
 displayed FEN, leaving the workspace or cancelling a review terminates stale
 work reliably.
 
-Full-game and optional post-sync review pools use one Stockfish worker. This
-leaves one scheduler slot available to an interactive request and bounds the
-combined normal workload at two active browser workers. A running background
-game is cooperative rather than forcibly preempted; the reserved second slot is
-the responsiveness policy. If both interactive slots are occupied, queued
-current-position work is selected before a variation and before another game.
+Full-game and optional post-sync review pools use one Stockfish worker. The
+scheduler allows up to two such jobs in parallel, while the total normal
+browser workload remains capped at two active engine tasks. A running
+background game is cooperative rather than forcibly preempted; queued
+current-position and variation work is selected before queued background work
+whenever a slot is available. History progress is therefore parallel but still
+bounded, and users can pause it to release engine capacity immediately.
 
 Maia and Coach remain optional local-service requests and do not enter this
 browser Stockfish queue. Their results retain separate source semantics, and no

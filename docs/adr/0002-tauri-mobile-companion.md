@@ -16,7 +16,7 @@ The repository already has:
 - browser-compatible `chess-core`, `shared` and `ui` packages;
 - a working Tauri 2 desktop host and Rust toolchain;
 - DOM/CSS-based board and export surfaces;
-- canonical `GameAnalysisV1`, Maia and Coach contracts.
+- versioned canonical game-analysis, Maia and Coach contracts.
 
 Tauri officially supports Android/iOS development through `tauri android` and
 `tauri ios`, and keeps a Rust library entry point for mobile builds. React Native

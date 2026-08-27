@@ -107,7 +107,7 @@ The future remote discovery response is `MobileEndpointManifestV1`:
 ```text
 protocolVersion = mobile-endpoint-v1
 endpointId
-objective.available + GameAnalysisV1 version + Stockfish version
+objective.available + canonical analysis schema/algorithm version + Stockfish version
 human.available + exact Maia model tiers
 coach.available + supported languages
 ```

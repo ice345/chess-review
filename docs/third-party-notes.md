@@ -15,3 +15,9 @@ Algorithm provenance:
 - OpenAI-compatible coaching uses the official Responses API request shape with strict JSON Schema output and `store: false`; Ollama coaching uses its native chat structured-output contract. Both transports remain outside canonical analysis logic.
 
 The product's SVG quality icons are original code in `packages/ui`; third-party classification images are not shipped.
+
+The chess sounds in `apps/web/public/sounds/wintrchess/` are exact local copies
+of the six MP3 files used by `WintrCat/wintrchess` commit
+`d145b20968955ca955cafe3fc3b51305f3bf41f9` under GPL-3.0. Runtime audio is
+never hotlinked. Source paths, checksums and the license reference are recorded
+in the distributable notice beside the assets.

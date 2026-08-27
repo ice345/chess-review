@@ -1,6 +1,8 @@
 # Connected platforms
 
-Connected accounts import games; they do not supply chess truth and do not trigger analysis unless the user enables the conservative sync policy.
+Connected accounts import games; they do not supply chess truth. An explicit
+full-history import queues local objective Stockfish analysis after syncing;
+Maia and Coach remain on-demand.
 
 ## Provider boundary
 
@@ -40,12 +42,21 @@ instead of retrying in parallel.
 
 ## Analysis policy
 
-Account sync stores PGN and metadata first. Automatic objective analysis is Off
-by default. The optional newest 1/3/5 policy is applied once after a completed
-sync, never once per page, and processes at most five games sequentially with the
-same Browser Stockfish queue and deterministic cache identity used by manual
-reviews. Maia and Coach are never run automatically. Full-history tools live in
-Settings; Home shows a compact connected-identity summary.
+Every completed sync — incremental or full-history — creates or reuses an
+`unanalyzed` history job for that account and starts it at low priority. The
+scope selects never-analyzed games only, so repeat syncs are no-ops when nothing
+is waiting: importing history fills Training without any manual per-game step.
+The optional newest 1/3/5 sequential policy remains a conservative alternative.
+
+Before a job is created, candidates are partitioned by chess-rules parsability.
+A provider PGN that fails parsing (for example a missing king in the FEN header)
+can never produce an analysis, so it is listed on the job as an excluded item —
+visible and distinguished from failures on the Training page — instead of
+consuming the retryable failure loop forever. The job runs at most two objective
+game analyses in parallel, persists each success immediately, and keeps
+item-level failures independent from the successful Training report. Maia and
+Coach are never run automatically. Full-history tools live in Settings; Home
+shows a compact connected-identity summary.
 
 `PlatformSyncState` stores mode, opaque cursor, incremental `since`, imported
 count, completed batches, provider progress, retry time and status. A state left

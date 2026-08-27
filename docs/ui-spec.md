@@ -87,7 +87,7 @@ available. Either interaction from any historical position creates or extends a
 runtime analysis branch. The UI clearly leaves canonical autoplay, retains the branch
 root ply, automatically analyzes each resulting FEN with the active Review source,
 and offers Return to Game. Canonical PGN,
-Accuracy, classifications and cached `GameAnalysisV1` are never edited by this
+Accuracy, classifications and cached canonical game analysis are never edited by this
 interaction. Promotion drops currently default to a queen; the rules helper
 already accepts an explicit underpromotion for a future chooser. The branch
 model is detailed in [`analysis-variations.md`](analysis-variations.md), and the
@@ -96,6 +96,23 @@ implementation status for each workspace part is kept in `docs/roadmap.md`.
 ## Service states
 
 Browser Core remains useful when local-ai is offline. Review's Maia selector and Coach use short capability-specific copy, poll for recovery, and never hide objective review. Settings lists every model returned by Ollama's local catalog and lets the user choose one. Maia Settings separately shows 5M/23M/79M cache status and an explicit Download model action. Selecting either an Ollama or Maia model never triggers a silent download.
+
+## Chess audio
+
+Chess sound is centralized in the web sound controller and derived from a
+legal `fenBefore + UCI` transition. Components must not construct `Audio`
+objects or choose sounds from button identity. Move precedence is checkmate,
+stalemate, check, castle, promotion, capture, then quiet move. Navigation plays the real
+move entered or undone; returning from a branch to its canonical root is
+silent. Initial page load, source/Elo changes, resize, flip, and graph hover are
+silent.
+
+Audio unlocks/preloads only after a user gesture. Rejected playback never
+changes chess state. Sound enabled, restrained volume, and the WintrChess theme
+are persisted in application settings, with an immediate mute control beside
+the board flip utility. The six MP3 sources match WintrChess; this controller
+intentionally emits one cue per transition instead of overlapping game-end and
+check cues.
 
 ## Connected identity and Library
 
@@ -107,17 +124,18 @@ persisted checkpoint rather than transient component state.
 
 Library keeps source, review status, time-control, result and text filters. It
 sorts the merged reviewed/pending collection by date and renders at most 60 rows
-per page, with an explicit Load more control for larger collections. Syncing never
-mounts or analyzes every imported game automatically.
+per page, with an explicit Load more control for larger collections. Incremental
+sync does not mount or analyze every imported game; an explicit full-history
+import queues local objective Stockfish work and Training reveals its progress.
 
 ## Advanced study and training
 
 `/training` is player-specific. Connected games default to the linked account
-color; manual PGNs expose both meaningful named players. The route contains four
-ordered sections: canonical multi-game form, White/Black-separated opening
-repertoire, recurring weakness evidence, and persistent deliberate-practice
-tasks. The trend chart links back to each review. Weakness and queue evidence
-links include the exact canonical ply so Review opens on the source decision.
+color; manual PGNs expose both meaningful named players. The route contains
+Overview, Rating & Form, Openings, Middlegame, Endgame, Mistakes, Highlights,
+Plan and Coverage tabs. The trend chart links back to each review. Weakness,
+highlight and queue evidence links include the exact canonical ply so Review
+opens on the source decision.
 
 No weakness is presented as recurring until the deterministic signal occurs in
 at least two distinct games. Move-quality icons and labels reuse the shared V3

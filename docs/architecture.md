@@ -47,7 +47,10 @@ The web product uses Next.js App Router nested layouts:
 
 `/review/[gameId]/layout.tsx` owns the persistent review shell. Client-side transitions replace only the contextual panel, preserving game, current ply, orientation, board position and engine runtime state. The shell is a normal scrolling document: the board and current-position study form the opening spread, followed by a full-width evaluation timeline. The import surface is not mounted inside review routes.
 
-Imported review records receive a deterministic browser-side ID and are stored in IndexedDB. A record points back to PGN or normalized FEN input; it does not duplicate `GameAnalysisV1`. Objective analysis continues using its existing identity of algorithm version, Stockfish version, depth, MultiPV, initial FEN and PGN.
+Imported review records receive a deterministic browser-side ID and are stored in
+IndexedDB. A record points back to PGN or normalized FEN input; it does not
+duplicate `GameAnalysisV2`. Objective cache identity is algorithm version,
+Stockfish version, depth, canonical classification MultiPV, initial FEN and PGN.
 
 Current-position continuations use the existing `BrowserStockfish.search()` boundary. Search identity includes FEN, engine version, depth and MultiPV. Display length is presentation-only and never changes the cache key. UCI PVs are replayed through `packages/chess-core` before SAN or branch positions are shown. A branch has its own selected path and explicit root FEN; it never mutates the game cursor or canonical analysis.
 
@@ -97,27 +100,34 @@ Connected-platform providers normalize only account and game-import metadata. Ch
 ```text
 Home import -> normalized PGN/FEN -> persisted review ID -> review route
 PGN -> opening EPD lookup -> structural Divider -> Stockfish queue
-    -> White-POV facts -> classification/Accuracy -> GameAnalysisV1
+    -> White-POV facts -> V2 quality/annotations/Accuracy
+    -> selective deeper/wider verification -> GameAnalysisV2
     -> usable objective review -> optional Maia -> lazy coach request
 ```
 
-Full-game work is queued through a browser pool capped at two Stockfish workers. A second `searchmoves` pass evaluates only played moves missing from MultiPV. Cancellation terminates active workers. Coach enrichments share the cached analysis record but are invalidated independently by prompt version.
+Full-game work uses one Stockfish worker under the lowest scheduler priority.
+Classification baseline MultiPV is fixed at three; a second `searchmoves` pass
+evaluates played moves missing from it. A bounded selective pass verifies
+high-impact/unstable candidates at deeper depth and MultiPV=5. Cancellation
+terminates owned workers. Coach enrichments share the cache record but invalidate
+independently by prompt version.
 
-Advanced study reads completed current-version `GameAnalysisV1` records from the
-browser cache. `packages/analysis` groups already-computed game Accuracy, phase
-Accuracy, opening identity and move-classification evidence; the web route does
-not rerun Stockfish or reconstruct chess semantics. Manual imports may be viewed
-from either named player's perspective, while connected records use the linked
-account color. Training progress is versioned separately in IndexedDB and stores
-traceable game/ply evidence rather than generated prose. See
+Player intelligence discovers games from a compact analysis projection index and
+loads full current-version `GameAnalysisV2` records only for the selected player.
+`packages/analysis` owns `advanced-study-v2` aggregation. Connected identity is
+the exact account ID and color; manual named-player identity stays separate.
+Whole-history work is a durable, resumable browser job at background priority,
+and Training progress stores traceable game/ply evidence rather than prose. See
 [`advanced-study.md`](advanced-study.md).
 
 Phase 5.1 uses one shared browser scheduler with two logical slots and three
 priorities: current interactive board, interactive branch, then background
-full-game review. Full-game pools use one worker so an interactive slot remains
-available; queued jobs are priority ordered and stale current/continuation work
-is cancelled with `AbortSignal`. Maia remains optional and is never allowed to
-replace Stockfish score/classification ownership. See
+full-game review. Full-game pools use one worker and the scheduler allows at
+most two engine tasks at once, so history review can make progress in parallel
+without unbounded browser CPU use. Queued jobs are priority ordered and stale
+current/continuation work is cancelled with `AbortSignal`. Maia remains
+optional and is never allowed to replace Stockfish score/classification
+ownership. See
 [`analysis-scheduler.md`](analysis-scheduler.md).
 
 ## Execution modes and security boundary

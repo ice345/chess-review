@@ -1,68 +1,122 @@
-# Advanced study
+# Player intelligence and training
 
-Implementation: `packages/analysis/src/study.ts`. Browser composition:
-`apps/web/src/lib/advanced-study-library.ts` and `/training`.
+Implementations:
 
-## Boundary
+- `packages/analysis/src/study-v2.ts`: deterministic report semantics.
+- `apps/web/src/lib/advanced-study-library.ts`: identity and lazy cache loading.
+- `apps/web/src/lib/history-analysis-jobs.ts`: durable browser work.
+- `/training`: filters, report, queue and job controls.
 
-Advanced study consumes completed, current-algorithm `GameAnalysisV1` records.
-It never runs Stockfish, Maia or a language model, and it never writes into a
-canonical game analysis. Stockfish remains the source of each objective
-classification and its evidence. Maia data is not used to relabel a move. Coach
-text is not an input to trend, repertoire or weakness calculations.
+## Report contract
 
-Manual PGNs contribute a view for each meaningful named player. Connected games
-contribute only the linked account's known color. Cache values are matched by
-normalized PGN; if more than one current-algorithm cache exists for a game, the
-latest `createdAt` record is selected. Engine configurations are disclosed in the
-report because a library may contain reviews run at different depths or MultiPV
-settings.
+The current report is `advanced-study-v2`. It consumes only compatible
+`GameAnalysisV2` records and refuses to mix objective algorithm versions. Its
+provenance includes the objective version, engine configurations, report filters,
+generation time and explicit coverage. Partial coverage is true whenever an
+eligible game is missing, stale or failed.
 
-## Multi-game trends
+One filter population—provider, time control, rated/casual, player color,
+recognized opening and date range—is applied before every rating, opening,
+phase, mistake, highlight, weakness and training-plan calculation. A section
+cannot silently use a larger population. The minimum-sample control suppresses
+rating/opening/weakness aggregates below its threshold while leaving raw,
+traceable move evidence available.
 
-Games are ordered by connected-game timestamp, valid PGN date, or original
-library-created timestamp in that order. Opening a review never changes trend
-chronology. Overall form is the arithmetic
-mean of already-computed canonical per-game Accuracy values; this is a summary of
-game Accuracy, not a replacement Accuracy formula. Phase form similarly averages
-the available canonical per-game phase Accuracy values. Recent change compares
-up to five most recent values with an equally sized preceding block. Missing
-canonical Accuracy remains missing rather than being converted to zero.
+Connected identity is `accountId`, not a normalized display name. Games from a
+connected account use only the imported account color. Two connected accounts
+with the same username remain separate. Manual PGNs use independent
+`manual:<normalized-name>` player choices and are never name-merged into a
+connected identity.
 
-## Opening repertoire
+## Ratings and form
 
-Groups use player color plus ECO, name and variation. White and Black are never
-merged. Each entry reports games, known-result score rate, average canonical
-overall/opening Accuracy, and the share of the player's structural-opening moves
-whose existing classification is Inaccuracy, Mistake, Blunder, Miss, Missed win
-or Missed mate. Opening recognition and structural game phase remain separate
-canonical inputs.
+Ratings are grouped by `provider + timeClass`. Chess.com rapid, Chess.com blitz
+and Lichess rapid are separate bands and are never averaged together. Each band
+reports the latest known rating, the last-ten-game observed range, result score,
+sample size and confidence (`low <5`, `medium 5–14`, `high >=15`). Performance
+rating is shown only with at least five opponent ratings. A conservative next
+target is the next 100-point rating milestone and is shown only at medium/high
+confidence; otherwise the UI says the sample is insufficient. Accuracy is never
+converted into a rating estimate.
 
-## Recurring weaknesses
+## Openings and phases
 
-The weak-move set is the existing six objective warning/error classifications:
-Inaccuracy, Mistake, Blunder, Miss, Missed win and Missed mate. Each qualifying
-move is assigned exactly one deterministic study category:
+Opening groups remain color-specific and use canonical ECO/name/variation. Each
+entry reports population share, W/D/L, score, overall/recent Accuracy, average
+WinPercent loss, error rate, representative games and up to three exact problem
+positions.
 
-1. Miss, Missed win and Missed mate become `missed-opportunities`.
-2. Remaining errors use their canonical opening, middlegame or endgame phase.
+Middlegame and endgame profiles report move count, Accuracy, recent Accuracy,
+error rate and average WinPercent loss. Advantage preservation means a move that
+started at least 70 mover WinPercent and remained at least 65. A defensive hold
+means a move starting at most 30 that lost no more than two WinPercent points.
+These are bounded decision metrics, not tablebase claims. Syzygy is not currently
+used, so the product does not claim theoretical wins/draws or perfect conversion.
 
-A category appears only with at least two incidents in at least two distinct
-games. Evidence retains game ID, ply, SAN, phase, classification and canonical
-WinPercent loss. Ordering priority uses a documented study-only severity order
-(Inaccuracy 1, Mistake/Miss 2, Blunder/Missed win 4, Missed mate 5), average
-WinPercent loss and a bounded recurrence bonus. The score ranks training tasks;
-it is not Move Quality, Accuracy, Elo or an engine evaluation.
+## Highlights, weaknesses and plan
 
-## Training queue
+Brilliant and Critical galleries use only V2 annotations retained by the
+verification pass and keep exact game/ply links. Best-game highlights require at least ten player moves. Comeback and save
+candidates require an observed position at or below 20 mover WinPercent followed
+by a win or draw. Clean conversion requires an observed 75% advantage, a win and
+no subsequent move losing five WinPercent points. These definitions are
+deterministic and do not infer narratives from prose.
 
-`TrainingQueueItemV1` is stored separately in the `training-queue` IndexedDB
-store. Its deterministic identity is player key plus weakness category. Adding a
-weakness saves up to five highest-impact evidence references. Status transitions
-are queued → in progress → completed, with reopening and explicit removal. Source
-links open `/review/[gameId]/moves?ply=N`; the persistent Review shell applies the
-requested canonical ply after the game has loaded.
+Weaknesses require at least two incidents across two games. They expose sample
+size, game frequency, average loss, confidence, early-vs-recent trend and bounded
+evidence. The top three create a deterministic plan backed by up to five exact
+positions. `TrainingQueueItemV2` records only position-review progress; it does
+not claim spaced repetition or a due-date model.
 
-The queue is browser-local. It is not synced across devices and it does not yet
-schedule spaced-repetition dates. Those are product extensions, not hidden or
-partially implemented Phase 7 behavior.
+## Whole-history jobs
+
+“Analyze my history” creates a persisted `HistoryAnalysisJobV1` with explicit
+provider, account, date, time-control, rated and freshness scope. Games are
+deduplicated by provider ID and PGN. Each item records queued/running/cached/
+completed/failed/cancelled state and attempt count. Current cache entries are
+reused; stale scope compares `objectiveAlgorithmVersion + depth`.
+
+Jobs run with two bounded workers through the scheduler's lowest
+`background-game` priority. Each game still owns one Stockfish worker, so the
+browser runs at most two full-game engine tasks at once; interactive position
+work keeps the higher scheduler priority. Results are persisted as each worker
+finishes, even when another item later fails. Pause returns active items to
+queued before aborting them. Refresh recovery changes a stranded running job to
+paused and keeps completed items. Resume continues queued items, Cancel
+preserves completed work, and Retry resets failed items only. Work exists only
+while a browser tab is open; the UI never claims background execution after
+shutdown.
+
+An explicit “Import full history” action also creates (or reuses) an
+`unanalyzed` job for that connected account and starts it without waiting for
+the Settings page to stay mounted. Training polls the durable record while the
+job is active, so completed games and cache hits become report data
+incrementally. A failed item keeps its exact error text and can be retried on
+its own; duplicate jobs with the same scope and game set are collapsed in the
+Training list.
+
+## Storage and large libraries
+
+The canonical V2 payload remains in `objective-analyses`. A compact
+`objective-analysis-index` stores hashes, engine/provenance data, player/phase
+summaries, opening data, counts and an approximate byte size. Pre-index V2
+records are backfilled one payload at a time. The Training player list reads only
+review records plus projections; selecting a player then loads only matching
+canonical analyses. Thousands of full records are therefore not eagerly mounted
+to discover identities or coverage. On read, Training also repairs legacy
+completed synced games whose cache and `SyncedGame` success marker exist but
+whose external review record was not persisted, so an older bulk run is not
+silently omitted from Overview. Pending or failed games are not promoted merely
+because an identical PGN happens to share a cache entry.
+
+Connected-player coverage is always scoped to that exact account even when the
+bulk-analysis control is set to analyze all accounts. Opening is unavailable for
+unanalyzed synced games, so an opening-filtered report discloses that coverage
+still refers to the broader synced scope. Coverage also keeps Chess.com and
+Lichess eligible/current/stale/failed counts separate.
+
+The projection intentionally does not replace canonical move evidence. Reports
+that need exact mistakes/highlights load the selected compatible population.
+IndexedDB growth remains dominated by full Stockfish PV payloads; the projection
+overhead is bounded to one small record per cache key and enables visible local
+cache-size accounting.

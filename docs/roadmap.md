@@ -130,7 +130,7 @@ alone do not complete an item.
 - [x] persistent progress plus cancel/resume for both providers
 - [x] simplified connected identity on Home
 - [x] paginated or virtualized Library suitable for thousands of games
-- [x] no automatic bulk Stockfish, Maia or Coach analysis
+- [x] no automatic Maia or Coach analysis; explicit full-history imports queue objective Stockfish work only
 
 ### Milestone F — grounded Coach refinement
 
@@ -338,3 +338,130 @@ projects, signing and device/store validation belong to a future production
 mobile gate rather than this exploration phase.
 
 Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phases 5–5.3 do not change Accuracy, Divider, WinPercent, score POV or objective classification semantics.
+
+## Release-readiness remediation (active)
+
+The 2026-08-26 full-product audit is the release gate after the numbered feature
+phases. “Complete” above means the documented phase scope was implemented; it
+does not mean the product is approved for public release. Desktop remains an
+experimental foundation until it reuses the complete review product and ships
+with CSP, service authentication and signed distribution.
+
+- [x] publish the full product and current WintrChess comparison audits
+- [x] add centralized transition-derived WintrChess chess audio, persistent
+  enabled/volume/theme settings, quick mute, source-pinned assets and resolver
+  tests
+- [x] add immediate model-download origin and strict JSON confirmation defenses
+- [ ] add per-launch local-service authentication and identity
+- [ ] preserve repetition-sensitive history through Stockfish and cache identity
+- [ ] close the P1 deletion, SSRF, export, promotion, cursor, persistence and
+  accessibility findings in `docs/audits/full-product-audit.md`
+
+This remediation does not change Accuracy, Divider, WinPercent, score POV,
+objective classification or Human Find Difficulty.
+
+## Phase 9 — Objective Analysis V2 / Correctness Gate
+
+Phase 9 is a semantic replacement for the persisted
+`objective-v1-preview.3` classification contract. Phases 0–8 remain completed
+history; existing V1 records remain readable as stale data but cannot be mixed
+into V2 player intelligence.
+
+### Milestone A — versioned classification semantics
+
+- [x] introduce an explicit V2 quality plus annotation schema and compatibility projection
+- [x] make ordinary quality WinPercent-loss-led and preserve CP as evidence
+- [x] remove `interesting` from canonical objective output and never invent an engine rank
+- [x] remove/defer unreachable tactical `miss` until a production detector exists
+- [x] redesign Critical around outcome-relevant MultiPV uniqueness
+- [x] tighten Brilliant with non-triviality, outcome and verification evidence
+
+### Milestone B — canonical engine evidence
+
+- [x] separate classification MultiPV from presentation line count
+- [x] retain restricted `searchmoves` evidence for outside-MultiPV moves
+- [x] add played-score/resulting-position consistency evidence without substituting scores
+- [x] add selective deeper/wider verification for unstable or high-impact candidates
+- [x] preserve interactive priority and bounded background engine use
+
+### Milestone C — compatibility and correctness gate
+
+- [x] bump objective schema/algorithm identity and invalidate incompatible cache reuse
+- [x] add a golden classification corpus and POV/property invariants
+- [x] prove retained special annotations are reachable through the full-game assembler
+- [x] update analysis, data-model, cache and Move Quality documentation
+- [x] document Syzygy <=7-piece support as a later correctness enhancement
+- [x] pass package, type, lint, build and browser acceptance checks
+
+## Phase 10 — Whole-History Player Intelligence & Training
+
+Phase 10 consumes only version-compatible Phase 9 evidence. Browser background
+analysis means low-priority work while the app is open; it never claims to keep
+computing after browser shutdown.
+
+### Milestone A — bulk analysis infrastructure
+
+- [x] add explicit provider/date/time-control/rated/stale history scopes
+- [x] persist deterministic queued/running/paused/cancelled/failed/completed jobs
+- [x] resume after refresh, reuse current cache, retry individual failures and deduplicate games
+- [x] keep whole-history Stockfish at the scheduler's lowest bounded priority
+- [x] analyze up to two history games in parallel while persisting successes independently of failures
+- [x] show partial Training data immediately and keep per-item failure reasons secondary
+- [x] add compact analysis-cache projections and storage/coverage accounting
+
+### Milestone B — versioned player-intelligence report
+
+- [x] add `advanced-study-v2` provenance, filters and partial-coverage semantics
+- [x] use explicit linked-account identity across Chess.com and Lichess
+- [x] keep manual-PGN player selection separate from connected identity
+- [x] prevent incompatible objective versions from entering one report
+
+### Milestone C — rating and form
+
+- [x] separate rating bands by platform and time control
+- [x] calculate documented recent range, performance evidence, confidence and conservative next target
+- [x] degrade honestly for missing Elo or insufficient sample size
+
+### Milestone D — opening intelligence
+
+- [x] expand color-specific repertoire with share, W/D/L, Accuracy, loss and recent metrics
+- [x] expose representative games and deterministic problem positions
+- [x] apply the shared dataset filter to every opening conclusion
+
+### Milestone E — middlegame and endgame intelligence
+
+- [x] add phase loss/error rates and recent trends
+- [x] add evidence-bounded conversion, hold, save and missed-opportunity metrics
+- [x] avoid tablebase-like claims without tablebase evidence
+
+### Milestone F — highlights
+
+- [x] add version-aware Brilliant/Critical galleries and exact ply links
+- [x] add minimum-length best games, comebacks, saves and clean conversions
+- [x] keep every highlight traceable to canonical moves and evaluations
+
+### Milestone G — weakness and training plan
+
+- [x] add sample size, frequency, severity, confidence, trend and representative evidence
+- [x] rank deterministic training recommendations with measurable source positions
+- [x] evolve queue progress metadata without claiming fake spaced repetition
+
+### Milestone H — Training UX
+
+- [x] add Overview, Rating & Form, Openings, Middlegame, Endgame, Mistakes, Highlights, Plan and Coverage hierarchy
+- [x] add explicit Analyze history, Pause, Resume, Cancel and retry controls
+- [x] propagate one filter population through the whole report
+- [x] preserve responsive, accessible and bounded rendering
+
+### Milestone I — large-dataset performance
+
+- [x] avoid mounting or eagerly projecting thousands of full game records
+- [x] document IndexedDB growth, canonical payload and report aggregation tradeoffs
+- [x] verify incremental aggregation and compact materialized indexes
+
+### Milestone J — acceptance gate
+
+- [x] add deterministic queue, report, identity, filter, highlight and training-plan tests
+- [x] add empty/partial/full Training and bulk-control browser workflows
+- [x] inspect intentional visual changes before updating representative baselines
+- [x] pass full TypeScript, Python, build and E2E validation

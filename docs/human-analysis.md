@@ -14,6 +14,12 @@ uv run --extra maia uvicorn chess_review_local_ai.main:app --host 127.0.0.1 --po
 
 The provider imports Maia lazily and uses CPU without AMP by default. It never downloads a checkpoint during analysis. `/health` reports `available`, `not-installed` or `error` plus `maiaModels` state for all three tiers. Selecting a tier changes settings only; an uncached tier returns a structured `409 maia-model-not-cached` setup state. The user must explicitly call `/maia/models/{model}/download` through the Settings or Review download action. The service keeps at most one resident Maia network and releases the previous network before allocating a different tier.
 
+The setup POST is a privileged local mutation. It requires an allowed localhost
+browser Origin and a strict JSON `{ "confirm": true }` body in addition to the
+UI's explicit action. This blocks ordinary cross-site form posts; a per-launch
+service capability remains the stronger long-term identity boundary described
+in the release audit.
+
 In Review, candidate arrows are visual guidance only. A branch is selected from an explicit Maia candidate row whose identity includes the root FEN, model, target Elo and full UCI move; destination-square clicks never guess between candidates that share a landing square. Compare mode marks overlap only when Stockfish and Maia recommend the same full UCI move.
 
 Product code calls `/maia/move-review` and `/maia/position-analysis`. `/maia/moves` remains a deprecated compatibility adapter and must not be used to infer whether a response describes the played move or the displayed position.

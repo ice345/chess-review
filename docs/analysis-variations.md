@@ -1,7 +1,7 @@
 # Interactive analysis variations
 
 Interactive analysis is deliberately separate from the reviewed game. The
-canonical PGN cursor, `GameAnalysisV1`, Accuracy, phases and classifications are
+canonical PGN cursor, versioned canonical game analysis, Accuracy, phases and classifications are
 never edited when a user moves a piece or selects a candidate line.
 
 ## Runtime tree
@@ -16,7 +16,7 @@ never edited when a user moves a piece or selects a candidate line.
   metadata describes how a path was selected; it is not a move-quality verdict.
 - A user-played node may separately hold a runtime-only objective Move Quality
   result. It records the canonical classification evidence and Accuracy for
-  that edge, but never enters `GameAnalysisV1`, game summaries or exports.
+  that edge, but never enters the persisted canonical game analysis, game summaries or exports.
 - `activePath` is one root-to-leaf path, while `selectedIndex` identifies the
   displayed node on that path.
 - Children are reused by parent plus UCI move, so a user move and an engine PV
@@ -73,4 +73,4 @@ cursor.
 
 The tree, including temporary Move Quality evidence, is session runtime state.
 If variation persistence is added later, it must use its own versioned record
-rather than extending `GameAnalysisV1` with exploratory classifications.
+rather than extending the canonical game-analysis schema with exploratory classifications.
