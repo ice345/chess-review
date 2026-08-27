@@ -20,6 +20,16 @@ export const HISTORY_ANALYSIS_CONCURRENCY = 2;
 // worker could overwrite another worker's completed item.
 const jobMutationTails = new Map<string, Promise<void>>();
 
+const FINISHED_HISTORY_JOB_STATUSES = new Set<HistoryAnalysisJobV1["status"]>([
+  "cancelled",
+  "failed",
+  "completed",
+]);
+
+export function isHistoryAnalysisJobFinished(job: Pick<HistoryAnalysisJobV1, "status">): boolean {
+  return FINISHED_HISTORY_JOB_STATUSES.has(job.status);
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -253,6 +263,55 @@ export async function listHistoryAnalysisJobs(): Promise<HistoryAnalysisJobV1[]>
   }
 }
 
+/**
+ * Remove only the durable batch-run record. Source games, review records,
+ * objective analyses, projections and Training data intentionally stay intact.
+ */
+export async function removeHistoryAnalysisJob(id: string): Promise<boolean> {
+  if (activeControllers.has(id)) {
+    throw new Error("Stop the active history analysis before removing its run history.");
+  }
+  const job = await getHistoryAnalysisJob(id);
+  if (!job) return false;
+  if (!isHistoryAnalysisJobFinished(job)) {
+    throw new Error("Cancel this history analysis before removing its run history.");
+  }
+  const database = await openReviewDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(HISTORY_ANALYSIS_JOB_STORE, "readwrite");
+      transaction.objectStore(HISTORY_ANALYSIS_JOB_STORE).delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to remove the history-analysis run."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("History-analysis run removal was aborted."));
+    });
+    return true;
+  } finally {
+    database.close();
+  }
+}
+
+/** Remove all completed/failed/cancelled run records in one transaction. */
+export async function clearFinishedHistoryAnalysisJobs(): Promise<number> {
+  const jobs = await listHistoryAnalysisJobs();
+  const ids = jobs.filter(isHistoryAnalysisJobFinished).map(({ id }) => id).filter((id) => !activeControllers.has(id));
+  if (ids.length === 0) return 0;
+  const database = await openReviewDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(HISTORY_ANALYSIS_JOB_STORE, "readwrite");
+      const store = transaction.objectStore(HISTORY_ANALYSIS_JOB_STORE);
+      for (const id of ids) store.delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to clear finished history-analysis runs."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Finished history-analysis cleanup was aborted."));
+    });
+    return ids.length;
+  } finally {
+    database.close();
+  }
+}
+
 export async function createHistoryAnalysisJob(
   scope: HistoryAnalysisScopeV1,
   depth: 10 | 12 | 15,
@@ -308,7 +367,8 @@ export async function createOrReuseHistoryAnalysisJob(
   sourceGames?: readonly SyncedGame[],
 ): Promise<{ job: HistoryAnalysisJobV1; reused: boolean }> {
   const normalized = normalizeScope(scope);
-  const candidates = partitionUnparsableSyncedGames(sourceGames ?? await listSyncedGames());
+  const scopedSourceGames = (sourceGames ?? await listSyncedGames()).filter((game) => gameMatchesHistoryScope(game, normalized, depth));
+  const candidates = partitionUnparsableSyncedGames(scopedSourceGames);
   const games = selectHistoryAnalysisGames(candidates.valid, normalized, depth);
   const gameIds = games.map((game) => game.id);
   const existing = (await listHistoryAnalysisJobs()).find((job) => sameHistoryJobRequest(job, normalized, depth, gameIds));
@@ -360,7 +420,8 @@ export async function queueAutomaticHistoryAnalysis(
 ): Promise<AutomaticHistoryAnalysisResult> {
   const scope = automaticScope(accountId);
   const [games, jobs] = await Promise.all([listSyncedGames(), listHistoryAnalysisJobs()]);
-  const { valid, excluded } = partitionUnparsableSyncedGames(games);
+  const scopedGames = games.filter((game) => gameMatchesHistoryScope(game, scope, depth));
+  const { valid, excluded } = partitionUnparsableSyncedGames(scopedGames);
   const candidates = selectHistoryAnalysisGames(valid, scope, depth);
   const matching = jobs.filter((job) => isAutomaticAccountJob(job, accountId, depth));
   const existing = matching.find((job) => job.status === "running" || job.status === "queued" || job.status === "paused");

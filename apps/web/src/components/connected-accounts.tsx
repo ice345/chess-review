@@ -39,7 +39,7 @@ export function ConnectedAccounts({
   onGamesUpdated,
 }: {
   compact?: boolean;
-  onGamesUpdated?: (games: SyncedGame[]) => void | Promise<void>;
+  onGamesUpdated?: (games: SyncedGame[], mode: PlatformSyncMode) => void | Promise<void>;
 }) {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([]);
   const [syncStates, setSyncStates] = useState<Record<string, PlatformSyncState>>({});
@@ -190,31 +190,31 @@ export function ConnectedAccounts({
 
       const complete = stateFor("complete", { lastSyncAt: currentAccount.lastSyncAt ?? new Date().toISOString() });
       await persistState(complete);
-      // Every completed sync — incremental or full-history — hands its newly
-      // unanalyzed games to the durable background queue. The scope selects
-      // never-analyzed games only, so repeat calls are no-ops when nothing is
-      // waiting. Importing history therefore fills Training without any
-      // manual per-game step.
+      // Full-history imports hand every currently unanalyzed game for this
+      // account to the durable queue. The scope selects never-analyzed games
+      // only, so repeat calls are no-ops when nothing is waiting. Incremental
+      // Home syncs retain their explicit newest-game setting instead of
+      // starting a second queue for the same imports.
       let analysisNotice = "";
-      try {
-        const queued = await queueAutomaticHistoryAnalysis(account.id, loadAppSettings().reviewDepth);
-        if (queued.job?.status === "paused") {
-          analysisNotice = " An existing analysis is paused; resume it from Training.";
-        } else if (queued.queuedCount > 0) {
-          analysisNotice = ` Background Stockfish analysis started for ${queued.queuedCount} game${queued.queuedCount === 1 ? "" : "s"} (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
-        } else if (queued.job?.status === "running" || queued.job?.status === "queued") {
-          analysisNotice = ` Background Stockfish analysis is already running (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
-        } else if (!queued.reused) {
-          analysisNotice = "";
-        } else {
-          analysisNotice = " All imported games already have current objective analysis.";
+      if (mode === "full-history") {
+        try {
+          const queued = await queueAutomaticHistoryAnalysis(account.id, loadAppSettings().reviewDepth);
+          if (queued.job?.status === "paused") {
+            analysisNotice = " An existing analysis is paused; resume it from Training.";
+          } else if (queued.queuedCount > 0) {
+            analysisNotice = ` Background Stockfish analysis started for ${queued.queuedCount} game${queued.queuedCount === 1 ? "" : "s"} (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
+          } else if (queued.job?.status === "running" || queued.job?.status === "queued") {
+            analysisNotice = ` Background Stockfish analysis is already running (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
+          } else if (queued.reused) {
+            analysisNotice = " All imported games already have current objective analysis.";
+          }
+        } catch (error) {
+          analysisNotice = ` History was imported, but background analysis could not be queued: ${error instanceof Error ? error.message : "unknown error"}`;
         }
-      } catch (error) {
-        analysisNotice = ` History was imported, but background analysis could not be queued: ${error instanceof Error ? error.message : "unknown error"}`;
       }
       setNotice(`${importedCount} new game${importedCount === 1 ? "" : "s"} imported.${analysisNotice}`);
       await load();
-      if (newestImported.length > 0) await onGamesUpdated?.(newestImported);
+      if (newestImported.length > 0) await onGamesUpdated?.(newestImported, mode);
     } catch (error) {
       if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         await persistState(stateFor("paused", { error: "Paused by user. Resume continues from the saved checkpoint." }));

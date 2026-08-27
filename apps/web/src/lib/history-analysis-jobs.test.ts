@@ -3,6 +3,7 @@ import type { HistoryAnalysisJobV1, HistoryAnalysisScopeV1, SyncedGame } from "@
 import {
   cancelHistoryAnalysisJobRecord,
   gameMatchesHistoryScope,
+  isHistoryAnalysisJobFinished,
   pauseHistoryAnalysisJobRecord,
   partitionUnparsableSyncedGames,
   retryFailedHistoryAnalysisJobRecord,
@@ -145,6 +146,15 @@ describe("history analysis durable transitions", () => {
     ]);
     // Genuine failures are still requeued.
     expect(retried.items.find((item) => item.gameId === "failed")?.status).toBe("queued");
+  });
+
+  it("only treats terminal runs as removable history", () => {
+    expect(isHistoryAnalysisJobFinished({ status: "completed" })).toBe(true);
+    expect(isHistoryAnalysisJobFinished({ status: "failed" })).toBe(true);
+    expect(isHistoryAnalysisJobFinished({ status: "cancelled" })).toBe(true);
+    expect(isHistoryAnalysisJobFinished({ status: "queued" })).toBe(false);
+    expect(isHistoryAnalysisJobFinished({ status: "running" })).toBe(false);
+    expect(isHistoryAnalysisJobFinished({ status: "paused" })).toBe(false);
   });
 });
 

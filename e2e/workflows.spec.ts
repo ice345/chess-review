@@ -331,6 +331,49 @@ test("offers first-run whole-history analysis and persists bulk cancellation", a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
+test("removes only a finished run record and keeps synced data", async ({ page }) => {
+  await seedConnectedLibrary(page, 1);
+  const job = await seedPausedHistoryJob(page, ["chesscom:fixture-0"]);
+  await page.goto("/training");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.locator(".history-job-list")).toContainText("cancelled");
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Remove from history" }).click();
+  await expect(page.getByText("Analysis runs", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("1 synced games match this scope.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("1 synced games match this scope.")).toBeVisible();
+
+  const finishedJob = {
+    ...job,
+    id: "history-job-clear-fixture",
+    status: "completed" as const,
+    updatedAt: "2026-08-25T00:00:00.000Z",
+    completedAt: "2026-08-25T00:00:00.000Z",
+    items: job.items.map((item) => ({ ...item, status: "cached" as const })),
+  };
+  await page.evaluate(async (value) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("open-chess-review", 5);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction("history-analysis-jobs", "readwrite");
+    transaction.objectStore("history-analysis-jobs").put(value, value.id);
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    database.close();
+  }, finishedJob);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Clear finished runs" })).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Clear finished runs" }).click();
+  await expect(page.getByText("Analysis runs", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("1 synced games match this scope.")).toBeVisible();
+});
+
 test("shows successful history items and the exact reason for failed items", async ({ page }) => {
   await seedPartialHistoryJob(page);
   await page.goto("/training");
@@ -395,6 +438,7 @@ test("builds advanced study evidence and persists an actionable training queue",
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await expect(page.locator(".study-metrics")).toContainText("3");
 
+  await page.getByText("Change scope", { exact: true }).click();
   await page.getByLabel("Color").selectOption("black");
   await expect(page.locator(".study-overview .study-metrics article").filter({ hasText: "Games" }).locator("strong")).toHaveText("0");
   await page.getByLabel("Color").selectOption("all");
@@ -418,7 +462,7 @@ test("builds advanced study evidence and persists an actionable training queue",
 
   await page.goto("/training");
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
-  await page.getByRole("button", { name: "Plan" }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText("Opening decisions", { exact: true })).toBeVisible();
   await expect(page.getByText("Missed opportunities", { exact: true })).toBeVisible();
 
@@ -430,7 +474,7 @@ test("builds advanced study evidence and persists an actionable training queue",
   await page.locator(".training-list").getByRole("button", { name: "Start" }).click();
   await expect(page.locator(".training-list")).toContainText("in progress");
   await page.reload();
-  await page.getByRole("button", { name: "Plan" }).click();
+  await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.locator(".training-list")).toContainText("in progress");
 
   await page.locator(".training-sources a").first().click();

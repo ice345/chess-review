@@ -17,6 +17,7 @@ import { listSyncedGames } from "../lib/platform-library";
 import type { SyncedGame } from "@chess-review/shared";
 import { loadAppSettings } from "../lib/app-settings";
 import { autoAnalyzeSyncedGames } from "../lib/auto-analysis";
+import type { PlatformSyncMode } from "../lib/platform-sync";
 import { BlueBishopMark } from "@chess-review/ui";
 
 const SAMPLE_PGN = `[Event "Open Review Sample"]
@@ -82,10 +83,12 @@ export function HomeWorkspace() {
     }
   }
 
-  async function applySyncAnalysisPolicy(games: SyncedGame[]) {
-    const settings = loadAppSettings();
-    const selected = games.slice(0, settings.autoAnalyzeImported);
-    if (selected.length > 0) await autoAnalyzeSyncedGames(selected, { depth: settings.reviewDepth, multiPv: settings.reviewMultiPv });
+  async function applySyncAnalysisPolicy(games: SyncedGame[], mode: PlatformSyncMode) {
+    if (mode === "incremental") {
+      const settings = loadAppSettings();
+      const selected = games.slice(0, settings.autoAnalyzeImported);
+      if (selected.length > 0) await autoAnalyzeSyncedGames(selected, { depth: settings.reviewDepth, multiPv: settings.reviewMultiPv });
+    }
     refreshLibrary();
   }
 
