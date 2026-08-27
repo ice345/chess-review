@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./styles/tokens.css";
 import "./styles/base.css";
+import "./styles/surfaces.css";
 import "./styles/chrome.css";
 import "./styles/home.css";
 import "./styles/utilities.css";

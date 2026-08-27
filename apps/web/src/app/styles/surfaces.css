@@ -1,0 +1,40 @@
+/* Small shared visual grammar. Feature styles own layout; these classes only
+   establish the product's paper, wash and dense-row surface semantics. */
+
+.paper-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-paper) 90%, transparent);
+  box-shadow: var(--shadow-paper);
+}
+
+.wash-card {
+  border: 1px solid color-mix(in srgb, var(--line-accent) 42%, transparent);
+  border-radius: 12px;
+  background: var(--wash-blue);
+}
+
+.wash-card[data-wash="pink"] { background: var(--wash-pink); }
+.wash-card[data-wash="sage"] { background: var(--wash-sage); }
+.wash-card[data-wash="cream"] { background: var(--wash-cream); }
+
+.ink-row {
+  border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-paper) 42%, transparent);
+}
+
+.ink-row:hover {
+  border-color: var(--line-accent);
+  background: color-mix(in srgb, var(--wash-blue) 38%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-row,
+  .paper-card,
+  .wash-card,
+  button,
+  a {
+    scroll-behavior: auto;
+    transition-duration: .01ms !important;
+  }
+}

@@ -1,16 +1,24 @@
 .study-page { padding-bottom: 72px; }
 .study-heading { display: flex; align-items: end; justify-content: space-between; gap: 28px; }
-.study-player-select { width: min(330px, 100%); display: grid; gap: 6px; color: var(--muted); font-size: 10px; }
-.study-player-select select { height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 253, 248, .82); }
-.study-sections, .study-empty, .study-notice, .study-filters, .study-tabs { width: min(1060px, calc(100% - 40px)); margin-inline: auto; }
-.study-filters { margin-bottom: 10px; padding: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; border: 1px solid var(--line-soft); border-radius: 13px; background: rgba(255, 253, 248, .62); }
-.study-filters label, .history-analysis-controls label { min-width: 0; display: grid; gap: 5px; color: var(--muted); font-size: 8px; }
-.study-filters select, .study-filters input, .history-analysis-controls select { width: 100%; height: 35px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: #fffdf8; font-size: 10px; }
+.study-player-select { width: min(330px, 100%); display: grid; gap: 6px; color: var(--ink-muted); font-size: var(--type-label); }
+.study-player-select select { height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface-paper) 84%, transparent); }
+.study-sections, .study-empty, .study-notice, .study-scope, .study-tabs { width: min(1060px, calc(100% - 40px)); margin-inline: auto; }
+.study-scope { margin-bottom: 10px; border: 1px solid var(--line-soft); border-radius: 13px; background: color-mix(in srgb, var(--surface-paper) 62%, transparent); }
+.study-scope > summary { min-height: 48px; padding: 8px 13px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.study-scope > summary::-webkit-details-marker { display: none; }
+.study-scope > summary::after { content: "⌄"; order: 3; color: var(--ink-muted); font-size: 13px; transition: transform .16s ease; }
+.study-scope[open] > summary::after { transform: rotate(180deg); }
+.study-scope > summary > span:first-child { color: var(--ink-muted); font-size: var(--type-label); font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.study-scope > summary strong { min-width: 0; overflow: hidden; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.study-scope-change { color: var(--accent-primary); font-size: var(--type-caption); font-weight: 750; }
+.study-filters { padding: 0 12px 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.study-filters label, .history-analysis-controls label { min-width: 0; display: grid; gap: 5px; color: var(--ink-muted); font-size: var(--type-label); }
+.study-filters select, .study-filters input, .history-analysis-controls select { width: 100%; height: 35px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-paper); font-size: var(--type-caption); }
 .study-tabs { margin-bottom: 14px; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
 .study-tabs button { min-height: 36px; padding: 0 12px; flex: 0 0 auto; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--muted); font-size: 9px; font-weight: 700; }
-.study-tabs button[aria-current="page"] { border-color: #b9cac8; background: #e8f0ed; color: #315867; }
+.study-tabs button[aria-current="page"] { border-color: var(--line-accent); background: var(--wash-blue); color: var(--accent-ink); }
 .study-sections { display: grid; gap: 16px; }
-.study-sections > section { padding: clamp(18px, 3vw, 28px); border: 1px solid #d3ddda; border-radius: 18px; background: rgba(255, 253, 248, .72); box-shadow: 0 14px 42px rgba(61, 82, 88, .045); }
+.study-sections > section { padding: clamp(18px, 3vw, 28px); border: 1px solid var(--line); border-radius: 18px; background: color-mix(in srgb, var(--surface-paper) 72%, transparent); box-shadow: var(--shadow-paper); }
 .study-empty { min-height: 260px; padding: 40px; display: grid; place-items: center; align-content: center; gap: 12px; border: 1px dashed var(--line); border-radius: 18px; color: var(--muted); text-align: center; }
 .study-empty .primary-link { margin-top: 6px; }
 .empty-history-actions { width: min(520px, 100%); display: grid; grid-template-columns: minmax(150px, 1fr) auto auto; align-items: end; gap: 10px; text-align: left; }
@@ -18,12 +26,12 @@
 .empty-history-actions select { height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: #fffdf8; }
 .empty-history-actions small { align-self: center; font-size: 8px; }
 .empty-jobs { width: min(720px, 100%); text-align: left; }
-.study-notice { margin-bottom: 14px; padding: 10px 13px; border: 1px solid #ccd9d6; border-radius: 10px; background: #edf3ef; color: #526d76; font-size: 11px; }
+.study-notice { margin-bottom: 14px; padding: 10px 13px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--success-soft); color: var(--ink-secondary); font-size: var(--type-caption); }
 .study-section-heading { margin-bottom: 20px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .study-section-heading h2 { margin: 5px 0 0; color: #2b4a57; font: 500 27px Georgia, "Songti SC", serif; letter-spacing: -.03em; }
 .study-section-heading > small { max-width: 450px; color: var(--muted); font-size: 9px; line-height: 1.5; text-align: right; }
 .study-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.study-metrics article { min-width: 0; padding: 14px; display: grid; gap: 4px; border-radius: 12px; background: #edf2ef; }
+.study-metrics article { min-width: 0; padding: 14px; display: grid; gap: 4px; border-radius: 12px; background: var(--wash-blue); }
 .study-metrics span, .study-metrics small { color: var(--muted); font-size: 9px; }
 .study-metrics strong { color: #365866; font: 500 25px Georgia, serif; }
 .study-distributions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
@@ -117,10 +125,45 @@
 .history-job-details li a { color: #55788a; font-size: 9px; }
 .history-job-more { display: block; margin-top: 6px; }
 
+/* The overview is a profile first, report second. These surfaces deliberately
+   carry more hierarchy than the dense tabs below without adding decoration. */
+.study-profile { margin-bottom: 14px; padding: clamp(16px, 2.5vw, 23px); }
+.study-profile-heading, .study-focus header, .study-highlights header { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+.study-profile-heading h3 { margin: 5px 0 3px; color: var(--ink-primary); font: 500 clamp(24px, 3vw, 34px) Georgia, "Songti SC", serif; letter-spacing: -.035em; }
+.study-profile-heading p { margin: 0; color: var(--ink-muted); font-size: var(--type-caption); }
+.study-profile-heading > a, .study-profile-heading > button, .study-focus header > a, .study-focus header > button, .study-highlights header > a, .study-highlights header > button { color: var(--accent-primary); font-size: var(--type-caption); font-weight: 700; }
+.study-profile-stats { margin-top: 17px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.study-profile-stats article { min-width: 0; padding: 13px; display: grid; gap: 4px; }
+.study-profile-stats article > span, .study-profile-stats article > small { color: var(--ink-muted); font-size: var(--type-caption); }
+.study-profile-stats article > strong { color: var(--ink-primary); font: 500 24px Georgia, serif; }
+.study-profile-stats article > small { line-height: 1.4; }
+.study-profile-note { margin: 12px 0 0; color: var(--ink-muted); font-size: var(--type-caption); line-height: 1.45; }
+.study-phase-cards { margin-bottom: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.study-phase-cards article { min-width: 0; padding: 14px; display: grid; gap: 6px; }
+.study-phase-cards article header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.study-phase-cards article header > span { color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; text-transform: capitalize; }
+.study-phase-cards article header > small { color: var(--ink-muted); font-size: var(--type-label); }
+.study-phase-cards article > strong { color: var(--ink-primary); font: 500 26px Georgia, serif; }
+.study-phase-cards article > small { color: var(--ink-muted); font-size: var(--type-caption); }
+.study-focus-row { margin-bottom: 14px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 9px; }
+.study-focus, .study-highlights { padding: 15px 17px; }
+.study-focus ol { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink-secondary); font-size: var(--type-body); }
+.study-focus p { margin: 13px 0 0; color: var(--ink-muted); font-size: var(--type-caption); }
+.study-highlights > div { margin-top: 15px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 15px; }
+.study-highlights > div span { display: grid; gap: 3px; color: var(--ink-muted); font-size: var(--type-caption); }
+.study-highlights > div strong { color: var(--ink-primary); font: 500 21px Georgia, serif; }
+.history-run-heading { margin-top: 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; }
+.history-past-runs { margin-top: 10px; border-top: 1px solid var(--line-soft); }
+.history-past-runs > summary { padding: 11px 2px 4px; cursor: pointer; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 700; }
+.history-job-list-past { margin-top: 5px; opacity: .86; }
+.history-job-explanation { color: var(--ink-secondary) !important; white-space: normal !important; }
+.history-job-list .text-button { font-size: var(--type-label); }
+
 @media (max-width: 820px) {
   .study-heading { align-items: stretch; flex-direction: column; }
   .study-player-select { width: 100%; }
-  .study-metrics, .weakness-grid { grid-template-columns: repeat(2, 1fr); }
+  .study-metrics, .study-profile-stats, .weakness-grid { grid-template-columns: repeat(2, 1fr); }
+  .study-phase-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .study-filters { grid-template-columns: repeat(2, 1fr); }
   .repertoire-list article { grid-template-columns: 32px 1fr; }
   .repertoire-list dl { grid-column: 1 / -1; }
@@ -132,7 +175,7 @@
 }
 
 @media (max-width: 560px) {
-  .study-sections, .study-empty, .study-notice, .study-filters, .study-tabs { width: min(100% - 24px, 1060px); }
+  .study-sections, .study-empty, .study-notice, .study-scope, .study-tabs { width: min(100% - 24px, 1060px); }
   .study-filters, .highlight-grid, .history-analysis-controls, .history-job-list article { grid-template-columns: 1fr; }
   .history-job-list .history-job-card { grid-template-columns: 1fr; }
   .coverage-provider-grid { grid-template-columns: 1fr; }
@@ -147,4 +190,6 @@
   .repertoire-list dl { grid-template-columns: repeat(2, 1fr); gap: 9px 0; }
   .study-section-heading { align-items: start; flex-direction: column; }
   .study-section-heading > small { text-align: left; }
+  .study-profile-stats, .study-phase-cards, .study-focus-row { grid-template-columns: 1fr; }
+  .study-profile-heading, .study-focus header, .study-highlights header { align-items: start; flex-direction: column; }
 }
