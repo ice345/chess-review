@@ -33,6 +33,13 @@ describe("review library records", () => {
     await expect(buildReviewRecord("pgn", `[Event "Empty"]\n\n*`)).rejects.toThrow("at least one move");
   });
 
+  it("does not leak chess.js parser internals for illegal PGN", async () => {
+    await expect(buildReviewRecord("pgn", "this is not a chess game 1. e4 e5 2. Ke2 illegal"))
+      .rejects.toThrow("This PGN could not be parsed.");
+    await expect(buildReviewRecord("pgn", `[Variant "Chess960"]\n\n1. e4 *`))
+      .rejects.toThrow("This product only supports standard chess.");
+  });
+
   it("does not expose an unknown PGN date placeholder", async () => {
     const record = await buildReviewRecord("pgn", `[White "A"]\n[Black "B"]\n\n1. e4 *`);
     expect(record.subtitle).toBe("1 ply");

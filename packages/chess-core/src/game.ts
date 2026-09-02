@@ -50,11 +50,37 @@ export interface NoLegalMoveTerminalStatus {
   sideToMove: PlayerColor;
 }
 
+export interface DrawStatus {
+  kind: "threefold" | "fivefold" | "fifty-move" | "seventy-five-move" | "insufficient-material";
+  automatic: boolean;
+}
+
+export class ChessImportError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "ChessImportError";
+  }
+}
+
+const SUPPORTED_VARIANT = /^(standard|chess|from position)?$/i;
+
+function rejectUnsupportedVariant(headers: Record<string, string>): void {
+  const variant = headers.Variant ?? headers.variant ?? "";
+  if (!SUPPORTED_VARIANT.test(variant.trim())) {
+    throw new ChessImportError("This product only supports standard chess.");
+  }
+}
+
 export function parsePgn(pgn: string): NormalizedGame {
   const parsed = new Chess();
-  parsed.loadPgn(pgn, { strict: false });
+  try {
+    parsed.loadPgn(pgn, { strict: false });
+  } catch (cause) {
+    throw new ChessImportError("This PGN could not be parsed.", { cause });
+  }
 
   const headers = parsed.getHeaders();
+  rejectUnsupportedVariant(headers);
   const initialFen = headers.FEN ?? new Chess().fen();
   const replay = new Chess(initialFen);
   const plies: NormalizedPly[] = [];
@@ -63,7 +89,7 @@ export function parsePgn(pgn: string): NormalizedGame {
     const fenBefore = replay.fen();
     const legalMoveCountBefore = replay.moves().length;
     const move = replay.move(san);
-    if (!move) throw new Error(`Unable to replay PGN move: ${san}`);
+    if (!move) throw new ChessImportError(`Unable to replay PGN move: ${san}`);
 
     plies.push({
       ply: plies.length + 1,
@@ -110,6 +136,37 @@ export function noLegalMoveTerminalStatus(fen: string): NoLegalMoveTerminalStatu
     kind: chess.isCheckmate() ? "checkmate" : "stalemate",
     sideToMove: chess.turn() === "w" ? "white" : "black",
   };
+}
+
+function positionKey(fen: string): string {
+  return fen.split(" ").slice(0, 4).join(" ");
+}
+
+/** History-dependent draw claims. FEN-only inspection cannot see threefold. */
+export function drawStatus(startFen: string, uciMoves: readonly string[] = []): DrawStatus | null {
+  const chess = new Chess(startFen);
+  const seen = new Map<string, number>();
+  const record = (): void => {
+    const key = positionKey(chess.fen());
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+  };
+  record();
+  for (const uci of uciMoves) {
+    const from = uci.slice(0, 2) as Square;
+    const to = uci.slice(2, 4) as Square;
+    const promotion = uci.length > 4 ? uci.slice(4, 5) : undefined;
+    const move = chess.move({ from, to, ...(promotion === undefined ? {} : { promotion }) });
+    if (!move) throw new ChessImportError(`Illegal UCI move: ${uci}`);
+    record();
+  }
+  const halfmove = Number(chess.fen().split(" ")[4] ?? "0");
+  if (halfmove >= 150) return { kind: "seventy-five-move", automatic: true };
+  if (chess.isInsufficientMaterial()) return { kind: "insufficient-material", automatic: true };
+  const repetitions = seen.get(positionKey(chess.fen())) ?? 1;
+  if (repetitions >= 5) return { kind: "fivefold", automatic: true };
+  if (halfmove >= 100) return { kind: "fifty-move", automatic: false };
+  if (repetitions >= 3 || chess.isThreefoldRepetition()) return { kind: "threefold", automatic: false };
+  return null;
 }
 
 /** Replay a deterministic engine line through the rules layer.

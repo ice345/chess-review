@@ -127,26 +127,30 @@ export async function saveSyncedGames(games: SyncedGame[]): Promise<SyncedGame[]
   if (games.length === 0) return [];
   const database = await openReviewDatabase();
   try {
-    const existing = new Map((await readAll<SyncedGame>(database, SYNCED_GAME_STORE)).map((game) => [game.id, game]));
+    const added: SyncedGame[] = [];
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(SYNCED_GAME_STORE, "readwrite");
       const store = transaction.objectStore(SYNCED_GAME_STORE);
       for (const game of games) {
-        const prior = existing.get(game.id);
-        store.put({
-          ...game,
-          analyzed: prior?.analyzed ?? game.analyzed,
-          ...(prior?.analysisId ? { analysisId: prior.analysisId } : {}),
-          ...(prior?.analysisAlgorithmVersion ? { analysisAlgorithmVersion: prior.analysisAlgorithmVersion } : {}),
-          ...(prior?.analysisDepth === undefined ? {} : { analysisDepth: prior.analysisDepth }),
-          ...(prior?.analyzedAt ? { analyzedAt: prior.analyzedAt } : {}),
-        }, game.id);
+        const request = store.get(game.id);
+        request.onsuccess = () => {
+          const prior = request.result as SyncedGame | undefined;
+          store.put({
+            ...game,
+            analyzed: prior?.analyzed ?? game.analyzed,
+            ...(prior?.analysisId ? { analysisId: prior.analysisId } : {}),
+            ...(prior?.analysisAlgorithmVersion ? { analysisAlgorithmVersion: prior.analysisAlgorithmVersion } : {}),
+            ...(prior?.analysisDepth === undefined ? {} : { analysisDepth: prior.analysisDepth }),
+            ...(prior?.analyzedAt ? { analyzedAt: prior.analyzedAt } : {}),
+          }, game.id);
+          if (!prior) added.push(game);
+        };
       }
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error("Unable to store synced games."));
       transaction.onabort = () => reject(transaction.error ?? new Error("Synced-game write was aborted."));
     });
-    return games.filter((game) => !existing.has(game.id));
+    return added;
   } finally {
     database.close();
   }

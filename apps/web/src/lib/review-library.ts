@@ -1,4 +1,4 @@
-import { normalizeFen, parsePgn } from "@chess-review/chess-core";
+import { ChessImportError, normalizeFen, parsePgn } from "@chess-review/chess-core";
 import type { ExternalGameReference, SyncedGame } from "@chess-review/shared";
 import { openReviewDatabase, REVIEW_STORE } from "./browser-storage";
 
@@ -74,8 +74,14 @@ export async function buildReviewRecord(kind: ReviewRecordKind, input: string): 
     };
   }
 
-  const game = parsePgn(input.trim());
-  if (game.plies.length === 0) throw new Error("PGN must contain at least one move.");
+  let game;
+  try {
+    game = parsePgn(input.trim());
+  } catch (error) {
+    if (error instanceof ChessImportError) throw error;
+    throw new ChessImportError("This PGN could not be parsed.", { cause: error });
+  }
+  if (game.plies.length === 0) throw new ChessImportError("PGN must contain at least one move.");
   const white = meaningfulHeader(game.headers.White) ?? "White";
   const black = meaningfulHeader(game.headers.Black) ?? "Black";
   const event = meaningfulHeader(game.headers.Event);

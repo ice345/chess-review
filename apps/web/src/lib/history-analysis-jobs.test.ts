@@ -4,11 +4,14 @@ import {
   cancelHistoryAnalysisJobRecord,
   gameMatchesHistoryScope,
   isHistoryAnalysisJobFinished,
+  markHistoryJobSuperseded,
   pauseHistoryAnalysisJobRecord,
   partitionUnparsableSyncedGames,
+  planHistoryJobSupersession,
   retryFailedHistoryAnalysisJobRecord,
   runBoundedParallel,
   selectHistoryAnalysisGames,
+  shouldSupersedeHistoryJob,
 } from "./history-analysis-jobs";
 
 function game(
@@ -132,7 +135,7 @@ describe("history analysis durable transitions", () => {
     expect(retried.completedAt).toBeUndefined();
   });
 
-  it("migrates unparsable failed games out of the retry loop as excluded items", () => {
+  it("migrates unparsable failed games out of retryable items and failure accounting", () => {
     const withInvalid = { ...job };
     withInvalid.items = [
       ...job.items,
@@ -140,12 +143,28 @@ describe("history analysis durable transitions", () => {
     ];
     const retried = retryFailedHistoryAnalysisJobRecord(withInvalid, "retry-at", ["cc-broken"]);
 
-    expect(retried.items.find((item) => item.gameId === "cc-broken")?.status).toBe("failed");
+    expect(retried.items.find((item) => item.gameId === "cc-broken")).toBeUndefined();
     expect(retried.excludedItems).toEqual([
       { gameId: "cc-broken", reason: "Invalid FEN: missing black king" },
     ]);
-    // Genuine failures are still requeued.
     expect(retried.items.find((item) => item.gameId === "failed")?.status).toBe("queued");
+    expect(retried.status).toBe("queued");
+  });
+
+  it("completes a job whose only remaining failures were unparsable provider games", () => {
+    const onlyInvalid: HistoryAnalysisJobV1 = {
+      ...job,
+      status: "failed",
+      items: [
+        { gameId: "done", status: "completed", attempts: 1, updatedAt: "before" },
+        { gameId: "cc-broken", status: "failed", attempts: 3, error: "Invalid FEN: missing black king", updatedAt: "before" },
+      ],
+    };
+    const retried = retryFailedHistoryAnalysisJobRecord(onlyInvalid, "retry-at", ["cc-broken"]);
+    expect(retried.status).toBe("completed");
+    expect(retried.items.map((item) => item.gameId)).toEqual(["done"]);
+    expect(retried.excludedItems).toHaveLength(1);
+    expect(retried.items.some((item) => item.status === "failed")).toBe(false);
   });
 
   it("only treats terminal runs as removable history", () => {
@@ -178,5 +197,57 @@ describe("history analysis parallel runner", () => {
     let called = false;
     await runBoundedParallel([], 2, async () => { called = true; });
     expect(called).toBe(false);
+  });
+});
+
+describe("history job supersession", () => {
+  function analysisJob(
+    id: string,
+    status: HistoryAnalysisJobV1["status"],
+    gameIds: string[],
+    createdAt: string,
+    extras: Partial<HistoryAnalysisJobV1> = {},
+  ): HistoryAnalysisJobV1 {
+    return {
+      version: 1,
+      id,
+      status,
+      scope: SCOPE,
+      objectiveAlgorithmVersion: "objective-v2.0",
+      depth: 10,
+      classificationMultiPv: 3,
+      items: gameIds.map((gameId) => ({ gameId, status: status === "paused" ? "queued" : "completed", attempts: 1, updatedAt: createdAt })),
+      createdAt,
+      updatedAt: createdAt,
+      ...extras,
+    };
+  }
+
+  it("replaces a paused smaller job when a later compatible job covers the same games", () => {
+    const paused = analysisJob("small", "paused", ["g1", "g2", "g3", "g4", "g5"], "2026-08-01T00:00:00.000Z");
+    const later = analysisJob("large", "failed", Array.from({ length: 98 }, (_, index) => `g${index + 1}`), "2026-08-02T00:00:00.000Z");
+    later.items = later.items.map((item, index) => ({
+      ...item,
+      status: index < 95 ? "completed" : "failed",
+    }));
+
+    expect(shouldSupersedeHistoryJob(later, paused)).toBe(true);
+    expect(planHistoryJobSupersession([later, paused])).toEqual([{ older: paused, newer: later }]);
+    expect(markHistoryJobSuperseded(paused, later.id, "now")).toMatchObject({
+      status: "cancelled",
+      supersededBy: "large",
+    });
+  });
+
+  it("does not replace genuinely different scopes or an active running job", () => {
+    const paused = analysisJob("small", "paused", ["g1", "g2"], "2026-08-01T00:00:00.000Z");
+    const running = analysisJob("run", "running", ["g1", "g2"], "2026-08-01T00:00:00.000Z");
+    const otherAccount = analysisJob("other", "completed", ["g1", "g2", "g3"], "2026-08-03T00:00:00.000Z", {
+      scope: { ...SCOPE, accountIds: ["chesscom:bob"] },
+    });
+
+    expect(shouldSupersedeHistoryJob(otherAccount, paused)).toBe(false);
+    expect(shouldSupersedeHistoryJob(paused, running)).toBe(false);
+    expect(planHistoryJobSupersession([paused, running, otherAccount])).toEqual([]);
   });
 });

@@ -6,7 +6,7 @@ const account: PlatformAccount = {
   id: "chesscom:ada",
   provider: "chesscom",
   username: "Ada",
-  avatarUrl: "https://images.example/ada.png",
+  avatarUrl: "https://images.chesscomfiles.com/uploads/v1/user/ada.png",
   authMode: "public-username",
   verified: false,
   linkedAt: "2026-08-23T00:00:00.000Z",
@@ -41,6 +41,26 @@ describe("review player identity", () => {
       connected: true,
     });
     expect(players.black).toMatchObject({ username: "Mikhail", rating: 1761, connected: false });
+    expect(players.black.avatarUrl).toBeUndefined();
+  });
+
+  it("uses fetched avatars for both players without changing connected identity", () => {
+    const players = buildReviewPlayerIdentities({}, account, game, {
+      white: "https://images.chesscomfiles.com/uploads/v1/user/ada.png",
+      black: "https://images.chesscomfiles.com/uploads/v1/user/mikhail.png",
+    }, "chesscom");
+    expect(players.white).toMatchObject({
+      username: "Ada",
+      avatarUrl: "https://images.chesscomfiles.com/uploads/v1/user/ada.png",
+      provider: "chesscom",
+      connected: true,
+    });
+    expect(players.black).toMatchObject({
+      username: "Mikhail",
+      avatarUrl: "https://images.chesscomfiles.com/uploads/v1/user/mikhail.png",
+      provider: "chesscom",
+      connected: false,
+    });
   });
 
   it("uses PGN headers and flips top/bottom presentation only", () => {
@@ -53,5 +73,14 @@ describe("review player identity", () => {
     expect(orderPlayersForBoard(players, "white").bottom.username).toBe("Long White Player");
     expect(orderPlayersForBoard(players, "black").bottom.username).toBe("Long Black Player");
     expect(players.white.rating).toBe(1702);
+  });
+
+  it("drops avatar URLs that are not on the provider CDN allowlist", () => {
+    const players = buildReviewPlayerIdentities({}, account, game, {
+      white: "https://evil.example/ada.png",
+      black: "https://images.chesscomfiles.com/uploads/v1/user/mikhail.png",
+    }, "chesscom");
+    expect(players.white.avatarUrl).toBeUndefined();
+    expect(players.black.avatarUrl).toBe("https://images.chesscomfiles.com/uploads/v1/user/mikhail.png");
   });
 });

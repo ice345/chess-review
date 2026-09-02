@@ -1,5 +1,5 @@
 export const DATABASE_NAME = "open-chess-review";
-export const DATABASE_VERSION = 5;
+export const DATABASE_VERSION = 6;
 export const ANALYSIS_STORE = "objective-analyses";
 export const ANALYSIS_INDEX_STORE = "objective-analysis-index";
 export const REVIEW_STORE = "review-records";
@@ -8,12 +8,13 @@ export const SYNCED_GAME_STORE = "synced-games";
 export const PLATFORM_SYNC_STORE = "platform-sync-state";
 export const TRAINING_QUEUE_STORE = "training-queue";
 export const HISTORY_ANALYSIS_JOB_STORE = "history-analysis-jobs";
+export const PLAYER_AVATAR_STORE = "player-avatars";
 
 export function openReviewDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {
-      for (const store of [ANALYSIS_STORE, ANALYSIS_INDEX_STORE, REVIEW_STORE, PLATFORM_ACCOUNT_STORE, SYNCED_GAME_STORE, PLATFORM_SYNC_STORE, TRAINING_QUEUE_STORE, HISTORY_ANALYSIS_JOB_STORE]) {
+      for (const store of [ANALYSIS_STORE, ANALYSIS_INDEX_STORE, REVIEW_STORE, PLATFORM_ACCOUNT_STORE, SYNCED_GAME_STORE, PLATFORM_SYNC_STORE, TRAINING_QUEUE_STORE, HISTORY_ANALYSIS_JOB_STORE, PLAYER_AVATAR_STORE]) {
         if (!request.result.objectStoreNames.contains(store)) request.result.createObjectStore(store);
       }
     };

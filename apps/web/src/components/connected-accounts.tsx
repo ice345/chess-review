@@ -39,7 +39,7 @@ export function ConnectedAccounts({
   onGamesUpdated,
 }: {
   compact?: boolean;
-  onGamesUpdated?: (games: SyncedGame[], mode: PlatformSyncMode) => void | Promise<void>;
+  onGamesUpdated?: (games: SyncedGame[], mode: PlatformSyncMode, complete?: boolean) => void | Promise<void>;
 }) {
   const [accounts, setAccounts] = useState<PlatformAccount[]>([]);
   const [syncStates, setSyncStates] = useState<Record<string, PlatformSyncState>>({});
@@ -185,6 +185,7 @@ export function ConnectedAccounts({
         if (result.done) break;
         if (!cursor) throw new Error("Provider returned an incomplete sync without a resume checkpoint.");
         await persistState(stateFor("syncing"));
+        await onGamesUpdated?.(newestImported, mode, false);
         await new Promise((resolve) => window.setTimeout(resolve, 250));
       }
 
@@ -214,7 +215,7 @@ export function ConnectedAccounts({
       }
       setNotice(`${importedCount} new game${importedCount === 1 ? "" : "s"} imported.${analysisNotice}`);
       await load();
-      if (newestImported.length > 0) await onGamesUpdated?.(newestImported, mode);
+      if (newestImported.length > 0) await onGamesUpdated?.(newestImported, mode, true);
     } catch (error) {
       if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         await persistState(stateFor("paused", { error: "Paused by user. Resume continues from the saved checkpoint." }));
@@ -242,8 +243,13 @@ export function ConnectedAccounts({
     if (!beginAction(account.id)) return;
     try {
       await providerFor(account).disconnect(account);
+      const removeGames = window.confirm(`Disconnect ${account.username}. Delete games imported from this account too?`);
+      const { deleteSyncedGamesForAccount } = await import("../lib/local-data");
+      if (removeGames) await deleteSyncedGamesForAccount(account.id);
       await removePlatformAccount(account.id);
-      setNotice(`${account.username} disconnected. Imported games remain in your browser.`);
+      setNotice(removeGames
+        ? `${account.username} disconnected and its imported games were deleted.`
+        : `${account.username} disconnected. Imported games remain in your browser.`);
       await load();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to disconnect account.");
@@ -256,19 +262,21 @@ export function ConnectedAccounts({
     <section className={`connected-accounts ${compact ? "compact" : ""}`} id="connected-accounts">
       <header>
         <div><span className="kicker">Connected games</span><h2>{compact ? "Your chess identities" : "Accounts"}</h2></div>
-        <p>{compact ? "Profiles stay lightweight here; account setup and full-history tools live in Settings." : "Sync metadata stays separate from analysis. Full-history imports queue objective Stockfish work after syncing, and every batch has a persistent, resumable checkpoint."}</p>
+        <p>{compact ? "Link Chess.com or Lichess here, then sync recent games. Full-history tools stay in Settings." : "Sync metadata stays separate from analysis. Full-history imports queue objective Stockfish work after syncing, and every batch has a persistent, resumable checkpoint."}</p>
       </header>
-      {!compact && <div className="account-link-grid">
+      <div className="account-link-grid">
         <div className="account-link-card chesscom-link" id="chesscom-link">
           <div><strong>Chess.com</strong><small>Public username · ownership unverified</small></div>
           <div><input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" /><button type="button" className="secondary" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button></div>
         </div>
         <div className="account-link-card lichess-link" id="lichess-link">
-          <div><strong>Lichess</strong><small>OAuth 2 · PKCE · verified session</small></div>
-          <button type="button" className="secondary" disabled={working !== null || lichessConfigured !== true} onClick={() => void linkLichess()}>{lichessConfigured === false ? "Configure OAuth in .env.local" : "Connect Lichess"}</button>
+          <div><strong>Lichess</strong><small>{compact ? "Verified OAuth session" : "OAuth 2 · PKCE · verified session"}</small></div>
+          <div>
+            {(!compact || lichessConfigured === true) && <button type="button" className="secondary" disabled={working !== null || lichessConfigured !== true} onClick={() => void linkLichess()}>{lichessConfigured === false ? "Not configured on this server" : "Connect Lichess"}</button>}
+            {compact && <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Connect Lichess in Settings</Link>}
+          </div>
         </div>
-      </div>}
-      {accounts.length === 0 && compact && <div className="compact-account-empty"><span>No chess identity connected.</span><Link href="/settings#connected-accounts">Connect in Settings →</Link></div>}
+      </div>
       {accounts.length > 0 && <div className="account-list">{accounts.map((account) => {
         const syncState = syncStates[account.id];
         const isSyncing = working === account.id && syncState?.status === "syncing";

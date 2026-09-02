@@ -15,6 +15,7 @@ export interface SyncedGamePlayer {
   username: string;
   rating?: number;
   result?: string;
+  avatarUrl?: string;
 }
 
 /** Sync metadata is intentionally separate from canonical chess analysis. */
@@ -669,6 +670,8 @@ export interface HistoryAnalysisJobV1 {
   startedAt?: string;
   completedAt?: string;
   error?: string;
+  /** Set when a later compatible job took over this job's unfinished work. */
+  supersededBy?: string;
 }
 
 export type StudyWeaknessKind =

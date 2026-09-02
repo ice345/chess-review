@@ -31,6 +31,7 @@ export function engineCacheKey(
   depth: number,
   multiPv: number,
   searchMoves: readonly string[] = [],
+  historyMoves: readonly string[] = [],
 ): string {
-  return `${version}\u0000${depth}\u0000${multiPv}\u0000${searchMoves.join(",")}\u0000${fen}`;
+  return `${version}\u0000${depth}\u0000${multiPv}\u0000${searchMoves.join(",")}\u0000${historyMoves.join(" ")}\u0000${fen}`;
 }

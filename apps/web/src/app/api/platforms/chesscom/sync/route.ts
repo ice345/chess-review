@@ -1,5 +1,14 @@
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
-import { chessComCursor, encodeChessComCursor, type PlatformSyncMode } from "../../../../../lib/platform-sync";
+import {
+  archiveKeyFromUrl,
+  assertChessComArchiveUrl,
+  chessComArchiveListTick,
+  chessComCursor,
+  encodeChessComCursor,
+  locateChessComArchive,
+  readBoundedJson,
+  type PlatformSyncMode,
+} from "../../../../../lib/platform-sync";
 
 const HEADERS = { Accept: "application/json", "User-Agent": "OpenChessReview/0.1 contact: local-user" };
 
@@ -22,9 +31,17 @@ function normalizedResult(value: string | undefined): string | undefined {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { account?: PlatformAccount; since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
-  const account = body?.account;
-  if (!account || account.provider !== "chesscom") return Response.json({ error: "A linked Chess.com account is required." }, { status: 400 });
+  let body: { account?: PlatformAccount; since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
+  try {
+    body = await readBoundedJson(request);
+  } catch (error) {
+    if (error instanceof Error && error.name === "PayloadTooLargeError") {
+      return Response.json({ error: "Request body is too large." }, { status: 413 });
+    }
+    throw error;
+  }
+  if (!body?.account || body.account.provider !== "chesscom") return Response.json({ error: "A linked Chess.com account is required." }, { status: 400 });
+  const account = body.account;
   const response = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(account.username.toLowerCase())}/games/archives`, { headers: HEADERS, cache: "no-store", signal: request.signal });
   if (!response.ok) return Response.json({ error: `Chess.com archive request failed (${response.status}).` }, { status: 502 });
   const archiveBody = await response.json() as { archives?: string[] };
@@ -36,8 +53,20 @@ export async function POST(request: Request) {
     const match = url.match(/\/(\d{4})\/(\d{2})$/);
     return !match || Date.UTC(Number(match[1]), Number(match[2]), 1) >= sinceMs - 32 * 86_400_000;
   }).reverse();
-  const checkpoint = chessComCursor(body.cursor);
-  if (checkpoint.archiveIndex >= archiveUrls.length) {
+  if (!body.cursor) {
+    const listing = chessComArchiveListTick(archiveUrls.length, archiveKeyFromUrl(archiveUrls[0] ?? "") ?? "");
+    const now = new Date().toISOString();
+    return Response.json({
+      provider: "chesscom",
+      account: listing.done ? { ...account, lastSyncAt: now } : account,
+      games: [],
+      done: listing.done,
+      ...(listing.cursor ? { cursor: listing.cursor } : {}),
+      progress: listing.progress,
+    });
+  }
+  const checkpoint = locateChessComArchive(archiveUrls, chessComCursor(body.cursor));
+  if (checkpoint.index >= archiveUrls.length) {
     const now = new Date().toISOString();
     return Response.json({
       provider: "chesscom",
@@ -47,9 +76,14 @@ export async function POST(request: Request) {
       progress: { completed: archiveUrls.length, total: archiveUrls.length },
     });
   }
-  const archiveUrl = archiveUrls[checkpoint.archiveIndex];
+  const archiveUrl = archiveUrls[checkpoint.index];
   if (!archiveUrl) return Response.json({ error: "Chess.com archive checkpoint is invalid." }, { status: 400 });
-  const archiveResponse = await fetch(archiveUrl, { headers: HEADERS, cache: "no-store", signal: request.signal });
+  try {
+    assertChessComArchiveUrl(archiveUrl, account.username);
+  } catch {
+    return Response.json({ error: "Chess.com archive URL is invalid." }, { status: 502 });
+  }
+  const archiveResponse = await fetch(archiveUrl, { headers: HEADERS, cache: "no-store", signal: request.signal, redirect: "error" });
   if (archiveResponse.status === 429) return Response.json(
     { error: "Chess.com rate limit reached. Sync can resume from the saved archive checkpoint." },
     { status: 429, headers: { "Retry-After": archiveResponse.headers.get("Retry-After") ?? "60" } },
@@ -61,10 +95,12 @@ export async function POST(request: Request) {
     .sort((left, right) => (right.end_time ?? 0) - (left.end_time ?? 0));
   const rawGames = eligibleGames.slice(checkpoint.offset, checkpoint.offset + limit);
   const archiveComplete = checkpoint.offset + rawGames.length >= eligibleGames.length;
-  const nextCheckpoint = archiveComplete
-    ? { archiveIndex: checkpoint.archiveIndex + 1, offset: 0 }
-    : { archiveIndex: checkpoint.archiveIndex, offset: checkpoint.offset + rawGames.length };
-  const done = nextCheckpoint.archiveIndex >= archiveUrls.length;
+  const nextIndex = archiveComplete ? checkpoint.index + 1 : checkpoint.index;
+  const nextCheckpoint = {
+    archiveKey: archiveKeyFromUrl(archiveUrls[nextIndex] ?? archiveUrl) ?? "",
+    offset: archiveComplete ? 0 : checkpoint.offset + rawGames.length,
+  };
+  const done = nextIndex >= archiveUrls.length;
   const now = new Date().toISOString();
   const normalizedUsername = account.username.toLowerCase();
   const games: SyncedGame[] = rawGames
@@ -99,7 +135,7 @@ export async function POST(request: Request) {
     done,
     ...(done ? {} : { cursor: encodeChessComCursor(nextCheckpoint) }),
     progress: {
-      completed: checkpoint.archiveIndex + (archiveComplete ? 1 : 0),
+      completed: checkpoint.index + (archiveComplete ? 1 : 0),
       total: archiveUrls.length,
     },
   });

@@ -5,15 +5,40 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExternalPlatform, SyncedGame } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
+import { deleteReviewRecord } from "../lib/local-data";
 import { listSyncedGames } from "../lib/platform-library";
 import { buildReviewRecordFromSyncedGame, listReviewRecords, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 
 type ProviderFilter = "all" | "manual" | ExternalPlatform;
 type AnalysisFilter = "all" | "reviewed" | "not-reviewed";
+type LibraryEntry =
+  | { kind: "pending"; date: string; game: SyncedGame }
+  | { kind: "review"; date: string; record: ReviewRecord };
 const LIBRARY_PAGE_SIZE = 60;
 
 function syncedGameExternalKey(external: NonNullable<SyncedGame["external"]>): string {
   return `${external.provider}:${external.accountId}:${external.externalGameId}`;
+}
+
+function entryProvider(entry: LibraryEntry): ProviderFilter {
+  if (entry.kind === "pending") return entry.game.external.provider;
+  return entry.record.external?.provider ?? "manual";
+}
+
+function historyFilterLabel(
+  provider: ProviderFilter,
+  analysisState: AnalysisFilter,
+  timeClass: string,
+  result: string,
+  query: string,
+  gameCount: number,
+): string {
+  const source = provider === "all" ? "All sources" : provider === "manual" ? "Manual import" : provider === "chesscom" ? "Chess.com" : "Lichess";
+  const status = analysisState === "all" ? "All" : analysisState === "reviewed" ? "Reviewed" : "Not reviewed";
+  const time = timeClass === "all" ? "All time controls" : timeClass;
+  const outcome = result === "all" ? "All results" : result === "win" ? "Win" : result === "loss" ? "Loss" : "Draw";
+  const search = query.trim() ? " · Search" : "";
+  return `${source} · ${status} · ${time} · ${outcome}${search} · ${gameCount} games`;
 }
 
 export function HistoryPage() {
@@ -27,6 +52,7 @@ export function HistoryPage() {
   const [query, setQuery] = useState("");
   const [working, setWorking] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
+  const [filterOpen, setFilterOpen] = useState(false);
   const preparing = useRef<string | null>(null);
 
   useEffect(() => {
@@ -55,18 +81,21 @@ export function HistoryPage() {
       && (result === "all" || game[game.accountColor].result === result)
       && `${game.white.username} ${game.black.username}`.toLowerCase().includes(query.toLowerCase());
   });
-  const libraryEntries = [
+  const libraryEntries: LibraryEntry[] = [
     ...pendingGames.map((game) => ({ kind: "pending" as const, date: game.playedAt, game })),
     ...reviewedRecords.map((record) => ({ kind: "review" as const, date: record.updatedAt, record })),
   ].sort((left, right) => right.date.localeCompare(left.date));
   const visibleEntries = libraryEntries.slice(0, visibleCount);
-  const reviewedCount = (records ?? []).filter((record) => {
-    if (!record.external) return true;
-    return syncedByExternalKey.get(syncedGameExternalKey(record.external))?.analyzed === true;
-  }).length;
-  const pendingCount = (games ?? []).filter((game) => !game.analyzed).length;
-  const chesscomCount = (games ?? []).filter((game) => game.external.provider === "chesscom").length;
-  const lichessCount = (games ?? []).filter((game) => game.external.provider === "lichess").length;
+  const listedReviewed = libraryEntries.filter((entry) => entry.kind === "review").length;
+  const listedPending = libraryEntries.filter((entry) => entry.kind === "pending").length;
+  const manualCount = libraryEntries.filter((entry) => entryProvider(entry) === "manual").length;
+  const chesscomCount = libraryEntries.filter((entry) => entryProvider(entry) === "chesscom").length;
+  const lichessCount = libraryEntries.filter((entry) => entryProvider(entry) === "lichess").length;
+  const sourceLabel = [
+    manualCount > 0 ? `${manualCount} Manual` : null,
+    chesscomCount > 0 ? `${chesscomCount} Chess.com` : null,
+    lichessCount > 0 ? `${lichessCount} Lichess` : null,
+  ].filter((value): value is string => value !== null).join(" · ") || "—";
 
   useEffect(() => setVisibleCount(LIBRARY_PAGE_SIZE), [analysisState, provider, query, result, timeClass]);
 
@@ -91,19 +120,26 @@ export function HistoryPage() {
     <main className="page-scroll utility-page">
       <AppHeader />
       <section className="utility-heading"><h1>Games and reviews</h1></section>
-      <section className="history-summary" aria-label="History summary">
-        <article className="wash-card"><span>All games</span><strong>{games?.length ?? 0}</strong></article>
-        <article className="wash-card" data-wash="sage"><span>Reviewed</span><strong>{reviewedCount}</strong></article>
-        <article className="wash-card" data-wash="pink"><span>Pending</span><strong>{pendingCount}</strong></article>
-        <article className="wash-card" data-wash="cream"><span>Sources</span><strong>{chesscomCount + lichessCount > 0 ? `${chesscomCount} Chess.com · ${lichessCount} Lichess` : "Manual"}</strong></article>
-      </section>
-      <section className="history-filters" aria-label="History filters">
-        <label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Player or event" /></label>
-        <label><span>Source</span><select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)}><option value="all">All sources</option><option value="manual">Manual import</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select></label>
-        <label><span>Status</span><select value={analysisState} onChange={(event) => setAnalysisState(event.target.value as AnalysisFilter)}><option value="all">All</option><option value="reviewed">Reviewed</option><option value="not-reviewed">Not reviewed</option></select></label>
-        <label><span>Time control</span><select value={timeClass} onChange={(event) => setTimeClass(event.target.value)}><option value="all">All</option>{timeClasses.map((value) => <option key={value}>{value}</option>)}</select></label>
-        <label><span>Result</span><select value={result} onChange={(event) => setResult(event.target.value)}><option value="all">All results</option><option value="win">Win</option><option value="loss">Loss</option><option value="draw">Draw</option></select></label>
-      </section>
+      <p className="history-summary study-ink-stats" aria-label="History summary">
+        <span><strong>{libraryEntries.length}</strong> All games</span>
+        <span><strong>{listedReviewed}</strong> Reviewed</span>
+        <span><strong>{listedPending}</strong> Pending</span>
+        <span><strong>{sourceLabel}</strong> Sources</span>
+      </p>
+      <details className="study-scope history-scope" open={filterOpen} onToggle={(event) => setFilterOpen(event.currentTarget.open)}>
+        <summary>
+          <span>Filter</span>
+          <strong>{historyFilterLabel(provider, analysisState, timeClass, result, query, libraryEntries.length)}</strong>
+          <span className="study-scope-change">{filterOpen ? "Hide filters" : "Change filters"}</span>
+        </summary>
+        <div className="history-filters" aria-label="History filters">
+          <label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Player or event" /></label>
+          <label><span>Source</span><select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)}><option value="all">All sources</option><option value="manual">Manual import</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select></label>
+          <label><span>Status</span><select value={analysisState} onChange={(event) => setAnalysisState(event.target.value as AnalysisFilter)}><option value="all">All</option><option value="reviewed">Reviewed</option><option value="not-reviewed">Not reviewed</option></select></label>
+          <label><span>Time control</span><select value={timeClass} onChange={(event) => setTimeClass(event.target.value)}><option value="all">All</option>{timeClasses.map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label><span>Result</span><select value={result} onChange={(event) => setResult(event.target.value)}><option value="all">All results</option><option value="win">Win</option><option value="loss">Loss</option><option value="draw">Draw</option></select></label>
+        </div>
+      </details>
       <section className="history-list">
         {loading ? <p className="utility-empty">Loading history…</p> : empty ? (
           <div className="utility-empty"><strong>No matching games</strong><span>Change the filters or connect an account.</span><Link href="/">Return home →</Link></div>
@@ -113,12 +149,16 @@ export function HistoryPage() {
             <span><strong>{entry.game.white.username} vs {entry.game.black.username}</strong><small>{entry.game.timeClass ?? "game"} · waiting for review</small></span>
             <time>{new Date(entry.game.playedAt).toLocaleDateString()}</time>
             <button type="button" className="text-button" disabled={working !== null} onClick={() => void review(entry.game)}>{working === entry.game.id ? "Preparing…" : "Analyze →"}</button>
-          </article> : <Link className="ink-row" href={entry.record.kind === "pgn" ? `/review/${entry.record.id}` : `/review/${entry.record.id}/engine`} key={entry.record.id}>
+          </article> : <article className="ink-row" key={entry.record.id}>
             <span className="record-kind">{entry.record.external?.provider === "chesscom" ? "CHESS.COM" : entry.record.external?.provider === "lichess" ? "LICHESS" : entry.record.kind.toUpperCase()}</span>
             <span><strong>{entry.record.title}</strong><small>{entry.record.subtitle}</small></span>
             <time>{new Date(entry.record.updatedAt).toLocaleDateString()}</time>
-            <em>Open →</em>
-          </Link>)}
+            <Link href={entry.record.kind === "pgn" ? `/review/${entry.record.id}` : `/review/${entry.record.id}/engine`}>Open →</Link>
+            <button type="button" className="text-button danger" onClick={() => {
+              if (!window.confirm(`Delete ${entry.record.title}?`)) return;
+              void deleteReviewRecord(entry.record.id).then(() => setRecords((current) => current?.filter((record) => record.id !== entry.record.id) ?? []));
+            }}>Delete</button>
+          </article>)}
           {visibleCount < libraryEntries.length && <button type="button" className="secondary library-load-more" onClick={() => setVisibleCount((count) => count + LIBRARY_PAGE_SIZE)}>Load {Math.min(LIBRARY_PAGE_SIZE, libraryEntries.length - visibleCount)} more · {visibleCount} of {libraryEntries.length}</button>}
         </>}
       </section>

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
 import { LICHESS_SESSION_COOKIE, openLichessValue, type LichessSession } from "../../../../../lib/server/lichess-session";
-import { encodeLichessCursor, lichessUntil, type PlatformSyncMode } from "../../../../../lib/platform-sync";
+import { encodeLichessCursor, lichessUntil, readBoundedJson, type PlatformSyncMode } from "../../../../../lib/platform-sync";
 
 interface LichessGame {
   id: string;
@@ -32,7 +32,15 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "The Lichess session is invalid. Connect again." }, { status: 401 });
   }
-  const body = await request.json().catch(() => null) as { since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
+  let body: { since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
+  try {
+    body = await readBoundedJson(request);
+  } catch (error) {
+    if (error instanceof Error && error.name === "PayloadTooLargeError") {
+      return Response.json({ error: "Request body is too large." }, { status: 413 });
+    }
+    throw error;
+  }
   const limit = Math.max(1, Math.min(100, body?.limit ?? 50));
   const mode = body?.mode ?? "incremental";
   const url = new URL(`https://lichess.org/api/games/user/${encodeURIComponent(session.account.id)}`);

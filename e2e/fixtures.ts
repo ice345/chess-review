@@ -3,6 +3,11 @@ import { buildGameAnalysis, divideGame, OBJECTIVE_ALGORITHM_VERSION } from "../p
 import { parsePgn } from "../packages/chess-core/src/index";
 import type { GameAnalysisV2, HistoryAnalysisJobV1, PlatformAccount, PlatformSyncState, StockfishMoveAnalysis, SyncedGame } from "../packages/shared/src/index";
 import { STOCKFISH_VERSION } from "../packages/stockfish/src/index";
+import {
+  analysisCacheKey,
+  analysisGameFingerprint,
+  buildAnalysisCacheProjection,
+} from "../apps/web/src/lib/analysis-cache";
 import { buildReviewRecord, buildReviewRecordFromSyncedGame, type ReviewRecord } from "../apps/web/src/lib/review-library";
 
 export const SAMPLE_PGN = `[Event "Phase 5.1 E2E"]
@@ -118,9 +123,9 @@ async function writeStores(page: Page, values: Record<string, Array<[IDBValidKey
   await page.goto("/");
   await page.evaluate(async ({ values }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 5);
+      const request = indexedDB.open("open-chess-review", 6);
       request.onupgradeneeded = () => {
-        for (const name of ["objective-analyses", "objective-analysis-index", "review-records", "platform-accounts", "synced-games", "platform-sync-state", "training-queue", "history-analysis-jobs"]) {
+        for (const name of ["objective-analyses", "objective-analysis-index", "review-records", "platform-accounts", "synced-games", "platform-sync-state", "training-queue", "history-analysis-jobs", "player-avatars"]) {
           if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name);
         }
       };
@@ -145,6 +150,35 @@ export async function seedReview(page: Page, options: { visualLabels?: boolean }
     "objective-analyses": [[fixture.cacheKey, fixture.analysis]],
   });
   return fixture;
+}
+
+/**
+ * History analysis writes the cache from the provider PGN. Review later loads
+ * the trimmed record input, which used to miss the PGN-hashed cache key.
+ */
+export async function seedHistoricalReviewWithPgnDrift(page: Page) {
+  const rawPgn = `${SAMPLE_PGN}
+`;
+  const storedGame = parsePgn(rawPgn);
+  const { analysis } = await reviewFixture();
+  analysis.game.pgn = storedGame.pgn;
+  const cacheKey = await analysisCacheKey(storedGame, { depth: DEPTH, multiPv: MULTI_PV });
+  const fingerprint = await analysisGameFingerprint(storedGame);
+  const record = {
+    ...await buildReviewRecord("pgn", rawPgn),
+    createdAt: "2026-08-23T01:00:00.000Z",
+    updatedAt: "2026-08-23T01:00:00.000Z",
+    preferredOrientation: "white" as const,
+  };
+  if (record.input === storedGame.pgn) {
+    throw new Error("PGN drift fixture did not produce a serialization mismatch.");
+  }
+  await writeStores(page, {
+    "review-records": [[record.id, record]],
+    "objective-analyses": [[cacheKey, analysis]],
+    "objective-analysis-index": [[cacheKey, buildAnalysisCacheProjection(analysis, cacheKey, fingerprint)]],
+  });
+  return { record, analysis, cacheKey, storedPgn: storedGame.pgn, reviewPgn: record.input };
 }
 
 export async function seedAdvancedStudy(page: Page) {
@@ -360,7 +394,7 @@ export async function seedPartialHistoryJob(page: Page): Promise<void> {
   const job = await seedPausedHistoryJob(page, ["chesscom:fixture-0", "chesscom:fixture-1"]);
   await page.evaluate(async ({ jobId, analysisId }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 5);
+      const request = indexedDB.open("open-chess-review", 6);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

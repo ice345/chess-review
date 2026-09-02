@@ -86,6 +86,8 @@ export class BrowserStockfishPool {
           worker.search(position.fen, {
             depth: options.depth,
             multiPv,
+            startFen: game.initialFen,
+            moves: game.plies.slice(0, position.index).map((ply) => ply.uci),
             ...(options.signal === undefined ? {} : { signal: options.signal }),
           }),
         (completed) => options.onProgress?.({
@@ -113,6 +115,8 @@ export class BrowserStockfishPool {
             depth: options.depth,
             multiPv: 1,
             searchMoves: [item.uci],
+            startFen: game.initialFen,
+            moves: game.plies.slice(0, item.ply - 1).map((ply) => ply.uci),
             ...(options.signal === undefined ? {} : { signal: options.signal }),
           }),
         (completed) =>
@@ -175,6 +179,8 @@ export class BrowserStockfishPool {
       (worker, position) => worker.search(position.fen, {
         depth: options.depth,
         multiPv: options.multiPv,
+        startFen: game.initialFen,
+        moves: game.plies.slice(0, position.index).map((ply) => ply.uci),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       }),
       (positionCompleted) => {
@@ -204,6 +210,8 @@ export class BrowserStockfishPool {
         depth: options.depth,
         multiPv: 1,
         searchMoves: [item.uci],
+        startFen: game.initialFen,
+        moves: game.plies.slice(0, item.ply - 1).map((ply) => ply.uci),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       }),
       (restrictedCompleted) => {

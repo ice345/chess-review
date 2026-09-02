@@ -436,11 +436,25 @@ function weaknessProfiles(
   });
 }
 
-function trainingPlan(weaknesses: WeaknessProfileV2[]): TrainingRecommendationV2[] {
+function openingFocusTitle(openings: OpeningProfileV2[]): string | undefined {
+  const chosen = openings
+    .filter((opening) => opening.gameCount >= 2 && opening.problemPositions.length > 0)
+    .sort((left, right) => (
+      right.errorRate - left.errorRate
+      || right.averageWinPercentLoss - left.averageWinPercentLoss
+      || right.gameCount - left.gameCount
+      || left.name.localeCompare(right.name)
+    ))[0];
+  if (!chosen) return undefined;
+  return `${chosen.color === "white" ? "White" : "Black"} ${chosen.name} positions`;
+}
+
+function trainingPlan(weaknesses: WeaknessProfileV2[], openings: OpeningProfileV2[]): TrainingRecommendationV2[] {
+  const openingTitle = openingFocusTitle(openings);
   const titles: Record<RecurringWeakness["kind"], string> = {
-    "opening-decisions": "Repair recurring opening decisions",
-    "middlegame-decisions": "Calculate critical middlegame choices",
-    "endgame-decisions": "Practice structural endgame decisions",
+    "opening-decisions": openingTitle ?? "Repair recurring opening decisions",
+    "middlegame-decisions": "Improve middlegame decision quality",
+    "endgame-decisions": "Convert and hold endgames",
     "missed-opportunities": "Convert objective opportunities",
   };
   return weaknesses.slice(0, 3).map((weakness, index) => ({
@@ -487,6 +501,7 @@ export function buildAdvancedStudyReportV2(
     .map((move) => evidence(game, move)))
     .sort((left, right) => right.winPercentLoss - left.winPercentLoss || right.playedAt.localeCompare(left.playedAt));
   const weaknesses = weaknessProfiles(games, legacy.weaknesses, minimumSampleSize);
+  const openings = openingProfiles(games, minimumSampleSize);
   const knownResults = games.map((game) => score(game.result)).filter((value): value is number => value !== undefined);
   const allPlayerMoves = games.flatMap(playerMoves);
   const errorCount = allPlayerMoves.filter((move) => ERROR_QUALITIES.has(move.quality)).length;
@@ -523,13 +538,13 @@ export function buildAdvancedStudyReportV2(
       timeControlDistribution: distribution(games.flatMap((game) => game.source?.timeClass ?? [])),
     },
     ratings: ratingBands(games, minimumSampleSize),
-    openings: openingProfiles(games, minimumSampleSize),
+    openings,
     phases: phaseProfiles(games),
     mistakes: mistakes.slice(0, 100),
     specialMoves: specialMoves.slice(0, 100),
     gameHighlights: gameHighlights(games),
     weaknesses,
-    trainingPlan: trainingPlan(weaknesses),
+    trainingPlan: trainingPlan(weaknesses, openings),
     engineConfigurations: legacy.engineConfigurations,
   };
 }

@@ -12,8 +12,10 @@ import type {
 } from "@chess-review/shared";
 import {
   analysisGameFingerprint,
+  gameMoveIdentity,
   getCachedAnalysisByKey,
   listAnalysisCacheProjections,
+  projectionMoveIdentity,
 } from "./analysis-cache";
 import { listPlatformAccounts, listSyncedGames, markSyncedGameAnalyzed, syncedGameHasAnalysis } from "./platform-library";
 import { listHistoryAnalysisJobs } from "./history-analysis-jobs";
@@ -105,7 +107,7 @@ interface LatestAnalysisIndex {
 }
 
 function analysisMovesIdentity(analysis: Extract<AnyGameAnalysis, { version: 2 }>): string {
-  return [analysis.game.initialFen, ...analysis.moves.map((move) => move.uci)].join("\u0000");
+  return gameMoveIdentity(analysis.game.initialFen, analysis.moves.map((move) => move.uci));
 }
 
 function latestAnalysesIndex(analyses: AnyGameAnalysis[]): LatestAnalysisIndex {
@@ -262,12 +264,11 @@ function syncedGameKey(game: SyncedGame): string {
  * normalization.
  */
 function gameAnalysisIdentity(game: NormalizedGame): string {
-  return [game.initialFen, ...game.plies.map((ply) => ply.uci)].join("\u0000");
+  return gameMoveIdentity(game.initialFen, game.plies.map((ply) => ply.uci));
 }
 
 function projectionAnalysisIdentity(projection: AnalysisCacheProjectionV1): string | null {
-  if (projection.initialFen === undefined || projection.uciMoves === undefined) return null;
-  return [projection.initialFen, ...projection.uciMoves].join("\u0000");
+  return projectionMoveIdentity(projection);
 }
 
 function recordExternalKey(record: ReviewRecord): string | null {

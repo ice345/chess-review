@@ -36,6 +36,7 @@ import {
   createOrReuseHistoryAnalysisJob,
   HISTORY_ANALYSIS_CONCURRENCY,
   isHistoryAnalysisJobFinished,
+  listHistoryAnalysisJobs,
   pauseHistoryAnalysisJob,
   recoverInterruptedHistoryJobs,
   removeHistoryAnalysisJob,
@@ -52,19 +53,23 @@ import {
   transitionTrainingQueueItem,
 } from "../lib/training-queue";
 
-type StudyTab = "overview" | "ratings" | "openings" | "middlegame" | "endgame" | "mistakes" | "highlights" | "plan" | "coverage";
 type QueueItem = TrainingQueueItemV1 | TrainingQueueItemV2;
+type StudyTab = "overview" | "ratings" | "openings" | "middlegame" | "endgame" | "mistakes" | "highlights" | "plan" | "coverage";
 
-const TABS: Array<{ id: StudyTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "ratings", label: "Rating & Form" },
-  { id: "openings", label: "Openings" },
-  { id: "middlegame", label: "Middlegame" },
-  { id: "endgame", label: "Endgame" },
-  { id: "mistakes", label: "Mistakes" },
-  { id: "highlights", label: "Highlights" },
-  { id: "plan", label: "Plan" },
-  { id: "coverage", label: "Coverage" },
+const NAV_GROUPS: Array<{ id: string; label?: string; tabs: Array<{ id: StudyTab; label: string }> }> = [
+  { id: "overview", tabs: [{ id: "overview", label: "Overview" }] },
+  { id: "analysis", label: "Analysis", tabs: [
+    { id: "ratings", label: "Rating" },
+    { id: "openings", label: "Openings" },
+    { id: "middlegame", label: "Middlegame" },
+    { id: "endgame", label: "Endgame" },
+  ] },
+  { id: "improvement", label: "Improvement", tabs: [
+    { id: "mistakes", label: "Mistakes" },
+    { id: "highlights", label: "Highlights" },
+    { id: "plan", label: "Plan" },
+  ] },
+  { id: "data", label: "Data", tabs: [{ id: "coverage", label: "Coverage" }] },
 ];
 
 const WEAKNESS_COPY: Record<StudyWeaknessKind, { title: string; description: string }> = {
@@ -105,6 +110,15 @@ function detailedJobCounts(job: HistoryAnalysisJobV1) {
   const failed = job.items.filter((item) => item.status === "failed").length;
   const pending = job.items.filter((item) => item.status === "queued" || item.status === "running").length;
   return { cached, completed, failed, pending, done: cached + completed, total: job.items.length };
+}
+
+function liveAnalysisStatus(jobs: readonly HistoryAnalysisJobV1[]): string | null {
+  const live = jobs.find((job) => !job.supersededBy && ["running", "queued", "paused"].includes(job.status));
+  if (!live) return null;
+  const counts = detailedJobCounts(live);
+  const excluded = live.excludedItems?.length ?? 0;
+  const phase = live.status === "running" ? "analysis running" : live.status === "paused" ? "paused" : "waiting to start";
+  return `${counts.done} / ${counts.total} games analyzed · ${phase}${excluded > 0 ? ` · ${excluded} excluded` : ""}`;
 }
 
 function gameLabel(gameId: string, games: readonly SyncedGame[]): string {
@@ -164,7 +178,7 @@ function HistoryJobCard({
   const counts = detailedJobCounts(job);
   const failedItems = job.items.filter((item) => item.status === "failed");
   const successfulItems = job.items.filter((item) => item.status === "cached" || item.status === "completed");
-  const statusLabel = job.status === "failed" && counts.done > 0 ? "partial" : job.status;
+  const statusLabel = job.supersededBy ? "replaced" : job.status === "failed" && counts.done > 0 ? "partial" : job.status;
   return <article className={`history-job-card ${compact ? "compact" : ""} ${job.status}`}>
     <div className="history-job-heading">
       <div>
@@ -252,16 +266,17 @@ function ScopeFilters({
 }
 
 function historyJobPresentation(groups: Array<{ job: HistoryAnalysisJobV1; duplicateCount: number }>) {
-  const active = groups.filter(({ job }) => ["running", "queued", "paused"].includes(job.status));
-  const errors = groups.filter(({ job }) => job.status === "failed");
-  const latestFinished = groups.find(({ job }) => job.status === "completed" || job.status === "cancelled");
+  const current = groups.filter(({ job }) => !job.supersededBy);
+  const active = current.filter(({ job }) => ["running", "queued", "paused"].includes(job.status));
+  const errors = current.filter(({ job }) => job.status === "failed");
+  const latestFinished = current.find(({ job }) => job.status === "completed" || job.status === "cancelled");
   const prominentIds = new Set([
     ...active.map(({ job }) => job.id),
     ...errors.map(({ job }) => job.id),
     ...(latestFinished ? [latestFinished.job.id] : []),
   ]);
   return {
-    prominent: groups.filter(({ job }) => prominentIds.has(job.id)),
+    prominent: current.filter(({ job }) => prominentIds.has(job.id)),
     past: groups.filter(({ job }) => !prominentIds.has(job.id)),
   };
 }
@@ -302,9 +317,11 @@ export function AdvancedStudyPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [filters, setFiltersState] = useState<StudyReportFiltersV2>(DEFAULT_FILTERS);
   const [scopeOpen, setScopeOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<StudyTab>("overview");
+  const [listLimit, setListLimit] = useState(12);
   const [freshness, setFreshness] = useState<HistoryAnalysisScopeV1["freshness"]>("all");
   const [jobAccountScope, setJobAccountScope] = useState<"selected" | "all">("all");
-  const [activeTab, setActiveTab] = useState<StudyTab>("overview");
+
   const [cacheBytes, setCacheBytes] = useState(0);
   const [workingItem, setWorkingItem] = useState<string | null>(null);
   const [jobWorking, setJobWorking] = useState(false);
@@ -314,7 +331,11 @@ export function AdvancedStudyPage() {
   // Keep an explicit user choice stable, but allow a connected account to
   // replace a temporary manual default when background analysis finishes.
   const playerSelectionTouched = useRef(false);
-  const jobProgressSignature = useRef("");
+  const previousActiveJobs = useRef<string | null>(null);
+
+  const refreshJobs = useCallback(async () => {
+    setJobs(await listHistoryAnalysisJobs());
+  }, []);
 
   const refreshSources = useCallback(async () => {
     const nextSummaries = await loadStudyPlayerSummaries();
@@ -334,11 +355,7 @@ export function AdvancedStudyPage() {
       if (hasCurrent && !(current.startsWith("manual:") && !playerSelectionTouched.current)) return current;
       return nextSummaries.find(({ kind }) => kind === "connected-account")?.key ?? nextSummaries[0]?.key ?? "";
     });
-    const nextProgressSignature = nextJobs.map((job) => `${job.id}:${job.status}:${job.items.map((item) => `${item.gameId}:${item.status}:${item.analysisId ?? ""}`).join(",")}`).join("|");
-    if (jobProgressSignature.current !== nextProgressSignature) {
-      jobProgressSignature.current = nextProgressSignature;
-      setPlayerRevision((current) => current + 1);
-    }
+    setPlayerRevision((current) => current + 1);
   }, []);
 
   useEffect(() => {
@@ -351,6 +368,16 @@ export function AdvancedStudyPage() {
   useEffect(() => {
     setFiltersState((current) => current.openingKeys.length === 0 ? current : { ...current, openingKeys: [] });
   }, [playerKey]);
+
+  useEffect(() => {
+    setListLimit(12);
+  }, [activeTab]);
+
+  function selectView(tab: StudyTab) {
+    setActiveTab(tab);
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  }
 
   useEffect(() => {
     let active = true;
@@ -369,28 +396,37 @@ export function AdvancedStudyPage() {
     return () => { active = false; };
   }, [playerKey, playerRevision]);
 
-  useEffect(() => {
-    if (!jobs.some((job) => job.status === "running" || job.status === "queued")) return;
-    const timer = window.setInterval(() => {
-      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh analysis progress."));
-    }, 1500);
-    return () => window.clearInterval(timer);
-  }, [jobs, refreshSources]);
-
-  // A final item can finish immediately before a partial job is persisted as
-  // failed. Refresh once on that terminal transition so the successful cache
-  // projections are visible even though polling no longer needs to continue.
-  const terminalSuccessSignature = useMemo(() => jobs
-    .filter((job) => (job.status === "failed" || job.status === "completed")
-      && job.items.some((item) => item.status === "cached" || item.status === "completed"))
-    .map((job) => `${job.id}:${job.updatedAt}`)
+  const hasActiveHistoryJob = jobs.some((job) => !job.supersededBy && (job.status === "running" || job.status === "queued"));
+  const activeJobSignature = jobs
+    .filter((job) => !job.supersededBy && (job.status === "running" || job.status === "queued"))
+    .map((job) => job.id)
     .sort()
-    .join("|"), [jobs]);
+    .join("|");
 
   useEffect(() => {
-    if (!terminalSuccessSignature) return;
-    void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh completed analyses."));
-  }, [refreshSources, terminalSuccessSignature]);
+    if (!hasActiveHistoryJob) return;
+    const jobTimer = window.setInterval(() => {
+      void refreshJobs().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh analysis progress."));
+    }, 1500);
+    const reportTimer = window.setInterval(() => {
+      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh training reports."));
+    }, 8000);
+    return () => {
+      window.clearInterval(jobTimer);
+      window.clearInterval(reportTimer);
+    };
+  }, [hasActiveHistoryJob, refreshJobs, refreshSources]);
+
+  useEffect(() => {
+    if (previousActiveJobs.current === null) {
+      previousActiveJobs.current = activeJobSignature;
+      return;
+    }
+    if (previousActiveJobs.current !== "" && activeJobSignature === "") {
+      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh completed analyses."));
+    }
+    previousActiveJobs.current = activeJobSignature;
+  }, [activeJobSignature, refreshSources]);
 
   const timeClasses = useMemo(() => [...new Set(player
     ? player.games.flatMap((game) => game.source?.timeClass ?? [])
@@ -414,34 +450,38 @@ export function AdvancedStudyPage() {
     if (filters.dateTo && game.playedAt > filters.dateTo) return false;
     return true;
   }), [coverageAccountIds, filters, syncedGames]);
-  const failedGameIds = useMemo(() => new Set(jobs.flatMap((job) => job.items.filter((item) => item.status === "failed").map((item) => item.gameId))), [jobs]);
+  const failedGameIds = useMemo(() => new Set(jobs.filter((job) => !job.supersededBy).flatMap((job) => job.items.filter((item) => item.status === "failed").map((item) => item.gameId))), [jobs]);
+  const excludedGameIds = useMemo(() => new Set(jobs.flatMap((job) => (job.excludedItems ?? []).map((item) => item.gameId))), [jobs]);
   const historyJobGroups = useMemo(() => collapseHistoryJobs(jobs), [jobs]);
-  const coverage = useMemo(() => player?.kind === "connected-account" ? {
-    eligibleGames: eligibleSynced.length,
-    analyzedGames: eligibleSynced.filter((game) => game.analysisAlgorithmVersion === OBJECTIVE_ALGORITHM_VERSION && game.analysisDepth === settings.reviewDepth).length,
-    staleGames: eligibleSynced.filter((game) => game.analyzed && (game.analysisAlgorithmVersion !== OBJECTIVE_ALGORITHM_VERSION || game.analysisDepth !== settings.reviewDepth)).length,
-    failedGames: eligibleSynced.filter((game) => !game.analyzed && failedGameIds.has(game.id)).length,
-    excludedGames: Math.max(0, syncedGames.filter((game) => game.external.accountId === player.accountId).length - eligibleSynced.length),
-    approximateCacheBytes: cacheBytes,
-    providers: (["chesscom", "lichess"] as const).flatMap((provider) => {
-      const games = eligibleSynced.filter((game) => game.external.provider === provider);
-      if (games.length === 0) return [];
-      return [{
-        provider,
-        eligibleGames: games.length,
-        analyzedGames: games.filter((game) => game.analysisAlgorithmVersion === OBJECTIVE_ALGORITHM_VERSION && game.analysisDepth === settings.reviewDepth).length,
-        staleGames: games.filter((game) => game.analyzed && (game.analysisAlgorithmVersion !== OBJECTIVE_ALGORITHM_VERSION || game.analysisDepth !== settings.reviewDepth)).length,
-        failedGames: games.filter((game) => !game.analyzed && failedGameIds.has(game.id)).length,
-      }];
-    }),
-  } : {
-    eligibleGames: compatibleGames.length,
-    analyzedGames: compatibleGames.length,
-    staleGames: 0,
-    failedGames: 0,
-    excludedGames: 0,
-    approximateCacheBytes: cacheBytes,
-  }, [cacheBytes, compatibleGames.length, eligibleSynced, failedGameIds, player, settings.reviewDepth, syncedGames]);
+  const coverage = useMemo(() => {
+    if (player?.kind !== "connected-account") {
+      return {
+        eligibleGames: compatibleGames.length,
+        analyzedGames: compatibleGames.length,
+        staleGames: 0,
+        failedGames: 0,
+        excludedGames: 0,
+        approximateCacheBytes: cacheBytes,
+      };
+    }
+    const coverageFor = (games: SyncedGame[]) => ({
+      eligibleGames: games.filter((game) => !excludedGameIds.has(game.id)).length,
+      analyzedGames: games.filter((game) => !excludedGameIds.has(game.id) && game.analysisAlgorithmVersion === OBJECTIVE_ALGORITHM_VERSION && game.analysisDepth === settings.reviewDepth).length,
+      staleGames: games.filter((game) => !excludedGameIds.has(game.id) && game.analyzed && (game.analysisAlgorithmVersion !== OBJECTIVE_ALGORITHM_VERSION || game.analysisDepth !== settings.reviewDepth)).length,
+      failedGames: games.filter((game) => !excludedGameIds.has(game.id) && !game.analyzed && failedGameIds.has(game.id)).length,
+    });
+    const totals = coverageFor(eligibleSynced);
+    return {
+      ...totals,
+      excludedGames: eligibleSynced.filter((game) => excludedGameIds.has(game.id)).length,
+      approximateCacheBytes: cacheBytes,
+      providers: (["chesscom", "lichess"] as const).flatMap((provider) => {
+        const games = eligibleSynced.filter((game) => game.external.provider === provider);
+        if (games.length === 0) return [];
+        return [{ provider, ...coverageFor(games) }];
+      }),
+    };
+  }, [cacheBytes, compatibleGames.length, eligibleSynced, excludedGameIds, failedGameIds, player, settings.reviewDepth]);
   const report = useMemo(() => player ? buildAdvancedStudyReportV2(compatibleGames, filters, coverage) : null, [compatibleGames, coverage, filters, player]);
   const queueIds = useMemo(() => new Set(queue.map(({ id }) => id)), [queue]);
 
@@ -568,6 +608,7 @@ export function AdvancedStudyPage() {
   }
 
   const loading = summaries === null;
+  const analysisStatus = useMemo(() => liveAnalysisStatus(jobs), [jobs]);
   const scopeGameCount = report?.overview.summary.gameCount ?? (player?.games.length ?? eligibleSynced.length);
   const primaryRating = report?.ratings.slice().sort((left, right) => right.sampleSize - left.sampleSize)[0];
   const phaseEntries = report
@@ -580,84 +621,112 @@ export function AdvancedStudyPage() {
     brilliant: report.specialMoves.filter((item) => item.annotations.includes("brilliant")).length,
     critical: report.specialMoves.filter((item) => item.annotations.includes("critical")).length,
     comebacks: report.gameHighlights.filter((item) => item.kind === "comeback").length,
+    saves: report.gameHighlights.filter((item) => item.kind === "save").length,
     conversions: report.gameHighlights.filter((item) => item.kind === "clean-conversion").length,
   } : null;
+  const brilliantMoves = report?.specialMoves.filter((item) => item.annotations.includes("brilliant")) ?? [];
+  const criticalMoves = report?.specialMoves.filter((item) => item.annotations.includes("critical")) ?? [];
   return <main className="page-scroll study-page">
     <AppHeader />
     <section className="utility-heading study-heading">
       <h1>Training</h1>
       {summaries && summaries.length > 0 && <label className="study-player-select"><span>Player</span><select value={playerKey} onChange={(event) => { playerSelectionTouched.current = true; setPlayerKey(event.target.value); }}>{summaries.map((summary) => <option key={summary.key} value={summary.key}>{summary.name} · {summary.gameCount} games{summary.provider ? ` · ${summary.provider === "chesscom" ? "Chess.com" : "Lichess"}` : " · manual"}</option>)}</select></label>}
     </section>
+    {analysisStatus && <p className="study-analysis-status" role="status">{analysisStatus}</p>}
     {notice && <p className="study-notice" role="status">{notice}</p>}
     {loading ? <section className="study-empty">Loading…</section> : summaries.length === 0 ? <>
       {accounts.length > 0 && <ScopeFilters filters={filters} setFilters={setFilters} timeClasses={timeClasses} openingOptions={openingOptions} gameCount={scopeGameCount} open={scopeOpen} onToggle={setScopeOpen} />}
       <section className="study-empty"><strong>{jobs.some((job) => job.items.some((item) => item.status === "cached" || item.status === "completed")) ? "Analysis is arriving" : "No current analyses"}</strong><span>{accounts.length > 0 ? `${eligibleSynced.length} synced games match this scope.` : "Sync games or complete an objective review."}</span>{accounts.length === 0 ? <Link className="primary-link" href="/history">Open History</Link> : <div className="empty-history-actions"><label><span>Freshness</span><select value={freshness} onChange={(event) => setFreshness(event.target.value as HistoryAnalysisScopeV1["freshness"])}><option value="all">All matching</option><option value="unanalyzed">Never analyzed</option><option value="stale">Stale only</option></select></label><button type="button" className="primary" disabled={jobWorking} onClick={() => void startHistoryAnalysis()}>{jobWorking ? "Analyzing…" : "Analyze my history"}</button><small>Background analysis · up to {HISTORY_ANALYSIS_CONCURRENCY} games at once.</small></div>}{historyJobGroups.length > 0 && <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />}</section>
     </> : <>
       <ScopeFilters filters={filters} setFilters={setFilters} timeClasses={timeClasses} openingOptions={openingOptions} gameCount={scopeGameCount} open={scopeOpen} onToggle={setScopeOpen} />
-      <nav className="study-tabs" aria-label="Player intelligence sections">{TABS.map((tab) => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}</nav>
+      <nav className="study-nav" aria-label="Training views">
+        {NAV_GROUPS.map((group) => <div key={group.id} className="study-nav-group">{group.label ? <p className="study-nav-label">{group.label}</p> : <p className="study-nav-label study-nav-label-spacer" aria-hidden="true"> </p>}<div className="study-nav-tabs">{group.tabs.map((tab) => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => selectView(tab.id)}>{tab.label}</button>)}</div></div>)}
+      </nav>
       {!player || !report ? <section className="study-empty">Loading selected player…</section> : <div className="study-sections">
-        {activeTab === "overview" && <section className="study-overview">
-          <header className="study-section-heading"><h2>Overview</h2><small>{report.coverage.analyzedGames}/{report.coverage.eligibleGames} eligible games analyzed</small></header>
-          <div className="study-profile paper-card">
+        {activeTab === "overview" && <section className="study-overview" id="player-profile">
+          <article className="study-paper study-profile">
             <header className="study-profile-heading">
-              <div><span className="eyebrow">Player profile</span><h3>{player.name}</h3><p>{primaryRating ? `${primaryRating.provider === "chesscom" ? "Chess.com" : "Lichess"} · ${primaryRating.timeClass}` : "Objective analysis profile"}</p></div>
-              <button type="button" className="text-button" onClick={() => setActiveTab("ratings")}>View rating & form →</button>
+              <div><span className="eyebrow">Player profile</span><h2>{player.name}</h2><p>{primaryRating ? `${primaryRating.provider === "chesscom" ? "Chess.com" : "Lichess"} · ${primaryRating.timeClass}` : "Objective analysis profile"}</p></div>
+              <button type="button" className="text-button" onClick={() => selectView("ratings")}>View rating & form →</button>
             </header>
-            <div className="study-profile-stats">
-              <article className="wash-card"><span>Current observed rating</span><strong>{primaryRating?.currentRating ?? "—"}</strong><small>{primaryRating?.recentRange ? `Recent range ${primaryRating.recentRange.low}–${primaryRating.recentRange.high}` : "No platform rating supplied"}</small></article>
-              <article className="wash-card" data-wash="pink"><span>Current form</span><strong>{report.overview.summary.accuracyChange === undefined ? "—" : `${report.overview.summary.accuracyChange >= 0 ? "+" : ""}${report.overview.summary.accuracyChange.toFixed(1)}`}</strong><small>Accuracy trend · {formatted(report.overview.summary.averageAccuracy)} average</small></article>
-              <article className="wash-card" data-wash="cream"><span>Next meaningful target</span><strong>{primaryRating?.stabilizeTarget ?? primaryRating?.nextTarget ?? "—"}</strong><small>{primaryRating?.stabilizeTarget && primaryRating.nextTarget ? `Stabilize ${primaryRating.stabilizeTarget} · then ${primaryRating.nextTarget}` : "Build a larger rated sample"}</small></article>
-              <article className="wash-card" data-wash="sage"><span>Analysis coverage</span><strong>{report.coverage.analyzedGames}/{report.coverage.eligibleGames}</strong><small>{formatted(report.coverage.coverageRate, "%")} current · {primaryRating?.confidence ?? "low"} confidence</small></article>
-            </div>
+            <dl className="study-profile-facts">
+              <div><dt>Current observed rating</dt><dd>{primaryRating?.currentRating ?? "—"}</dd><small>{primaryRating?.recentRange ? `Recent range ${primaryRating.recentRange.low}–${primaryRating.recentRange.high}` : "No platform rating in this scope"}</small></div>
+              <div><dt>Form</dt><dd>{report.overview.summary.accuracyChange === undefined ? "—" : `${report.overview.summary.accuracyChange >= 0 ? "+" : ""}${report.overview.summary.accuracyChange.toFixed(1)}`}</dd><small>Accuracy trend · {formatted(report.overview.summary.averageAccuracy)} average</small></div>
+              <div><dt>Next meaningful target</dt><dd>{primaryRating?.stabilizeTarget ?? primaryRating?.nextTarget ?? "—"}</dd><small>{primaryRating?.stabilizeTarget && primaryRating.nextTarget ? `Stabilize ${primaryRating.stabilizeTarget} · then ${primaryRating.nextTarget}` : "Build a larger rated sample"}</small></div>
+              <div><dt>Analysis coverage</dt><dd>{report.coverage.analyzedGames}/{report.coverage.eligibleGames}</dd><small>{formatted(report.coverage.coverageRate, "%")} current · {primaryRating?.confidence ?? "low"} confidence</small></div>
+            </dl>
             {primaryRating?.performanceRating !== undefined && <p className="study-profile-note">Estimated recent performance {primaryRating.performanceRating} from {primaryRating.performanceSampleSize} games with both opponent rating and result.</p>}
+          </article>
+          {observedPhases.length > 0 && <div className="study-phase-row">
+            {observedPhases.map(({ phase, profile }) => {
+              const strongest = observedPhases.length > 1 && strongestPhase?.phase === phase;
+              const focus = observedPhases.length > 1 && needsWorkPhase?.phase === phase && !strongest;
+              const wash = phase === "opening" ? "mist" : phase === "middlegame" ? "pink" : "sage";
+              const conversion = profile.advantageOpportunities > 0 ? Math.round((100 * profile.advantagePreserved) / profile.advantageOpportunities) : undefined;
+              const detail = phase === "endgame" && conversion !== undefined
+                ? `${conversion}% advantages preserved`
+                : phase === "middlegame"
+                  ? `${formatted(profile.errorRate, "%")} decision errors`
+                  : `${formatted(profile.errorRate, "%")} errors`;
+              return <article key={phase} className="study-wash" data-wash={wash}><span className="eyebrow">{phase}</span><strong>{formatted(profile.averageAccuracy)}</strong><small>{strongest ? "Strongest phase" : focus ? "Primary improvement area" : `${profile.moveCount} moves`}</small><p>{detail}</p></article>;
+            })}
+          </div>}
+          <article className="study-paper study-focus">
+            <header><span className="eyebrow">Focus now</span><button type="button" className="text-button" onClick={() => selectView("plan")}>Open plan →</button></header>
+            {report.trainingPlan.length > 0 ? <ol>{report.trainingPlan.slice(0, 3).map((item) => <li key={item.weaknessKind}><strong>{item.title}</strong><small>{item.rationale}</small>{item.evidence[0] && <Link href={`/review/${item.evidence[0].gameId}/moves?ply=${item.evidence[0].ply}`}>{item.evidence[0].san} · ply {item.evidence[0].ply}</Link>}</li>)}</ol> : <p>Keep collecting analyzed games to establish a reliable training focus.</p>}
+          </article>
+          <article className="study-highlights-summary">
+            <header><span className="eyebrow">Highlights</span><button type="button" className="text-button" onClick={() => selectView("highlights")}>View Highlights →</button></header>
+            <p><span><strong>{highlightCounts?.brilliant ?? 0}</strong> Brilliant</span><span><strong>{highlightCounts?.critical ?? 0}</strong> Critical</span><span><strong>{highlightCounts?.comebacks ?? 0}</strong> Comebacks</span><span><strong>{highlightCounts?.conversions ?? 0}</strong> Clean conversions</span></p>
+          </article>
+          <div className="study-form-summary">
+            <div className="study-form-heading">
+              <p className="study-ink-stats">
+                <span><strong>{report.overview.summary.gameCount}</strong> Games</span>
+                <span><strong>{formatted(report.overview.summary.averageAccuracy)}</strong> Accuracy</span>
+                <span><strong>{formatted(report.coverage.coverageRate, "%")}</strong> Coverage</span>
+              </p>
+              <p className="study-trend-legend">Result under each bar: <span data-result="win">W win</span><span data-result="draw">D draw</span><span data-result="loss">L loss</span></p>
+            </div>
+            <ol className="study-trend-chart" aria-label="Accuracy by game, with win, draw, or loss under each bar">{report.overview.games.slice(-18).map((point) => <li key={point.gameId} data-result={point.result}><span className="trend-track"><i style={{ height: `${Math.max(2, point.accuracy ?? 0)}%` }} /></span><Link href={`/review/${point.gameId}`} aria-label={`${point.title}, ${point.result === "win" ? "win" : point.result === "draw" ? "draw" : point.result === "loss" ? "loss" : "unknown result"}, Accuracy ${formatted(point.accuracy)}`}>{point.result === "win" ? "W" : point.result === "draw" ? "D" : point.result === "loss" ? "L" : ""}</Link></li>)}</ol>
           </div>
-          <div className="study-phase-cards">
-            {phaseEntries.map(({ phase, profile }) => <article key={phase} className="wash-card" data-wash={phase === "opening" ? "blue" : phase === "middlegame" ? "pink" : "sage"}><header><span>{phase}</span>{strongestPhase?.phase === phase && <small>Strongest phase</small>}{needsWorkPhase?.phase === phase && strongestPhase?.phase !== phase && <small>Focus area</small>}</header><strong>{formatted(profile.averageAccuracy)}</strong><small>{profile.moveCount} moves · {formatted(profile.errorRate, "%")} errors</small></article>)}
-          </div>
-          <div className="study-focus-row">
-            <article className="study-focus paper-card"><header><span className="eyebrow">Focus now</span><button type="button" className="text-button" onClick={() => setActiveTab("plan")}>Open plan →</button></header>{report.trainingPlan.length > 0 ? <ol>{report.trainingPlan.slice(0, 3).map((item) => <li key={item.weaknessKind}>{item.title}</li>)}</ol> : <p>Keep collecting analyzed games to establish a reliable training focus.</p>}</article>
-            <article className="study-highlights paper-card"><header><span className="eyebrow">Highlights</span><button type="button" className="text-button" onClick={() => setActiveTab("highlights")}>See all →</button></header><div><span><strong>{highlightCounts?.brilliant ?? 0}</strong> Brilliant</span><span><strong>{highlightCounts?.critical ?? 0}</strong> Critical</span><span><strong>{highlightCounts?.comebacks ?? 0}</strong> Comebacks</span><span><strong>{highlightCounts?.conversions ?? 0}</strong> Clean conversions</span></div></article>
-          </div>
-          <div className="study-metrics">
-            <article><span>Games</span><strong>{report.overview.summary.gameCount}</strong><small>{report.overview.summary.analyzedMoveCount} moves</small></article>
-            <article><span>Accuracy</span><strong>{formatted(report.overview.summary.averageAccuracy)}</strong></article>
-            <article><span>Recent form</span><strong>{report.overview.summary.accuracyChange === undefined ? "—" : `${report.overview.summary.accuracyChange >= 0 ? "+" : ""}${report.overview.summary.accuracyChange.toFixed(1)}`}</strong></article>
-            <article><span>Score</span><strong>{formatted(report.overview.scoreRate, "%")}</strong></article>
-            <article><span>Error rate</span><strong>{formatted(report.overview.errorRate, "%")}</strong></article>
-            <article><span>Open tasks</span><strong>{queue.filter((item) => item.status !== "completed").length}</strong></article>
-          </div>
-          <div className="study-distributions"><span>Sources: {report.overview.platformDistribution.length === 0 ? "manual" : report.overview.platformDistribution.map((item) => `${item.key === "chesscom" ? "Chess.com" : "Lichess"} ${item.gameCount}`).join(" · ")}</span><span>Time controls: {report.overview.timeControlDistribution.length === 0 ? "not supplied" : report.overview.timeControlDistribution.map((item) => `${item.key} ${item.gameCount}`).join(" · ")}</span></div>
-          <ol className="study-trend-chart" aria-label="Accuracy by game">{report.overview.games.slice(-30).map((point) => <li key={point.gameId}><span className="trend-value">{formatted(point.accuracy)}</span><span className="trend-track"><i style={{ height: `${Math.max(2, point.accuracy ?? 0)}%` }} /></span><Link href={`/review/${point.gameId}`} aria-label={`${point.title}, Accuracy ${formatted(point.accuracy)}`}>{point.result === "unknown" ? "·" : point.result[0]?.toUpperCase()}</Link></li>)}</ol>
-          <div className="phase-metrics">{(["opening", "middlegame", "endgame"] as const).map((phase) => <div key={phase}><span>{phase}</span><strong>{formatted(report.phases[phase].averageAccuracy)}</strong><small>{formatted(report.phases[phase].errorRate, "%")} errors</small></div>)}</div>
         </section>}
 
-        {activeTab === "ratings" && <section id="rating-form"><header className="study-section-heading"><h2>Rating & Form</h2><small>Platform rating and time controls stay separate. Performance is an estimate, never derived from Accuracy.</small></header>{report.ratings.length === 0 ? <p className="study-section-empty">No rating evidence in this population.</p> : <div className="study-metrics rating-grid">{report.ratings.map((band) => <article key={band.key}><span>{band.provider === "chesscom" ? "Chess.com" : "Lichess"} · {band.timeClass}</span><strong>{band.currentRating ?? "—"}</strong><small>{band.recentRange ? `${band.recentRange.low}–${band.recentRange.high}` : "No recent range"} · {band.sampleSize} games · {band.confidence} confidence</small><small>Estimated recent performance {band.performanceRating ?? "—"} · matched sample {band.performanceSampleSize}</small><small>{band.stabilizeTarget ? `Stabilize ${band.stabilizeTarget} · next target ${band.nextTarget ?? "—"}` : `Next target ${band.nextTarget ?? "insufficient sample"}`}</small></article>)}</div>}</section>}
+        {activeTab === "ratings" && <section id="rating-form"><header className="study-section-heading"><h2>Rating & Form</h2><small>Platform rating and time controls stay separate. Performance is an estimate, never derived from Accuracy.</small></header>{report.ratings.length === 0 ? <p className="study-section-empty">No rating evidence in this population.</p> : report.ratings.map((band) => <article key={band.key} className="study-paper study-rating-band"><span className="eyebrow">{band.provider === "chesscom" ? "Chess.com" : "Lichess"} · {band.timeClass}</span><strong className="study-rating-primary">{band.currentRating ?? "—"}</strong><p>{band.recentRange ? `Recent range ${band.recentRange.low}–${band.recentRange.high}` : "No recent range"} · {band.sampleSize} games · {band.confidence} confidence</p><dl className="study-profile-facts"><div><dt>Estimated recent performance</dt><dd>{band.performanceRating ?? "—"}</dd><small>Matched sample {band.performanceSampleSize}</small></div><div><dt>Score</dt><dd>{formatted(report.overview.scoreRate, "%")}</dd><small>Accuracy {formatted(report.overview.summary.averageAccuracy)}</small></div><div><dt>Next meaningful target</dt><dd>{band.stabilizeTarget ?? band.nextTarget ?? "—"}</dd><small>{band.stabilizeTarget && band.nextTarget ? `Stabilize ${band.stabilizeTarget} · then ${band.nextTarget}` : "Need a larger rated sample"}</small></div></dl></article>)}</section>}
 
-        {activeTab === "openings" && <section><header className="study-section-heading"><h2>Openings</h2><small>Color-specific, filtered population.</small></header>{report.openings.length === 0 ? <p className="study-section-empty">No recognized openings.</p> : <div className="repertoire-list">{report.openings.slice(0, 40).map((opening) => <article key={opening.key}><span className={`repertoire-color ${opening.color}`}>{opening.color === "white" ? "W" : "B"}</span><div><small>{opening.eco} · {formatted(opening.share, "%")}</small><strong>{opening.name}</strong>{opening.variation && <span>{opening.variation}</span>}<span>{opening.wins}W {opening.draws}D {opening.losses}L</span></div><dl><div><dt>Accuracy</dt><dd>{formatted(opening.averageAccuracy)}</dd></div><div><dt>Recent</dt><dd>{formatted(opening.recentAccuracy)}</dd></div><div><dt>Loss</dt><dd>{formatted(opening.averageWinPercentLoss)}</dd></div><div><dt>Errors</dt><dd>{formatted(opening.errorRate, "%")}</dd></div></dl><div className="training-sources">{opening.problemPositions.map((item) => <Link key={`${item.gameId}:${item.ply}`} href={`/review/${item.gameId}/moves?ply=${item.ply}`}>{item.san} · ply {item.ply}</Link>)}</div></article>)}</div>}</section>}
+        {activeTab === "openings" && <section id="openings"><header className="study-section-heading"><h2>Openings</h2><small>What you play, and how well you play it.</small></header>{report.openings.length === 0 ? <p className="study-section-empty">No recognized openings.</p> : <><div className="repertoire-list">{report.openings.slice(0, listLimit).map((opening) => <article key={opening.key}><span className={`repertoire-color ${opening.color}`}>{opening.color === "white" ? "W" : "B"}</span><div><small>{opening.eco} · {formatted(opening.share, "%")}</small><strong>{opening.name}</strong>{opening.variation && <span>{opening.variation}</span>}<span>{opening.gameCount} games · {opening.wins}W {opening.draws}D {opening.losses}L</span></div><dl><div><dt>Accuracy</dt><dd>{formatted(opening.averageAccuracy)}</dd></div><div><dt>Recent</dt><dd>{formatted(opening.recentAccuracy)}</dd></div><div><dt>Win% loss</dt><dd>{formatted(opening.averageWinPercentLoss)}</dd></div><div><dt>Errors</dt><dd>{formatted(opening.errorRate, "%")}</dd></div></dl><div className="training-sources">{opening.problemPositions.slice(0, 3).map((item) => <Link key={`${item.gameId}:${item.ply}`} href={`/review/${item.gameId}/moves?ply=${item.ply}`}>{item.san} · ply {item.ply}</Link>)}</div></article>)}</div>{report.openings.length > listLimit && <button type="button" className="text-button" onClick={() => setListLimit((current) => current + 12)}>Show more openings</button>}</>}</section>}
 
         {(activeTab === "middlegame" || activeTab === "endgame") && (() => {
           const phase = report.phases[activeTab];
           const endgame = activeTab === "endgame";
-          return <section><header className="study-section-heading"><h2>{endgame ? "Endgame" : "Middlegame"}</h2><small>{endgame ? "Conversion and defensive evidence from the structural endgame boundary; no tablebase claims." : "Decision quality, evaluation loss and missed opportunities after the opening boundary."}</small></header>
-            {endgame ? <>
-              <div className="study-metrics"><article><span>Moves</span><strong>{phase.moveCount}</strong></article><article><span>Endgame Accuracy</span><strong>{formatted(phase.averageAccuracy)}</strong></article><article><span>Winning chances converted</span><strong>{phase.advantagePreserved}/{phase.advantageOpportunities}</strong><small>Held at least 65% winning chances</small></article><article><span>Recent Accuracy</span><strong>{formatted(phase.recentAccuracy)}</strong></article></div>
-              <div className="study-metrics"><article><span>Defensive holds</span><strong>{phase.defensiveHolds}/{phase.defensivePositions}</strong><small>Lost no more than 2 Win%</small></article><article><span>Missed wins / mates</span><strong>{phase.missedOpportunities}</strong><small>Verified annotations only</small></article><article><span>Error rate</span><strong>{formatted(phase.errorRate, "%")}</strong></article></div>
-            </> : <>
-              <div className="study-metrics"><article><span>Moves</span><strong>{phase.moveCount}</strong></article><article><span>Decision error rate</span><strong>{formatted(phase.errorRate, "%")}</strong></article><article><span>Average Win% loss</span><strong>{formatted(phase.averageWinPercentLoss)}</strong></article><article><span>Recent Accuracy</span><strong>{formatted(phase.recentAccuracy)}</strong></article></div>
-              <div className="study-metrics"><article><span>Decision errors</span><strong>{phase.errorCount}</strong><small>Inaccuracies, mistakes and blunders</small></article><article><span>Missed opportunities</span><strong>{phase.missedOpportunities}</strong><small>Verified annotations only</small></article><article><span>Advantages preserved</span><strong>{phase.advantagePreserved}/{phase.advantageOpportunities}</strong><small>Held at least 65% winning chances</small></article></div>
-            </>}
+          const evidence = report.mistakes.filter((item) => item.phase === activeTab).slice(0, 8);
+          return <section id={activeTab}><header className="study-section-heading"><h2>{endgame ? "Endgame" : "Middlegame"}</h2><small>{endgame ? "How well you convert and defend late positions. No tablebase claims." : "How good your decisions are after the opening."}</small></header>
+            <div className="study-metric-groups">
+              <section className="study-wash" data-wash="mist"><h3>Decision quality</h3><dl><div><dt>Moves</dt><dd>{phase.moveCount}</dd></div><div><dt>Error rate</dt><dd>{formatted(phase.errorRate, "%")}</dd></div><div><dt>Average Win% loss</dt><dd>{formatted(phase.averageWinPercentLoss)}</dd></div>{!endgame && <div><dt>Decision errors</dt><dd>{phase.errorCount}</dd></div>}</dl></section>
+              <section className="study-wash" data-wash="cream"><h3>Recent form</h3><dl><div><dt>Accuracy</dt><dd>{formatted(phase.averageAccuracy)}</dd></div><div><dt>Recent Accuracy</dt><dd>{formatted(phase.recentAccuracy)}</dd></div></dl></section>
+              <section className="study-wash" data-wash="sage"><h3>{endgame ? "Conversion" : "Advantages"}</h3><dl><div><dt>Advantages preserved</dt><dd>{phase.advantagePreserved}/{phase.advantageOpportunities}</dd></div>{endgame && <div><dt>Defensive holds</dt><dd>{phase.defensiveHolds}/{phase.defensivePositions}</dd></div>}</dl></section>
+              <section className="study-wash" data-wash="pink"><h3>{endgame ? "Missed wins / mates" : "Opportunities"}</h3><dl><div><dt>Missed opportunities</dt><dd>{phase.missedOpportunities}</dd></div></dl>{evidence.length > 0 && <ul className="study-evidence-list">{evidence.map((item) => <li key={`${item.gameId}:${item.ply}`}><QualityIcon classification={item.classification} size={20} /><span><strong title={item.san}>{item.san}</strong><small>−{item.winPercentLoss.toFixed(1)} Win%</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul>}</section>
+            </div>
           </section>;
         })()}
 
-        {activeTab === "mistakes" && <section><header className="study-section-heading"><h2>Mistakes</h2><small>Largest objective losses first.</small></header>{report.mistakes.length === 0 ? <p className="study-section-empty">No errors in this population.</p> : <ul className="study-evidence-list">{report.mistakes.slice(0, 60).map((item) => <li key={`${item.gameId}:${item.ply}`}><QualityIcon classification={item.classification} size={22} /><span><strong>{item.san} · {QUALITY_META[item.classification].label}</strong><small>{item.phase} · −{item.winPercentLoss.toFixed(1)} Win%</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul>}</section>}
+        {activeTab === "mistakes" && <section id="mistakes"><header className="study-section-heading"><h2>Mistakes</h2><small>Which decisions deserve review.</small></header>{report.mistakes.length === 0 ? <p className="study-section-empty">No errors in this population.</p> : <><ul className="study-evidence-list">{report.mistakes.slice(0, listLimit).map((item) => <li key={`${item.gameId}:${item.ply}`}><QualityIcon classification={item.classification} size={22} /><span><strong title={item.san}>{item.san} · {QUALITY_META[item.classification].label}</strong><small>{item.phase} · −{item.winPercentLoss.toFixed(1)} Win% · {new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul>{report.mistakes.length > listLimit && <button type="button" className="text-button" onClick={() => setListLimit((current) => current + 12)}>Show more mistakes</button>}</>}</section>}
 
-        {activeTab === "highlights" && <section id="highlights"><header className="study-section-heading"><h2>Highlights</h2><small>Every item links to its game or exact ply.</small></header><div className="highlight-grid">{report.specialMoves.slice(0, 24).map((item) => <article key={`${item.gameId}:${item.ply}`}><strong>{item.annotations.includes("brilliant") ? "Brilliant" : "Critical"} · {item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Ply {item.ply} →</Link></article>)}{report.gameHighlights.map((item) => <article key={`${item.kind}:${item.gameId}`}><strong>{item.kind.replaceAll("-", " ")}</strong><small>{item.title}{item.accuracy === undefined ? "" : ` · ${item.accuracy.toFixed(1)} Accuracy`}</small><Link href={item.referencePly ? `/review/${item.gameId}/moves?ply=${item.referencePly}` : `/review/${item.gameId}`}>Open →</Link></article>)}</div>{report.specialMoves.length + report.gameHighlights.length === 0 && <p className="study-section-empty">No verified highlights in this population.</p>}</section>}
+        {activeTab === "highlights" && <section id="highlights"><header className="study-section-heading"><h2>Highlights</h2><small>Notable chess moments, grouped by kind.</small></header>{report.specialMoves.length + report.gameHighlights.length === 0 ? <p className="study-section-empty">No verified highlights in this population.</p> : <div className="study-highlight-groups">
+          <section data-kind="brilliant"><h3>Brilliant <small>{brilliantMoves.length}</small></h3>{brilliantMoves.length === 0 ? <p className="study-section-empty">None in this population.</p> : <ul className="study-highlight-cards">{brilliantMoves.slice(0, 6).map((item) => <li key={`${item.gameId}:${item.ply}`} className="study-highlight-card" data-kind="brilliant"><QualityIcon classification="brilliant" size={22} /><span><strong>{item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Ply {item.ply} →</Link></li>)}</ul>}</section>
+          <section data-kind="critical"><h3>Critical <small>{criticalMoves.length}</small></h3>{criticalMoves.length === 0 ? <p className="study-section-empty">None in this population.</p> : <ul className="study-highlight-cards">{criticalMoves.slice(0, listLimit).map((item) => <li key={`${item.gameId}:${item.ply}`} className="study-highlight-card" data-kind="critical"><QualityIcon classification="great" size={22} /><span><strong>{item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Ply {item.ply} →</Link></li>)}</ul>}{criticalMoves.length > listLimit && <button type="button" className="text-button" onClick={() => setListLimit((current) => current + 12)}>View more critical moments</button>}</section>
+          {(["comeback", "save", "clean-conversion", "best-game"] as const).map((kind) => {
+            const items = report.gameHighlights.filter((item) => item.kind === kind);
+            if (items.length === 0) return null;
+            return <section key={kind} data-kind={kind}><h3>{kind.replaceAll("-", " ")} <small>{items.length}</small></h3><ul className="study-highlight-cards">{items.slice(0, 6).map((item) => <li key={`${item.kind}:${item.gameId}`} className="study-highlight-card" data-kind={kind}><span><strong>{item.title}</strong><small>{item.accuracy === undefined ? "" : `${item.accuracy.toFixed(1)} Accuracy`}</small></span><Link href={item.referencePly ? `/review/${item.gameId}/moves?ply=${item.referencePly}` : `/review/${item.gameId}`}>Open →</Link></li>)}</ul></section>;
+          })}
+        </div>}</section>}
 
-        {activeTab === "plan" && <section id="training-plan"><header className="study-section-heading"><h2>Plan</h2><small>Ranked from measurable source positions.</small></header>{report.trainingPlan.length === 0 ? <p className="study-section-empty">No recurring weakness has enough evidence yet.</p> : <div className="weakness-grid">{report.weaknesses.map((weakness) => { const itemId = trainingQueueItemId(player.key, weakness.kind); return <article key={weakness.kind}><div className="weakness-head"><span className="weakness-priority">P{weakness.priority}</span><div><strong>{WEAKNESS_COPY[weakness.kind].title}</strong><p>{WEAKNESS_COPY[weakness.kind].description}</p></div></div><div className="weakness-metrics"><span>{formatted(weakness.frequency, "%")} of games</span><span>{weakness.confidence} confidence</span><span>{weakness.trend}</span></div><ul>{weakness.evidence.slice(0, 5).map((item) => <li key={`${item.gameId}:${item.ply}`}><span><strong>{item.san}</strong><small>{item.phase} · −{item.winPercentLoss.toFixed(1)} Win%</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul><button type="button" className="secondary" disabled={queueIds.has(itemId) || workingItem !== null} onClick={() => void addWeakness(weakness)}>{queueIds.has(itemId) ? "In queue" : "Add to queue"}</button></article>; })}</div>}
+        {activeTab === "plan" && <section id="training-plan"><header className="study-section-heading"><h2>Plan</h2><small>Ranked from measurable source positions.</small></header>{report.trainingPlan.length === 0 ? <p className="study-section-empty">No recurring weakness has enough evidence yet.</p> : <div className="weakness-grid">{report.weaknesses.map((weakness, index) => { const itemId = trainingQueueItemId(player.key, weakness.kind); return <article key={weakness.kind}><div className="weakness-head"><span className="weakness-priority">{index + 1}</span><div><strong>{WEAKNESS_COPY[weakness.kind].title}</strong><p>{WEAKNESS_COPY[weakness.kind].description}</p></div></div><div className="weakness-metrics"><span>{formatted(weakness.frequency, "%")} of games</span><span>{weakness.confidence} confidence</span><span>{weakness.trend}</span></div><ul>{weakness.evidence.slice(0, 5).map((item) => <li key={`${item.gameId}:${item.ply}`}><span><strong title={item.san}>{item.san}</strong><small>{item.phase} · −{item.winPercentLoss.toFixed(1)} Win%</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul><button type="button" className="text-button" disabled={queueIds.has(itemId) || workingItem !== null} onClick={() => void addWeakness(weakness)}>{queueIds.has(itemId) ? "In queue" : "Add to queue"}</button></article>; })}</div>}
           <div className="training-list">{queue.map((item) => <article key={item.id} className={item.status}><div><span className="training-status">{item.status.replace("-", " ")}</span><strong>{WEAKNESS_COPY[item.weaknessKind].title}</strong><small>{item.version === 2 ? `${item.progress.reviewedPositionCount}/${item.progress.totalPositionCount} positions reviewed` : `${item.evidence.length} saved positions`}</small></div><div className="training-sources">{item.evidence.slice(0, 5).map((source) => <Link key={`${source.gameId}:${source.ply}`} href={`/review/${source.gameId}/moves?ply=${source.ply}`}>{source.san} · ply {source.ply}</Link>)}</div><div className="training-actions"><button type="button" className="primary" disabled={workingItem !== null} onClick={() => void transition(item)}>{queueActionLabel(item.status)}</button><button type="button" className="text-button" disabled={workingItem !== null} onClick={() => void remove(item)}>Remove</button></div></article>)}</div>
         </section>}
 
-        {activeTab === "coverage" && <section><header className="study-section-heading"><h2>Coverage</h2><small>{report.algorithmVersion} · {report.objectiveAlgorithmVersion}</small></header><div className="study-metrics"><article><span>Eligible</span><strong>{report.coverage.eligibleGames}</strong></article><article><span>Current</span><strong>{report.coverage.analyzedGames}</strong><small>{formatted(report.coverage.coverageRate, "%")}</small></article><article><span>Stale</span><strong>{report.coverage.staleGames}</strong></article><article><span>Failed</span><strong>{report.coverage.failedGames}</strong></article></div>{report.coverage.providers && report.coverage.providers.length > 0 && <div className="coverage-provider-grid">{report.coverage.providers.map((item) => <article key={item.provider}><strong>{item.provider === "chesscom" ? "Chess.com" : "Lichess"}</strong><span>{item.analyzedGames}/{item.eligibleGames} current</span><small>{item.staleGames} stale · {item.failedGames} failed</small></article>)}</div>}<p className="study-section-empty">{report.coverage.partial ? "This report is partial. Conclusions use only current compatible analyses." : "This filtered population has complete current analysis coverage."}{filters.openingKeys.length > 0 ? " Opening is known only for current analyses, so coverage remains based on the broader synced scope." : ""} Local objective cache: {(cacheBytes / 1024 / 1024).toFixed(1)} MB.</p>
+        {activeTab === "coverage" && <section id="coverage"><header className="study-section-heading"><h2>Coverage</h2><small>{report.algorithmVersion} · {report.objectiveAlgorithmVersion}</small></header><div className="study-metrics"><article><span>Eligible</span><strong>{report.coverage.eligibleGames}</strong></article><article><span>Current</span><strong>{report.coverage.analyzedGames}</strong><small>{formatted(report.coverage.coverageRate, "%")}</small></article><article><span>Stale</span><strong>{report.coverage.staleGames}</strong></article><article><span>Failed</span><strong>{report.coverage.failedGames}</strong></article></div>{report.coverage.providers && report.coverage.providers.length > 0 && <div className="coverage-provider-grid">{report.coverage.providers.map((item) => <article key={item.provider}><strong>{item.provider === "chesscom" ? "Chess.com" : "Lichess"}</strong><span>{item.analyzedGames}/{item.eligibleGames} current</span><small>{item.staleGames} stale · {item.failedGames} failed</small></article>)}</div>}<p className="study-section-empty">{report.coverage.partial ? "This report is partial. Conclusions use only current compatible analyses." : "This filtered population has complete current analysis coverage."}{report.coverage.excludedGames > 0 ? ` ${report.coverage.excludedGames} provider game${report.coverage.excludedGames === 1 ? "" : "s"} with invalid PGN ${report.coverage.excludedGames === 1 ? "is" : "are"} excluded and do not keep this range incomplete.` : ""}{filters.openingKeys.length > 0 ? " Opening is known only for current analyses, so coverage remains based on the broader synced scope." : ""} Local objective cache: {(cacheBytes / 1024 / 1024).toFixed(1)} MB.</p>
           {accounts.length > 0 && <div className="history-analysis-controls"><label><span>Account scope</span><select value={jobAccountScope} onChange={(event) => setJobAccountScope(event.target.value as "selected" | "all")}><option value="all">All connected accounts</option><option value="selected" disabled={!player.accountId}>Selected account</option></select></label><label><span>Freshness</span><select value={freshness} onChange={(event) => setFreshness(event.target.value as HistoryAnalysisScopeV1["freshness"])}><option value="all">All matching (reuse cache)</option><option value="unanalyzed">Never analyzed</option><option value="stale">Stale only</option></select></label><button type="button" className="primary" disabled={jobWorking} onClick={() => void startHistoryAnalysis()}>{jobWorking ? "Analyzing…" : "Analyze my history"}</button><small>Background analysis · up to {HISTORY_ANALYSIS_CONCURRENCY} games at once.</small></div>}
           <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />
         </section>}

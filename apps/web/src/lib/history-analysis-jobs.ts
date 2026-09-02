@@ -173,29 +173,37 @@ export function retryFailedHistoryAnalysisJobRecord(
   const unparsable = new Set(unparsableGameIds);
   const excludedById = new Map((job.excludedItems ?? []).map((item) => [item.gameId, item]));
   const migratedExcluded: HistoryAnalysisJobExcludedItemV1[] = [...(job.excludedItems ?? [])];
+  const items = job.items.flatMap((item) => {
+    if (item.status !== "failed") return [item];
+    // An unparsable provider PGN can never succeed. Move it out of items so it
+    // cannot keep the job in Partial/Failed or re-enter retry accounting.
+    if (unparsable.has(item.gameId)) {
+      if (!excludedById.has(item.gameId)) {
+        const reason = item.error ?? "Invalid PGN from the provider.";
+        migratedExcluded.push({ gameId: item.gameId, reason });
+        excludedById.set(item.gameId, { gameId: item.gameId, reason });
+      }
+      return [];
+    }
+    const reset = { ...item, status: "queued" as const, updatedAt: timestamp };
+    delete reset.error;
+    return [reset];
+  });
+  const hasRetryable = items.some((item) => item.status === "queued" || item.status === "running");
+  const hasFailures = items.some((item) => item.status === "failed");
   const updated = {
     ...job,
-    status: "queued" as const,
-    items: job.items.map((item) => {
-      if (item.status !== "failed") return item;
-      // An unparsable provider PGN can never succeed. Migrate it out of the
-      // retry loop instead of failing it again on every retry attempt.
-      if (unparsable.has(item.gameId)) {
-        if (!excludedById.has(item.gameId)) {
-          const reason = item.error ?? "Invalid PGN from the provider.";
-          migratedExcluded.push({ gameId: item.gameId, reason });
-          excludedById.set(item.gameId, { gameId: item.gameId, reason });
-        }
-        return item;
-      }
-      const reset = { ...item, status: "queued" as const, updatedAt: timestamp };
-      delete reset.error;
-      return reset;
-    }),
+    status: hasRetryable ? "queued" as const : hasFailures ? "failed" as const : "completed" as const,
+    items,
     updatedAt: timestamp,
   };
-  delete updated.completedAt;
-  delete updated.error;
+  if (updated.status === "queued") {
+    delete updated.completedAt;
+    delete updated.error;
+  } else {
+    updated.completedAt = timestamp;
+    if (updated.status === "completed") delete updated.error;
+  }
   if (migratedExcluded.length > 0) updated.excludedItems = migratedExcluded;
   return updated;
 }
@@ -356,6 +364,88 @@ function sameHistoryJobRequest(
     && JSON.stringify(job.items.map((item) => item.gameId).sort()) === JSON.stringify([...gameIds].sort());
 }
 
+function scopeWithoutFreshness(scope: HistoryAnalysisScopeV1) {
+  return {
+    providers: scope.providers,
+    accountIds: scope.accountIds,
+    timeClasses: scope.timeClasses,
+    rated: scope.rated,
+    dateFrom: scope.dateFrom ?? null,
+    dateTo: scope.dateTo ?? null,
+  };
+}
+
+export function historyJobsShareSemanticScope(left: HistoryAnalysisJobV1, right: HistoryAnalysisJobV1): boolean {
+  return left.depth === right.depth
+    && left.objectiveAlgorithmVersion === right.objectiveAlgorithmVersion
+    && left.classificationMultiPv === right.classificationMultiPv
+    && JSON.stringify(scopeWithoutFreshness(left.scope)) === JSON.stringify(scopeWithoutFreshness(right.scope));
+}
+
+export function historyJobCovers(newer: HistoryAnalysisJobV1, older: HistoryAnalysisJobV1): boolean {
+  const newerIds = new Set(newer.items.map((item) => item.gameId));
+  return older.items.length > 0 && older.items.every((item) => newerIds.has(item.gameId));
+}
+
+const SUPERSEDEABLE_STATUSES = new Set<HistoryAnalysisJobV1["status"]>(["queued", "paused", "failed"]);
+
+export function shouldSupersedeHistoryJob(newer: HistoryAnalysisJobV1, older: HistoryAnalysisJobV1): boolean {
+  if (newer.id === older.id || older.supersededBy) return false;
+  if (!SUPERSEDEABLE_STATUSES.has(older.status)) return false;
+  if (newer.status === "cancelled" || newer.supersededBy) return false;
+  if (!historyJobsShareSemanticScope(newer, older)) return false;
+  if (historyJobCovers(newer, older)) return true;
+  const newerIds = new Set(newer.items.map((item) => item.gameId));
+  const overlapping = older.items.some((item) => newerIds.has(item.gameId));
+  return overlapping && newer.items.length > older.items.length;
+}
+
+export function planHistoryJobSupersession(
+  jobs: readonly HistoryAnalysisJobV1[],
+): Array<{ older: HistoryAnalysisJobV1; newer: HistoryAnalysisJobV1 }> {
+  const chronological = [...jobs].sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+  const replaced = new Set<string>();
+  const decisions: Array<{ older: HistoryAnalysisJobV1; newer: HistoryAnalysisJobV1 }> = [];
+  for (let index = chronological.length - 1; index >= 0; index -= 1) {
+    const newer = chronological[index]!;
+    if (newer.supersededBy || newer.status === "cancelled") continue;
+    for (const older of chronological.slice(0, index)) {
+      if (replaced.has(older.id) || !shouldSupersedeHistoryJob(newer, older)) continue;
+      replaced.add(older.id);
+      decisions.push({ older, newer });
+    }
+  }
+  return decisions;
+}
+
+export function markHistoryJobSuperseded(
+  job: HistoryAnalysisJobV1,
+  supersededBy: string,
+  timestamp: string,
+): HistoryAnalysisJobV1 {
+  return {
+    ...cancelHistoryAnalysisJobRecord(job, timestamp),
+    supersededBy,
+    error: "Replaced by a later analysis of this scope.",
+  };
+}
+
+async function persistHistoryJobSupersession(
+  jobs?: readonly HistoryAnalysisJobV1[],
+): Promise<HistoryAnalysisJobV1[]> {
+  const current = jobs ?? await listHistoryAnalysisJobs();
+  const decisions = planHistoryJobSupersession(current);
+  if (decisions.length === 0) return [...current].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const timestamp = now();
+  for (const { older, newer } of decisions) {
+    if (activeControllers.has(older.id)) continue;
+    await mutateHistoryAnalysisJob(older.id, (job) => (
+      job.supersededBy ? job : markHistoryJobSuperseded(job, newer.id, timestamp)
+    ));
+  }
+  return listHistoryAnalysisJobs();
+}
+
 /**
  * Reuse a persisted request with the same scope and game set. This prevents a
  * second click (or a remounted page) from creating another copy of a long
@@ -373,7 +463,9 @@ export async function createOrReuseHistoryAnalysisJob(
   const gameIds = games.map((game) => game.id);
   const existing = (await listHistoryAnalysisJobs()).find((job) => sameHistoryJobRequest(job, normalized, depth, gameIds));
   if (existing) return { job: existing, reused: true };
-  return { job: await createHistoryAnalysisJob(normalized, depth, games, candidates.excluded), reused: false };
+  const created = await createHistoryAnalysisJob(normalized, depth, games, candidates.excluded);
+  await persistHistoryJobSupersession();
+  return { job: created, reused: false };
 }
 
 export interface AutomaticHistoryAnalysisResult {
@@ -423,14 +515,18 @@ export async function queueAutomaticHistoryAnalysis(
   const scopedGames = games.filter((game) => gameMatchesHistoryScope(game, scope, depth));
   const { valid, excluded } = partitionUnparsableSyncedGames(scopedGames);
   const candidates = selectHistoryAnalysisGames(valid, scope, depth);
-  const matching = jobs.filter((job) => isAutomaticAccountJob(job, accountId, depth));
+  const matching = jobs.filter((job) => isAutomaticAccountJob(job, accountId, depth) && !job.supersededBy);
   const existing = matching.find((job) => job.status === "running" || job.status === "queued" || job.status === "paused");
   if (existing) {
-    return {
-      job: existing,
-      queuedCount: existing.items.filter((item) => item.status === "queued" || item.status === "running").length,
-      reused: true,
-    };
+    const existingIds = new Set(existing.items.map((item) => item.gameId));
+    const uncovered = candidates.filter((game) => !existingIds.has(game.id));
+    if (uncovered.length === 0 || existing.status === "running") {
+      return {
+        job: existing,
+        queuedCount: existing.items.filter((item) => item.status === "queued" || item.status === "running").length,
+        reused: true,
+      };
+    }
   }
   const candidateIds = candidates.map((game) => game.id).sort();
   const retryable = matching.find((job) => {
@@ -453,6 +549,7 @@ export async function queueAutomaticHistoryAnalysis(
     };
   }
   const job = await createHistoryAnalysisJob(scope, depth, valid, excluded);
+  await persistHistoryJobSupersession();
   void runHistoryAnalysisJob(job.id).catch(() => undefined);
   return { job, queuedCount: job.items.length, reused: false };
 }
@@ -487,7 +584,7 @@ export async function recoverInterruptedHistoryJobs(): Promise<HistoryAnalysisJo
     updated.error = "Browser work was interrupted. Resume to continue from the saved queue.";
     recovered.push(await writeJob(updated));
   }
-  return recovered.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  return persistHistoryJobSupersession(recovered);
 }
 
 export async function runHistoryAnalysisJob(

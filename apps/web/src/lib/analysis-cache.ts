@@ -9,6 +9,64 @@ export interface AnalysisCacheOptions {
   multiPv: number;
 }
 
+export interface CompatibleAnalysisQuery {
+  initialFen: string;
+  uciMoves: readonly string[];
+  depth: number;
+  multiPv: number;
+  algorithmVersion?: string;
+  stockfishVersion?: string;
+}
+
+/** Header-independent game identity. PGN string hashing is not this identity. */
+export function gameMoveIdentity(initialFen: string, uciMoves: readonly string[]): string {
+  return [initialFen, ...uciMoves].join("\u0000");
+}
+
+export function projectionMoveIdentity(projection: AnalysisCacheProjectionV1): string | null {
+  if (projection.initialFen === undefined || projection.uciMoves === undefined) return null;
+  return gameMoveIdentity(projection.initialFen, projection.uciMoves);
+}
+
+export function compatibleAnalysisQuery(
+  game: Pick<NormalizedGame, "initialFen" | "plies">,
+  options: AnalysisCacheOptions,
+): CompatibleAnalysisQuery {
+  return {
+    initialFen: game.initialFen,
+    uciMoves: game.plies.map((ply) => ply.uci),
+    depth: options.depth,
+    multiPv: options.multiPv,
+  };
+}
+
+export function isCompatibleAnalysisProjection(
+  projection: AnalysisCacheProjectionV1,
+  query: CompatibleAnalysisQuery,
+): boolean {
+  if (projection.version !== 1) return false;
+  if (projection.algorithmVersion !== (query.algorithmVersion ?? OBJECTIVE_ALGORITHM_VERSION)) return false;
+  if (projection.engine.stockfishVersion !== (query.stockfishVersion ?? STOCKFISH_VERSION)) return false;
+  if (projection.engine.depth !== query.depth) return false;
+  const multiPv = projection.engine.classificationMultiPv ?? projection.engine.multiPv;
+  if (multiPv !== query.multiPv) return false;
+  const identity = projectionMoveIdentity(projection);
+  return identity !== null && identity === gameMoveIdentity(query.initialFen, query.uciMoves);
+}
+
+/** Latest compatible projection for the same chess game and analysis settings. */
+export function selectCompatibleAnalysisProjection(
+  projections: readonly AnalysisCacheProjectionV1[],
+  query: CompatibleAnalysisQuery,
+): AnalysisCacheProjectionV1 | null {
+  let latest: AnalysisCacheProjectionV1 | null = null;
+  for (const projection of projections) {
+    if (!isCompatibleAnalysisProjection(projection, query)) continue;
+    if (!latest || projection.createdAt.localeCompare(latest.createdAt) > 0) latest = projection;
+  }
+  return latest;
+}
+
 async function gameFingerprint(initialFen: string, pgn: string): Promise<string> {
   const identity = `${initialFen}\u0000${pgn}`;
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
@@ -47,7 +105,7 @@ export async function analysisCacheKey(game: NormalizedGame, options: AnalysisCa
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function projection(
+export function buildAnalysisCacheProjection(
   analysis: GameAnalysisV2,
   key: string,
   gameFingerprint: string,
@@ -62,7 +120,7 @@ function projection(
     createdAt: analysis.createdAt,
     engine: analysis.engine,
     headers: analysis.game.headers,
-    // Header-independent identity keeps library joins stable across builds.
+    // Header-independent identity keeps library joins and Review restores stable.
     initialFen: analysis.game.initialFen,
     uciMoves: analysis.moves.map((move) => move.uci),
     ...(analysis.opening === undefined ? {} : { opening: analysis.opening }),
@@ -85,24 +143,50 @@ function projection(
   };
 }
 
-export async function getCachedAnalysis(
-  game: NormalizedGame,
-  options: AnalysisCacheOptions,
-): Promise<GameAnalysisV2 | null> {
+async function readCachedAnalysis(key: string, requireCurrentAlgorithm: boolean): Promise<GameAnalysisV2 | null> {
   const database = await openReviewDatabase();
   try {
-    const key = await analysisCacheKey(game, options);
     return await new Promise((resolve, reject) => {
       const request = database.transaction(ANALYSIS_STORE, "readonly").objectStore(ANALYSIS_STORE).get(key);
       request.onsuccess = () => {
         const cached = request.result as GameAnalysisV2 | undefined;
-        resolve(cached?.version === 2 ? withoutStaleCoach(cached) : null);
+        if (!cached || cached.version !== 2) {
+          resolve(null);
+          return;
+        }
+        if (requireCurrentAlgorithm && cached.algorithmVersion !== OBJECTIVE_ALGORITHM_VERSION) {
+          resolve(null);
+          return;
+        }
+        resolve(withoutStaleCoach(cached));
       };
       request.onerror = () => reject(request.error ?? new Error("Unable to read the analysis cache."));
     });
   } finally {
     database.close();
   }
+}
+
+/**
+ * Resolve canonical objective analysis for a game.
+ * Concrete cache keys still include the raw PGN string, but Review/Training
+ * must not treat that string as game identity. Lookup order:
+ * 1. exact cache key for the current normalized game
+ * 2. compatible projection by initial FEN + played UCI + engine settings
+ */
+export async function getCachedAnalysis(
+  game: NormalizedGame,
+  options: AnalysisCacheOptions,
+): Promise<GameAnalysisV2 | null> {
+  const key = await analysisCacheKey(game, options);
+  const exact = await readCachedAnalysis(key, false);
+  if (exact) return exact;
+  const matched = selectCompatibleAnalysisProjection(
+    await listAnalysisCacheProjections(),
+    compatibleAnalysisQuery(game, options),
+  );
+  if (!matched || matched.cacheKey === key) return null;
+  return readCachedAnalysis(matched.cacheKey, true);
 }
 
 export async function putCachedAnalysis(
@@ -112,14 +196,14 @@ export async function putCachedAnalysis(
 ): Promise<void> {
   const database = await openReviewDatabase();
   try {
-    const [key, gameFingerprint] = await Promise.all([
+    const [key, fingerprint] = await Promise.all([
       analysisCacheKey(game, options),
       analysisGameFingerprint(game),
     ]);
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction([ANALYSIS_STORE, ANALYSIS_INDEX_STORE], "readwrite");
       transaction.objectStore(ANALYSIS_STORE).put(analysis, key);
-      transaction.objectStore(ANALYSIS_INDEX_STORE).put(projection(analysis, key, gameFingerprint), key);
+      transaction.objectStore(ANALYSIS_INDEX_STORE).put(buildAnalysisCacheProjection(analysis, key, fingerprint), key);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error("Unable to write the analysis cache."));
       transaction.onabort = () => reject(transaction.error ?? new Error("Analysis cache write was aborted."));
@@ -181,7 +265,7 @@ export async function backfillAnalysisCacheProjections(): Promise<number> {
       const fingerprint = await gameFingerprint(analysis.game.initialFen, analysis.game.pgn);
       await new Promise<void>((resolve, reject) => {
         const transaction = database.transaction(ANALYSIS_INDEX_STORE, "readwrite");
-        transaction.objectStore(ANALYSIS_INDEX_STORE).put(projection(analysis, key, fingerprint), rawKey);
+        transaction.objectStore(ANALYSIS_INDEX_STORE).put(buildAnalysisCacheProjection(analysis, key, fingerprint), rawKey);
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error ?? new Error("Unable to backfill the analysis index."));
         transaction.onabort = () => reject(transaction.error ?? new Error("Analysis index backfill was aborted."));
@@ -195,21 +279,7 @@ export async function backfillAnalysisCacheProjections(): Promise<number> {
 }
 
 export async function getCachedAnalysisByKey(key: string): Promise<GameAnalysisV2 | null> {
-  const database = await openReviewDatabase();
-  try {
-    return await new Promise((resolve, reject) => {
-      const request = database.transaction(ANALYSIS_STORE, "readonly").objectStore(ANALYSIS_STORE).get(key);
-      request.onsuccess = () => {
-        const analysis = request.result as GameAnalysisV2 | undefined;
-        resolve(analysis?.version === 2 && analysis.algorithmVersion === OBJECTIVE_ALGORITHM_VERSION
-          ? withoutStaleCoach(analysis)
-          : null);
-      };
-      request.onerror = () => reject(request.error ?? new Error("Unable to read indexed analysis."));
-    });
-  } finally {
-    database.close();
-  }
+  return readCachedAnalysis(key, true);
 }
 
 export async function listCachedAnalyses(): Promise<GameAnalysisV2[]> {

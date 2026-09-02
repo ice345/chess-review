@@ -11,6 +11,10 @@ export interface SearchOptions {
   multiPv?: number;
   searchMoves?: string[];
   signal?: AbortSignal;
+  /** Base FEN for the UCI `position` command. Defaults to `fen`. */
+  startFen?: string;
+  /** UCI moves from `startFen` that Stockfish must see for repetition/fifty-move. */
+  moves?: string[];
 }
 
 function abortError(): Error {
@@ -75,7 +79,9 @@ export class BrowserStockfish {
   async search(fen: string, options: SearchOptions): Promise<StockfishMoveAnalysis> {
     const multiPv = options.multiPv ?? 3;
     const searchMoves = options.searchMoves?.filter(Boolean) ?? [];
-    const key = engineCacheKey(fen, STOCKFISH_VERSION, options.depth, multiPv, searchMoves);
+    const historyMoves = options.moves?.filter(Boolean) ?? [];
+    const startFen = options.startFen ?? fen;
+    const key = engineCacheKey(fen, STOCKFISH_VERSION, options.depth, multiPv, searchMoves, [startFen, ...historyMoves]);
     const cached = this.cache.get(key);
     if (cached) return cached;
     const terminal = noLegalMoveTerminalStatus(fen);
@@ -112,7 +118,8 @@ export class BrowserStockfish {
 
     this.worker.postMessage(`setoption name MultiPV value ${multiPv}`);
     this.worker.postMessage("ucinewgame");
-    this.worker.postMessage(`position fen ${fen}`);
+    const history = historyMoves.length > 0 ? ` moves ${historyMoves.join(" ")}` : "";
+    this.worker.postMessage(`position fen ${startFen}${history}`);
 
     const result = await new Promise<StockfishMoveAnalysis>((resolve, reject) => {
       const onAbort = (): void => {

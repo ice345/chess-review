@@ -112,6 +112,8 @@ describe("BrowserStockfishPool", () => {
     expect(FakeSearcher.maximumActive).toBeLessThanOrEqual(2);
     expect(result.playedMoveAnalyses.get(2)?.searchMoves).toEqual([game.plies[1]!.uci]);
     expect(FakeSearcher.searches.filter(({ options }) => options.searchMoves)).toHaveLength(1);
+    expect(FakeSearcher.searches.some(({ options }) => (options.moves?.length ?? 0) > 0)).toBe(true);
+    expect(FakeSearcher.searches.every(({ options }) => options.startFen === game.initialFen)).toBe(true);
     expect(progress).toContain(`positions:${game.plies.length + 1}/${game.plies.length + 1}`);
     expect(progress).toContain("played-moves:1/1");
   });

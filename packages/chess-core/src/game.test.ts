@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fenToEpd, legalBoardDestinations, noLegalMoveTerminalStatus, parsePgn, playLegalBoardMove, replayUciLine } from "./game";
+import { ChessImportError, drawStatus, fenToEpd, legalBoardDestinations, noLegalMoveTerminalStatus, parsePgn, playLegalBoardMove, replayUciLine } from "./game";
 
 describe("parsePgn", () => {
   it("normalizes SAN, UCI, colors, and before/after positions", () => {
@@ -15,6 +15,28 @@ describe("parsePgn", () => {
     const game = parsePgn(`[SetUp "1"]\n[FEN "8/8/8/8/8/8/K6k/8 w - - 0 1"]\n\n1. Kb3`);
     expect(game.initialFen).toContain("K6k");
     expect(game.plies[0]?.uci).toBe("a2b3");
+  });
+
+  it("rejects Chess960 and other named variants", () => {
+    expect(() => parsePgn(`[Variant "Chess960"]\n\n1. e4 *`)).toThrow(ChessImportError);
+    expect(() => parsePgn(`[Variant "Chess960"]\n\n1. e4 *`)).toThrow(/standard chess/);
+    expect(() => parsePgn("this is not a chess game 1. e4 e5 2. Ke2 illegal")).toThrow(/could not be parsed/);
+  });
+});
+
+describe("drawStatus", () => {
+  it("detects claimable threefold from start-position repetitions", () => {
+    const game = parsePgn("1. Nf3 Nf6 2. Ng1 Ng8 3. Nf3 Nf6 4. Ng1 Ng8");
+    expect(drawStatus(game.initialFen, game.plies.map((ply) => ply.uci))).toEqual({
+      kind: "threefold",
+      automatic: false,
+    });
+    expect(drawStatus(game.finalFen)).toBeNull();
+  });
+
+  it("treats fifty-move as claimable and seventy-five as automatic", () => {
+    expect(drawStatus("4k3/8/8/8/8/8/8/R3K3 w - - 100 50")).toEqual({ kind: "fifty-move", automatic: false });
+    expect(drawStatus("4k3/8/8/8/8/8/8/R3K3 w - - 150 80")).toEqual({ kind: "seventy-five-move", automatic: true });
   });
 });
 
