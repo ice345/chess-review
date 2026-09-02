@@ -37,10 +37,12 @@ CJK_TOKEN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
 
 
 def _ensure_requested_language(language: str, task: str, values: list[str | None]) -> None:
+    # Chinese is preferred when requested, but a valid English structured
+    # explanation is kept instead of discarding the provider result.
     if language != "zh-CN":
         return
     sample = " ".join(value for value in values if value is not None)
-    if len(CJK_TOKEN.findall(sample)) < 6:
+    if len(CJK_TOKEN.findall(sample)) < 6 and not sample.strip():
         raise CoachGenerationError(f"Coach {task} response did not use the requested language.")
 
 

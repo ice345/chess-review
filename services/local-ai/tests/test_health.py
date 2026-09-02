@@ -142,6 +142,10 @@ def test_health_preserves_optional_capability_status() -> None:
             "ollamaModels": ["gemma4:12b-it-qat", "qwen3:8b"],
             "openaiCompatible": "not-configured",
         },
+        "identity": {
+            "product": "open-chess-review-local-ai",
+            "version": "0.1.0",
+        },
     }
 
 
@@ -155,6 +159,26 @@ def test_local_development_port_is_allowed_by_cors() -> None:
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:4317"
+
+
+def test_mutating_routes_require_launcher_token_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LOCAL_AI_TOKEN", "secret-token")
+    import chess_review_local_ai.main as main
+    monkeypatch.setattr(main, "_SERVICE_TOKEN", "secret-token")
+    app.dependency_overrides[get_maia_provider] = lambda: AvailableMaia()
+    client = TestClient(app)
+    denied = client.post(
+        "/maia/models/maia3-23m/download",
+        headers={"Origin": "http://localhost:3000"},
+        json={"confirm": True},
+    )
+    assert denied.status_code == 401
+    allowed = client.post(
+        "/maia/models/maia3-23m/download",
+        headers={"Origin": "http://localhost:3000", "X-Open-Chess-Review-Token": "secret-token"},
+        json={"confirm": True},
+    )
+    assert allowed.status_code == 200
 
 
 def test_explicit_model_download_requires_trusted_origin_and_json_confirmation() -> None:

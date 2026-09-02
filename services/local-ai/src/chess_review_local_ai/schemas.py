@@ -630,8 +630,14 @@ class CoachHealth(CoachModel):
     openai_compatible: Literal["configured", "not-configured"]
 
 
+class ServiceIdentity(CoachModel):
+    product: Literal["open-chess-review-local-ai"] = "open-chess-review-local-ai"
+    version: str = "0.1.0"
+
+
 class HealthResponse(CoachModel):
     status: Literal["ok"] = "ok"
     maia: Literal["available", "not-installed", "error"]
     maia_models: dict[str, MaiaModelState]
     coach: CoachHealth
+    identity: ServiceIdentity = Field(default_factory=ServiceIdentity)

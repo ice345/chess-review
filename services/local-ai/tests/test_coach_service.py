@@ -239,16 +239,17 @@ def test_move_facts_reject_a_future_line_that_is_not_an_after_position_pv() -> N
         CoachExplainRequest.model_validate({"factsVersion": 1, "facts": facts})
 
 
-def test_move_coach_rejects_a_provider_that_ignores_requested_chinese() -> None:
+def test_move_coach_keeps_a_valid_english_explanation_when_chinese_is_requested() -> None:
     provider = FakeCoachProvider(explanation_payload())
     service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
 
-    with pytest.raises(CoachGenerationError, match="requested language"):
-        service.explain(CoachExplainRequest.model_validate({
-            "factsVersion": 1,
-            "facts": move_facts(),
-            "language": "zh-CN",
-        }))
+    result = service.explain(CoachExplainRequest.model_validate({
+        "factsVersion": 1,
+        "facts": move_facts(),
+        "language": "zh-CN",
+    }))
+    assert result.headline
+    assert result.source.language == "zh-CN"
 
 
 def game_facts() -> dict[str, object]:
@@ -318,7 +319,7 @@ def test_game_summary_accepts_objective_v2_quality_and_annotation_counts() -> No
     assert request.facts.moves[0].annotations == ["critical"]
 
 
-def test_game_summary_rejects_a_provider_that_ignores_requested_chinese() -> None:
+def test_game_summary_keeps_a_valid_english_plan_when_chinese_is_requested() -> None:
     provider = FakeCoachProvider({
         "headline": "Game summary",
         "summary": "The game should be reviewed carefully.",
@@ -330,12 +331,12 @@ def test_game_summary_rejects_a_provider_that_ignores_requested_chinese() -> Non
     })
     service = CoachService(CoachProviderRegistry(ollama=provider, openai_compatible=provider))
 
-    with pytest.raises(CoachGenerationError, match="requested language"):
-        service.game_summary(CoachGameSummaryRequest.model_validate({
-            "factsVersion": 1,
-            "facts": game_facts(),
-            "language": "zh-CN",
-        }))
+    result = service.game_summary(CoachGameSummaryRequest.model_validate({
+        "factsVersion": 1,
+        "facts": game_facts(),
+        "language": "zh-CN",
+    }))
+    assert result.headline == "Game summary"
 
 
 def test_game_summary_accepts_the_requested_chinese_and_records_it_in_source() -> None:

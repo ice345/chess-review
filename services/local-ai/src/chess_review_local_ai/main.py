@@ -1,3 +1,4 @@
+import os
 import re
 from functools import lru_cache
 
@@ -40,6 +41,7 @@ app.add_middleware(
 )
 
 _TRUSTED_BROWSER_ORIGIN = re.compile(r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$")
+_SERVICE_TOKEN = os.environ.get("LOCAL_AI_TOKEN", "")
 
 
 @lru_cache(maxsize=1)
@@ -84,6 +86,19 @@ def _run_maia(operation):
         ) from exc
 
 
+def require_service_token(request: Request) -> None:
+    if not _SERVICE_TOKEN:
+        return
+    if request.headers.get("x-open-chess-review-token") != _SERVICE_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "local-service-token-required",
+                "message": "This local-ai instance requires the launcher capability token.",
+            },
+        )
+
+
 def require_trusted_browser_origin(request: Request) -> None:
     """Protect explicit local mutations from cross-site browser requests.
 
@@ -106,6 +121,7 @@ def require_trusted_browser_origin(request: Request) -> None:
 @app.post("/maia/move-review", response_model=MaiaMoveReviewResponse)
 def maia_move_review(
     request: MaiaMoveReviewRequest,
+    _token: None = Depends(require_service_token),
     provider: MaiaProvider = Depends(get_maia_provider),
 ) -> MaiaMoveReviewResponse:
     return _run_maia(lambda: provider.review_move(request))
@@ -114,6 +130,7 @@ def maia_move_review(
 @app.post("/maia/position-analysis", response_model=MaiaPositionAnalysisResponse)
 def maia_position_analysis(
     request: MaiaPositionAnalysisRequest,
+    _token: None = Depends(require_service_token),
     provider: MaiaProvider = Depends(get_maia_provider),
 ) -> MaiaPositionAnalysisResponse:
     return _run_maia(lambda: provider.analyze_position(request))
@@ -124,6 +141,7 @@ def maia_model_download(
     model: MaiaModelName,
     _confirmation: MaiaModelSetupRequest,
     _trusted_origin: None = Depends(require_trusted_browser_origin),
+    _token: None = Depends(require_service_token),
     provider: MaiaProvider = Depends(get_maia_provider),
 ) -> MaiaModelSetupResponse:
     model_status = _run_maia(lambda: provider.prepare_model(model))
@@ -133,6 +151,7 @@ def maia_model_download(
 @app.post("/maia/moves", response_model=MaiaMovesResponse)
 def maia_moves(
     request: MaiaMovesRequest,
+    _token: None = Depends(require_service_token),
     provider: MaiaProvider = Depends(get_maia_provider),
 ) -> MaiaMovesResponse:
     return _run_maia(lambda: provider.analyze(request))
@@ -149,6 +168,7 @@ def maia_analyze(
 @app.post("/coach/explain", response_model=CoachExplanationResponse)
 def coach_explain(
     request: CoachExplainRequest,
+    _token: None = Depends(require_service_token),
     coach_service: CoachService = Depends(get_coach_service),
 ) -> CoachExplanationResponse:
     try:
@@ -168,6 +188,7 @@ def coach_explain(
 @app.post("/coach/game-summary", response_model=CoachGameSummaryResponse)
 def coach_game_summary(
     request: CoachGameSummaryRequest,
+    _token: None = Depends(require_service_token),
     coach_service: CoachService = Depends(get_coach_service),
 ) -> CoachGameSummaryResponse:
     try:

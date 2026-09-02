@@ -1,5 +1,6 @@
 /* global AbortController, URL, clearTimeout, fetch, process, setInterval, setTimeout */
 
+import { randomBytes } from "node:crypto";
 import { access } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { spawn } from "node:child_process";
@@ -10,6 +11,7 @@ const OLLAMA_URL = (process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434").rep
 const LOCAL_AI_URL = (process.env.NEXT_PUBLIC_LOCAL_AI_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma4:12b-it-qat";
 const WEB_PORT = process.env.PORT ?? "3000";
+const LOCAL_AI_TOKEN = process.env.LOCAL_AI_TOKEN ?? process.env.NEXT_PUBLIC_LOCAL_AI_TOKEN ?? randomBytes(24).toString("hex");
 const ownedChildren = new Set();
 let stopping = false;
 
@@ -70,7 +72,7 @@ function pipeLines(stream, scope, target) {
 function startOwned(scope, command, args, options = {}, fatal = true) {
   const child = spawn(command, args, {
     ...options,
-    env: { ...process.env, ...options.env },
+    env: { ...process.env, LOCAL_AI_TOKEN, NEXT_PUBLIC_LOCAL_AI_TOKEN: LOCAL_AI_TOKEN, ...options.env },
     shell: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -172,6 +174,22 @@ async function ensureWeb() {
   return startOwned("web", pnpm, ["--filter", "@chess-review/web", "exec", "next", "dev", "--port", WEB_PORT]);
 }
 
+async function ensureOptionalServices({ failFast = false } = {}) {
+  const services = [
+    { scope: "ollama", task: ensureOllama() },
+    { scope: "local-ai", task: ensureLocalAi() },
+  ];
+  const results = await Promise.allSettled(services.map(({ task }) => task));
+  const failures = results.flatMap((result, index) => result.status === "rejected" ? [{ result, scope: services[index].scope }] : []);
+  if (failures.length === 0) return;
+
+  for (const { result, scope } of failures) {
+    const error = result.reason instanceof Error ? result.reason.message : String(result.reason);
+    log(scope, `${error}${failFast ? "" : " Browser Core remains available."}`);
+  }
+  if (failFast) throw failures[0].result.reason;
+}
+
 function shutdown(code = 0) {
   if (stopping) return;
   stopping = true;
@@ -187,19 +205,11 @@ process.on("SIGTERM", () => shutdown(0));
 try {
   const web = !CHECK_ONLY && !SERVICES_ONLY ? await ensureWeb() : null;
   if (SERVICES_ONLY || CHECK_ONLY) {
-    await ensureOllama();
-    await ensureLocalAi();
+    await ensureOptionalServices({ failFast: SERVICES_ONLY });
   } else {
-    try {
-      await ensureOllama();
-    } catch (error) {
-      log("ollama", `${error instanceof Error ? error.message : String(error)} Browser Core remains available.`);
-    }
-    try {
-      await ensureLocalAi();
-    } catch (error) {
-      log("local-ai", `${error instanceof Error ? error.message : String(error)} Browser Core remains available.`);
-    }
+    // Optional services start in parallel and never delay the browser shell.
+    // Their health is surfaced in the app as a reconnectable capability state.
+    void ensureOptionalServices();
   }
   if (CHECK_ONLY) {
     log("dev", "runtime check complete; no process was started.");
