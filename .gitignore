@@ -21,3 +21,7 @@ test-results/
 # Upstream repositories are research material, not production source.
 references/*
 !references/.gitkeep
+
+# Local browser inspection artifacts are not product source or test baselines.
+.playwright-mcp/
+page-screenshot.png
