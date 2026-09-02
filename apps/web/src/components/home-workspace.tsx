@@ -2,23 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Chessboard } from "react-chessboard";
+import { normalizeFen, parsePgn } from "@chess-review/chess-core";
+import { BlueBishopMark } from "@chess-review/ui";
+import type { SyncedGame } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
 import { ConnectedAccounts } from "./connected-accounts";
+import { loadAppSettings } from "../lib/app-settings";
+import { autoAnalyzeSyncedGames } from "../lib/auto-analysis";
+import { listSyncedGames } from "../lib/platform-library";
+import type { PlatformSyncMode } from "../lib/platform-sync";
 import {
   buildReviewRecord,
+  buildReviewRecordFromSyncedGame,
   listReviewRecords,
   saveReviewRecord,
   type ReviewRecord,
   type ReviewRecordKind,
-  buildReviewRecordFromSyncedGame,
 } from "../lib/review-library";
-import { listSyncedGames } from "../lib/platform-library";
-import type { SyncedGame } from "@chess-review/shared";
-import { loadAppSettings } from "../lib/app-settings";
-import { autoAnalyzeSyncedGames } from "../lib/auto-analysis";
-import type { PlatformSyncMode } from "../lib/platform-sync";
-import { BlueBishopMark } from "@chess-review/ui";
 
 const SAMPLE_PGN = `[Event "Open Review Sample"]
 [White "Ada"]
@@ -27,6 +29,18 @@ const SAMPLE_PGN = `[Event "Open Review Sample"]
 
 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5
 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 *`;
+
+const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+function previewImport(kind: ReviewRecordKind, input: string): { fen: string; previewable: boolean } {
+  const value = input.trim();
+  if (!value) return { fen: STARTING_FEN, previewable: false };
+  try {
+    return { fen: kind === "fen" ? normalizeFen(value) : parsePgn(value).initialFen, previewable: true };
+  } catch {
+    return { fen: STARTING_FEN, previewable: false };
+  }
+}
 
 export function HomeWorkspace() {
   const router = useRouter();
@@ -37,6 +51,9 @@ export function HomeWorkspace() {
   const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
+  const preview = useMemo(() => previewImport(kind, input), [kind, input]);
+  const fen = preview.fen;
+  const ready = input.trim() !== "";
 
   function refreshLibrary() {
     void listReviewRecords().then((records) => setRecent(records.slice(0, 3))).catch(() => undefined);
@@ -56,7 +73,13 @@ export function HomeWorkspace() {
       router.push(record.kind === "pgn" ? `/review/${record.id}` : `/review/${record.id}/engine`);
     } catch (requestError) {
       saving.current = false;
-      setError(requestError instanceof Error ? requestError.message : "Unable to import this chess record.");
+      const message = requestError instanceof Error ? requestError.message : "";
+      const known = message === "This PGN could not be parsed."
+        || message === "This product only supports standard chess."
+        || message.includes("at least one move")
+        || message.includes("Unable to replay");
+      if (!known) console.error(requestError);
+      setError(known ? message : "This chess record could not be imported.");
       setStatus("idle");
     }
   }
@@ -64,6 +87,13 @@ export function HomeWorkspace() {
   function loadExample() {
     setKind("pgn");
     setInput(SAMPLE_PGN);
+    setError(null);
+    void openReview(SAMPLE_PGN);
+  }
+
+  function loadStartingPosition() {
+    setKind("fen");
+    setInput(STARTING_FEN);
     setError(null);
   }
 
@@ -83,8 +113,8 @@ export function HomeWorkspace() {
     }
   }
 
-  async function applySyncAnalysisPolicy(games: SyncedGame[], mode: PlatformSyncMode) {
-    if (mode === "incremental") {
+  async function applySyncAnalysisPolicy(games: SyncedGame[], mode: PlatformSyncMode, complete = true) {
+    if (mode === "incremental" && complete) {
       const settings = loadAppSettings();
       const selected = games.slice(0, settings.autoAnalyzeImported);
       if (selected.length > 0) await autoAnalyzeSyncedGames(selected, { depth: settings.reviewDepth, multiPv: settings.reviewMultiPv });
@@ -98,45 +128,71 @@ export function HomeWorkspace() {
       <section className="home-hero">
         <div className="home-copy">
           <div className="home-chess-identity" aria-hidden="true">
-            <BlueBishopMark size={78} decorative />
+            <BlueBishopMark size={52} decorative />
             <span><b>Position by position</b><small>Stockfish · Maia · grounded Coach</small></span>
           </div>
           <span className="kicker">Open Chess Review</span>
           <h1>Review a chess game.<br /><em>See what mattered.</em></h1>
-          <p>Import a PGN or position, explore the board, compare objective and human choices, and turn critical moves into lessons.</p>
+          <p>The board is ready. Paste a PGN, load an example, or connect an account and sync recent games.</p>
         </div>
 
-        <form
-          className="import-card"
-          aria-labelledby="import-title"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void openReview();
-          }}
-        >
-          <div className="import-heading"><span className="kicker">New review</span><h2 id="import-title">Bring in a game</h2></div>
-          <div className="source-tabs" role="group" aria-label="Import source">
-            <button type="button" aria-pressed={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => setKind("pgn")}>PGN</button>
-            <button type="button" aria-pressed={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => setKind("fen")}>FEN</button>
-            <Link href="/settings#chesscom-link" aria-label="Connect Chess.com in Settings">Chess.com</Link>
-            <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Lichess</Link>
-          </div>
-          <label className="import-field">
-            <span>{kind === "pgn" ? "Paste a complete PGN" : "Paste an explicit FEN"}</span>
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder={kind === "pgn" ? "[Event \"My game\"]\n\n1. e4 e5 2. Nf3 …" : "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}
-              spellCheck={false}
-            />
-          </label>
-          {error && <p className="error" role="alert">{error}</p>}
-          <button type="submit" className="primary import-submit" disabled={status === "saving" || input.trim() === ""}>
-            {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
-          </button>
-          <button type="button" className="text-action" onClick={loadExample}>Load example game</button>
-          <small className="import-note">Game and analysis records stay in this browser unless you explicitly choose a cloud coach provider.</small>
-        </form>
+        <div className="home-stage">
+          <figure className="home-board">
+            <div className="home-board-frame" aria-hidden="true">
+              <Chessboard options={{
+                position: fen,
+                allowDragging: false,
+                canDragPiece: () => false,
+                allowDrawingArrows: false,
+                boardOrientation: "white",
+                lightSquareStyle: { backgroundColor: "#f2e5cf" },
+                darkSquareStyle: { backgroundColor: "#91aeb6" },
+                lightSquareNotationStyle: { color: "#6d8290" },
+                darkSquareNotationStyle: { color: "#f4eadb" },
+                boardStyle: { borderRadius: "5px", boxShadow: "0 20px 54px rgba(60, 74, 84, .16)" },
+              }} />
+            </div>
+            <figcaption>{
+              !ready
+                ? "Starting position"
+                : !preview.previewable
+                  ? "Could not preview this input"
+                  : kind === "fen" ? "This position" : "Opening position of the pasted game"
+            }</figcaption>
+          </figure>
+
+          <form
+            className="import-card"
+            aria-labelledby="import-title"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void openReview();
+            }}
+          >
+            <div className="import-heading"><span className="kicker">New review</span><h2 id="import-title">Bring in a game</h2></div>
+            <div className="source-tabs" role="group" aria-label="Import source">
+              <button type="button" aria-pressed={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => { if (kind === "pgn") return; setKind("pgn"); setInput(""); setError(null); }}>PGN</button>
+              <button type="button" aria-pressed={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => { if (kind === "fen") return; setKind("fen"); setInput(""); setError(null); }}>FEN</button>
+            </div>
+            <label className="import-field">
+              <span>{kind === "pgn" ? "Paste a complete PGN" : "Paste an explicit FEN"}</span>
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder={kind === "pgn" ? "Paste a complete PGN…" : "Paste a FEN…"}
+                spellCheck={false}
+              />
+            </label>
+            {error && <p className="error" role="alert">{error}</p>}
+            <button type="submit" className="primary import-submit" disabled={!ready || status === "saving"}>
+              {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
+            </button>
+            <button type="button" className="text-action" onClick={kind === "pgn" ? loadExample : loadStartingPosition}>
+              {kind === "pgn" ? "Load example game" : "Use starting position"}
+            </button>
+            <small className="import-note">Game and analysis records stay in this browser unless you explicitly choose a cloud coach provider.</small>
+          </form>
+        </div>
       </section>
 
       <ConnectedAccounts compact onGamesUpdated={applySyncAnalysisPolicy} />

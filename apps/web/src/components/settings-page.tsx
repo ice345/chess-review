@@ -65,7 +65,7 @@ export function SettingsPage() {
           <label>Continuation lines<select value={settings.continuationLines} onChange={(event) => update({ ...settings, continuationLines: Number(event.target.value) as AppSettings["continuationLines"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>Moves shown per line<select value={settings.continuationLength} onChange={(event) => update({ ...settings, continuationLength: Number(event.target.value) as AppSettings["continuationLength"] })}>{[6, 8, 10, 12, 16].map((value) => <option key={value}>{value}</option>)}</select></label>
           <label>After account sync<select value={settings.autoAnalyzeImported} onChange={(event) => update({ ...settings, autoAnalyzeImported: Number(event.target.value) as AppSettings["autoAnalyzeImported"] })}><option value={0}>Off · choose each game</option><option value={1}>Analyze newest 1</option><option value={3}>Analyze newest 3</option><option value={5}>Analyze newest 5</option></select></label>
-          <small>Depth affects full-review cache identity. Full-game classification always uses canonical 3PV plus selective verification; Engine Lab lines only controls the current position and branches. Full-history imports automatically queue objective Stockfish analysis. This setting only controls optional newest-game analysis during “Sync newest”; it never starts Maia or Coach.</small>
+          <small>Deeper reviews take longer and are cached separately. Engine Lab lines control only the current position. Sync-newest can auto-analyze a few recent games; it never starts Maia or Coach.</small>
         </section>
         <section className="settings-card">
           <div><span className="kicker">Human defaults</span><h2>Maia prediction</h2></div>
@@ -84,6 +84,7 @@ export function SettingsPage() {
         <section className="settings-card">
           <div><span className="kicker">Coach defaults</span><h2>Explanation layer</h2></div>
           <label>Provider<select value={settings.coachProvider} onChange={(event) => update({ ...settings, coachProvider: event.target.value as CoachRequestProvider })}><option value="ollama">Ollama · local</option><option value="openai-compatible">OpenAI-compatible</option></select></label>
+          {settings.coachProvider === "openai-compatible" && <small role="status">Cloud explanations send structured move facts off this device. Game PGNs stay in the browser unless you paste them elsewhere.</small>}
           <label>Language<select value={settings.coachLanguage} onChange={(event) => update({ ...settings, coachLanguage: event.target.value as CoachLanguage })}><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
           <label>Local model<select value={settings.coachModel} onChange={(event) => update({ ...settings, coachModel: event.target.value })}>
             {!selectedModelInstalled && <option value={settings.coachModel}>{settings.coachModel} · not detected</option>}
@@ -118,6 +119,22 @@ export function SettingsPage() {
       </div>
       {oauthNotice && <p className="oauth-notice" role="status">{oauthNotice}</p>}
       <ConnectedAccounts />
+      <div className="settings-grid">
+        <section className="settings-card data-card">
+          <div><span className="kicker">This browser</span><h2>Local data</h2></div>
+          <p>Games, reviews, analysis cache, training jobs and settings stay in this browser until you delete them. Disconnecting an account asks whether to keep imported games.</p>
+          <div className="account-sync-actions">
+            <button type="button" className="secondary" onClick={() => {
+              if (!window.confirm("Clear derived Stockfish analysis cache? Reviews and imported games stay.")) return;
+              void import("../lib/local-data").then(({ resetLocalData }) => resetLocalData("cache"));
+            }}>Clear analysis cache</button>
+            <button type="button" className="secondary danger" onClick={() => {
+              if (!window.confirm("Erase all Open Chess Review data in this browser? This cannot be undone.")) return;
+              void import("../lib/local-data").then(({ resetLocalData }) => resetLocalData("all")).then(() => window.location.assign("/"));
+            }}>Reset all local data</button>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
