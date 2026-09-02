@@ -1,4 +1,4 @@
-import type { MoveClassification } from "@chess-review/shared";
+import type { MoveAnnotation, MoveClassification } from "@chess-review/shared";
 
 export type QualityMotif =
   | "diamond-double"
@@ -45,6 +45,7 @@ export interface QualityIconProps {
   classification: MoveClassification;
   size?: number;
   title?: string;
+  decorative?: boolean;
 }
 
 const textStyle = {
@@ -99,12 +100,39 @@ function Motif({ motif, ink, wash }: { motif: QualityMotif; ink: string; wash: s
   }
 }
 
+export function classificationForAnnotation(annotation: MoveAnnotation): MoveClassification {
+  switch (annotation) {
+    case "brilliant":
+      return "brilliant";
+    case "critical":
+      return "great";
+    case "book":
+      return "book";
+    case "forced":
+      return "forced";
+    case "sacrifice":
+      return "interesting";
+    case "missed_win":
+      return "missed_win";
+    case "missed_mate":
+      return "missed_mate";
+  }
+}
+
 /** Project-owned Move Quality Annotation System V3, rendered as inline SVG. */
-export function QualityIcon({ classification, size = 28, title }: QualityIconProps) {
+export function QualityIcon({ classification, size = 28, title, decorative = false }: QualityIconProps) {
   const meta = QUALITY_META[classification];
+  const label = title ?? meta.label;
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" role="img" aria-label={title ?? meta.label}>
-      <title>{title ?? meta.label}</title>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      role={decorative ? "presentation" : "img"}
+      aria-hidden={decorative ? true : undefined}
+      aria-label={decorative ? undefined : label}
+    >
+      {decorative ? null : <title>{label}</title>}
       <Motif motif={meta.motif} ink={meta.ink} wash={meta.wash} />
     </svg>
   );

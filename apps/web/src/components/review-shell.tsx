@@ -7,7 +7,7 @@ import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
-import { BoardQualityBadge, EvaluationGraph, QUALITY_META } from "@chess-review/ui";
+import { BoardQualityBadge, QUALITY_META } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
 import { ReviewRuntimeProvider } from "./review-runtime";
 import { BoardFlipButton } from "./review/board-flip-button";
@@ -23,6 +23,7 @@ import { useReviewHuman } from "../hooks/use-review-human";
 import { useReviewPlayback } from "../hooks/use-review-playback";
 import { useReviewRecord } from "../hooks/use-review-record";
 import { loadAppSettings } from "../lib/app-settings";
+import { useLocalAiHealth } from "../lib/use-local-ai-health";
 import {
   analysisModeArrows,
   matchingHumanCandidate,
@@ -33,7 +34,7 @@ import {
 import { boardMoveHintStyles, pieceMatchesTurn } from "../lib/board-move-hints";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { orderPlayersForBoard } from "../lib/player-identity";
-import { downloadBlob, renderGameReviewCard, renderPositionCard, reviewFilename } from "../lib/png-export";
+import { downloadBlob, renderDisplayedPositionCard, renderGameReviewCard, renderPositionCard, reviewFilename } from "../lib/png-export";
 import { BlueBishopMark } from "@chess-review/ui";
 import { saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { exportAnalysisJson, exportAnnotatedPgn } from "@chess-review/shared";
@@ -45,6 +46,10 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const gameId = params.gameId;
   const state = useReviewStore();
   const settings = useMemo(() => loadAppSettings(), []);
+  // Review's Maia and Coach surfaces share one capability poller. This keeps
+  // route transitions and health updates from creating duplicate /health
+  // requests and intervals.
+  const localAi = useLocalAiHealth();
   const soundRuntime = useChessSounds({
     game: state.game,
     currentPly: state.currentPly,
@@ -79,7 +84,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     persistEnrichedAnalysis,
   } = analysisRuntime;
   const branchQualityRuntime = useBranchMoveQuality(reviewDepth, reviewMultiPv);
-  const coachRuntime = useReviewCoach(settings, persistEnrichedAnalysis);
+  const coachRuntime = useReviewCoach(settings, persistEnrichedAnalysis, localAi);
   const { record, setRecord, loadState, loadError } = useReviewRecord({
     gameId,
     settings,
@@ -114,6 +119,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     [reviewedAnalysis],
   );
   const humanRuntime = useReviewHuman({
+    localAi,
     positionFen: state.positionFen,
     reviewedMove: reviewedMoveTarget,
     persistedHuman: reviewedAnalysis?.human,
@@ -136,6 +142,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   }, [humanRuntime.moveReview, reviewedAnalysis]);
   const currentHuman = matchingStoredHuman ?? liveHuman;
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
+  const pendingPromotionRef = useRef(pendingPromotion);
+  pendingPromotionRef.current = pendingPromotion;
   const requestedPlyApplied = useRef<string | null>(null);
   const legalDestinations = useMemo(
     () => selectedSquare ? legalBoardDestinations(state.positionFen, selectedSquare) : [],
@@ -148,6 +157,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setSelectedSquare(null);
+    setPendingPromotion(null);
   }, [state.positionFen]);
 
   useEffect(() => {
@@ -179,7 +189,15 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function navigate(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+      if (pendingPromotionRef.current) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setPendingPromotion(null);
+        }
+        return;
+      }
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select, button, a, [contenteditable='true'], [role='slider']")) return;
       const review = useReviewStore.getState();
       if (event.key === "Escape" && review.branch) {
         pausePlayback();
@@ -199,6 +217,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", navigate);
     return () => window.removeEventListener("keydown", navigate);
   }, [pausePlayback]);
+
+  const root = `/review/${gameId}`;
 
   if (loadState !== "ready" || !record) {
     return (
@@ -224,11 +244,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     ?? currentAnalysis?.evaluationAfter
     ?? state.analysis?.moves[0]?.evaluationBefore
     ?? null;
-  const root = `/review/${gameId}`;
   const primary = [
     { href: root, label: "Review" },
     { href: `${root}/moves`, label: "Moves" },
     { href: `${root}/coach`, label: "Study" },
+    { href: `${root}/engine`, label: "Engine" },
   ];
   const selectedBranchMove = selectedBranch?.move ?? null;
   const boardArrows = analysisModeArrows({
@@ -243,9 +263,41 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     downloadBlob(new Blob([content], { type: `${mimeType};charset=utf-8` }), filename);
   }
 
+  function playBoardMove(from: string, to: string, promotion?: "q" | "r" | "b" | "n") {
+    const destinations = legalBoardDestinations(state.positionFen, from).filter((move) => move.to === to);
+    const promotionChoices = destinations.flatMap((move) => (
+      move.promotion === "q" || move.promotion === "r" || move.promotion === "b" || move.promotion === "n"
+        ? [move.promotion]
+        : []
+    ));
+    if (promotionChoices.length > 0 && promotion === undefined) {
+      setPendingPromotion({ from, to });
+      return false;
+    }
+    setPendingPromotion(null);
+    return state.playAnalysisMove(from, to, promotion);
+  }
+
   async function exportPositionPng() {
-    if (!state.analysis || !currentAnalysis) return;
-    downloadBlob(await renderPositionCard(state.analysis, currentAnalysis, state.orientation), reviewFilename(state.analysis, `move-${currentAnalysis.ply}.png`));
+    const fen = state.positionFen;
+    const title = state.branch
+      ? `Analysis variation · ${selectedBranchMove?.san ?? "root"}`
+      : currentMove
+        ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}`
+        : "Starting position";
+    if (state.analysis && currentAnalysis && !state.branch) {
+      downloadBlob(await renderPositionCard(state.analysis, currentAnalysis, state.orientation), reviewFilename(state.analysis, `move-${currentAnalysis.ply}.png`));
+      return;
+    }
+    downloadBlob(
+      await renderDisplayedPositionCard({
+        fen,
+        orientation: state.orientation,
+        title,
+        subtitle: state.analysis?.opening ? `${state.analysis.opening.eco} · ${state.analysis.opening.name}` : "Displayed position",
+      }),
+      `${title.replaceAll(" ", "-").toLowerCase()}.png`,
+    );
   }
 
   async function exportReviewPng() {
@@ -373,10 +425,10 @@ export function ReviewShell({ children }: { children: ReactNode }) {
             <details key={`export-${pathname}`}><summary>Export</summary><div className="action-menu">
               <button type="button" disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json"))}>Canonical JSON</button>
               <button type="button" disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn"))}>Annotated PGN</button>
-              <button type="button" disabled={!currentAnalysis} onClick={() => void exportPositionPng()}>Position PNG</button>
+              <button type="button" onClick={() => void exportPositionPng()}>Position PNG</button>
               <button type="button" disabled={!state.analysis} onClick={() => void exportReviewPng()}>Review PNG</button>
             </div></details>
-            <details key={`more-${pathname}`}><summary>More</summary><div className="action-menu"><Link href={`${root}/engine`}>Engine Lab</Link><Link href="/settings">Settings</Link></div></details>
+            <Link className="review-settings-link" href="/settings">Settings</Link>
           </div>
         </div>
 
@@ -414,34 +466,29 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                     position: state.positionFen,
                     allowDragging: true,
                     allowDrawingArrows: false,
-                    arrows: boardArrows,
+                    arrows: pendingPromotion ? [] : boardArrows,
                     arrowOptions: { ...defaultArrowOptions, arrowWidthDenominator: 9, opacity: .76 },
                     boardOrientation: state.orientation,
                     animationDurationInMs: 160,
                     squareStyles: boardSquareStyles,
-                    canDragPiece: ({ piece }) => pieceMatchesTurn(piece.pieceType, state.positionFen),
+                    canDragPiece: ({ piece }) => !pendingPromotion && pieceMatchesTurn(piece.pieceType, state.positionFen),
                     onPieceDrag: ({ piece, square }) => {
                       if (square && pieceMatchesTurn(piece.pieceType, state.positionFen)) setSelectedSquare(square);
                     },
                     onPieceDragCancel: () => setSelectedSquare(null),
                     onPieceDrop: ({ sourceSquare, targetSquare }) => {
                       setSelectedSquare(null);
-                      if (!targetSquare) return false;
+                      if (pendingPromotion || !targetSquare) return false;
                       playback.pause();
-                      return state.playAnalysisMove(sourceSquare, targetSquare);
+                      return playBoardMove(sourceSquare, targetSquare);
                     },
                     onSquareClick: ({ piece, square }) => {
+                      if (pendingPromotion) return;
                       if (selectedSquare) {
-                        const destination = legalDestinations.find((move) => move.to === square && (move.promotion === undefined || move.promotion === "q"))
-                          ?? legalDestinations.find((move) => move.to === square);
+                        const destination = legalDestinations.find((move) => move.to === square);
                         if (destination) {
                           playback.pause();
-                          const promotion = destination.promotion;
-                          state.playAnalysisMove(
-                            selectedSquare,
-                            square,
-                            promotion === "q" || promotion === "r" || promotion === "b" || promotion === "n" ? promotion : undefined,
-                          );
+                          playBoardMove(selectedSquare, square);
                           setSelectedSquare(null);
                           return;
                         }
@@ -461,11 +508,44 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                     darkSquareNotationStyle: { color: "#f4eadb" },
                     boardStyle: { borderRadius: "5px", boxShadow: "0 20px 54px rgba(60, 74, 84, .16)" },
                   }} />
-                  {state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
+                  {pendingPromotion && (
+                    <div className="promotion-chooser" role="dialog" aria-label="Choose promotion piece">
+                      <div className="promotion-pieces">
+                        {([
+                          ["q", "Queen"],
+                          ["r", "Rook"],
+                          ["b", "Bishop"],
+                          ["n", "Knight"],
+                        ] as const).map(([piece, label]) => {
+                          const black = state.positionFen.split(" ")[1] === "b";
+                          const glyph = piece === "q" ? (black ? "♛" : "♕")
+                            : piece === "r" ? (black ? "♜" : "♖")
+                              : piece === "b" ? (black ? "♝" : "♗")
+                                : (black ? "♞" : "♘");
+                          return (
+                            <button
+                              type="button"
+                              key={piece}
+                              autoFocus={piece === "q"}
+                              onClick={() => {
+                                playback.pause();
+                                playBoardMove(pendingPromotion.from, pendingPromotion.to, piece);
+                              }}
+                            >
+                              <span aria-hidden="true">{glyph}</span>
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button type="button" className="promotion-cancel" onClick={() => setPendingPromotion(null)}>Cancel</button>
+                    </div>
+                  )}
+                  {!pendingPromotion && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
                     ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={state.orientation} classification={selectedBranchQuality.classification} />
                     : currentAnalysis && !state.branch
                       ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />
-                      : null}
+                      : null)}
                 </div>
               </div>
               <PlayerStrip player={orderedPlayers.bottom} />
@@ -501,10 +581,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
               </div>
             </section>
 
-            {state.analysis && <section className="timeline-panel"><div><span className="kicker">The whole game</span><strong>Evaluation timeline</strong><small>Hover for details · selecting a point returns to the canonical game</small></div><EvaluationGraph analysis={state.analysis} currentPly={state.currentPly} onSelectPly={navigateToPly} /></section>}
           </div>
 
-          <aside className="context-panel">{children}</aside>
+          <aside className={`context-panel${pathname === `${root}/moves` ? " moves-context" : ""}`}>{children}</aside>
         </div>
       </main>
     </ReviewRuntimeProvider>

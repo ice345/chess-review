@@ -115,40 +115,82 @@
 
 .action-menu button:hover,
 .action-menu a:hover { background: #e9f0ee; color: #345b6d; }
+.review-settings-link {
+  padding: 8px 10px;
+  border: 1px solid #cbd5d3;
+  border-radius: 9px;
+  color: #667d87;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .review-settings-link { display: none; }
+}
 
 .review-workspace {
+  --eval-gutter: 40px;
+  --review-board-size: min(520px, calc(100vh - 390px), calc(100vw - 620px));
   width: min(1280px, calc(100% - 44px));
   margin: 36px auto 0;
   display: grid;
-  grid-template-columns: minmax(540px, 650px) minmax(390px, 1fr);
-  gap: clamp(34px, 4vw, 72px);
+  grid-template-columns: max-content minmax(360px, 1fr);
+  grid-template-rows: auto auto;
+  gap: clamp(28px, 3.2vw, 52px) clamp(28px, 3.2vw, 52px);
   align-items: start;
 }
 
+.analysis-column {
+  width: calc(var(--review-board-size) + var(--eval-gutter) + 10px);
+}
+
 .context-panel {
-  min-height: 620px;
+  min-height: 0;
+  max-height: calc(var(--review-board-size) + 245px);
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  scrollbar-width: thin;
+}
+.context-panel > * { min-width: 0; min-height: 0; }
+.context-panel.moves-context {
+  height: calc(var(--review-board-size) + 245px);
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .timeline-panel {
-  width: min(1280px, calc(100% - 44px));
-  min-height: 340px;
-  margin: 48px auto 82px;
-  padding: 25px 30px 18px;
-  border: 1px solid rgba(115, 143, 149, .26);
-  border-radius: 24px 20px 27px 21px;
-  background: rgba(255, 253, 248, .64);
-  box-shadow: 0 20px 55px rgba(65, 84, 90, .075);
+  width: 100%;
+  min-height: 0;
+  margin: 18px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid rgba(115, 143, 149, .26);
 }
-
-.timeline-panel > div:first-child {
+.timeline-panel[open] { min-height: 0; }
+.timeline-panel > summary {
   display: grid;
-  justify-content: start;
-  gap: 4px;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 16px;
+  cursor: pointer;
+  list-style: none;
 }
+.timeline-panel > summary::-webkit-details-marker { display: none; }
+.timeline-panel > summary .kicker { grid-column: 1; }
+.timeline-panel > summary strong { grid-column: 1; }
+.timeline-panel > summary::after {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #6e8792;
+  font-size: 10px;
+  content: "Show";
+}
+.timeline-panel[open] > summary::after { content: "Hide"; }
 
-.timeline-panel strong { color: #2f4c58; font: 500 25px Georgia, "Songti SC", serif; }
+.timeline-panel strong { color: #2f4c58; font: 500 21px Georgia, "Songti SC", serif; }
 .timeline-panel small { color: #819096; font-size: 10px; }
-.timeline-panel .evaluation-graph svg { width: 100%; height: 280px; display: block; overflow: visible; }
+.timeline-panel .evaluation-graph svg { width: 100%; height: 220px; display: block; overflow: visible; }
 
 .evaluation-graph { position: relative; }
 
@@ -180,12 +222,13 @@
 
 @media (max-width: 1120px) {
   .review-workspace {
-    grid-template-columns: minmax(490px, 570px) minmax(350px, 1fr);
-    gap: 34px;
+    --review-board-size: min(500px, calc(100vw - 480px));
+    grid-template-columns: max-content minmax(320px, 1fr);
+    gap: 28px;
   }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .review-titlebar {
     padding: 9px 12px;
     grid-template-columns: 1fr auto;
@@ -196,21 +239,24 @@
   .review-nav a { padding-inline: 10px; }
 
   .review-workspace {
+    --review-board-size: min(calc(100vw - 74px), 600px);
     width: min(100% - 24px, 650px);
     margin-top: 20px;
     grid-template-columns: 1fr;
     gap: 42px;
   }
 
-  .context-panel { min-height: 0; }
-  .timeline-panel { width: min(100% - 24px, 760px); margin-top: 44px; padding-inline: 15px; }
+  .analysis-column { width: 100%; }
+  .context-panel { min-height: 0; max-height: none; overflow: visible; }
+  .context-panel.moves-context { height: auto; }
+  .timeline-panel { width: 100%; margin-top: 16px; padding-top: 14px; }
 }
 
 @media (max-width: 560px) {
-  .review-actions details:first-child { display: none; }
   .review-nav a { padding: 8px 7px; font-size: 9px; }
+  .review-actions summary { min-height: 32px; padding: 0 10px; font-size: 10px; }
   .review-workspace { width: min(100% - 16px, 650px); }
-  .timeline-panel { min-height: 290px; margin-bottom: 45px; }
-  .timeline-panel .evaluation-graph svg { height: 230px; }
+  .review-workspace { --review-board-size: min(calc(100vw - 62px), 520px); }
+  .timeline-panel .evaluation-graph svg { height: 190px; }
   .evaluation-graph-detail { position: static; min-height: 25px; margin: 2px 8px 0; flex-wrap: wrap; }
 }

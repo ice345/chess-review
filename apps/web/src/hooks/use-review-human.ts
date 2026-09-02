@@ -12,7 +12,7 @@ import {
 import { savePreferredHumanModel, savePreferredHumanTargetElo } from "../lib/app-settings";
 import type { AnalysisMode } from "../lib/board-analysis-arrows";
 import type { MaiaServiceState } from "../lib/human-lens-state";
-import { useLocalAiHealth } from "../lib/use-local-ai-health";
+import type { LocalAiHealthRuntime } from "../lib/use-local-ai-health";
 
 export interface ReviewedMoveTarget {
   ply: number;
@@ -37,6 +37,7 @@ interface PositionOutput {
 }
 
 export function useReviewHuman({
+  localAi,
   positionFen,
   reviewedMove,
   persistedHuman,
@@ -45,6 +46,7 @@ export function useReviewHuman({
   initialTargetElo,
   initialModel,
 }: {
+  localAi: LocalAiHealthRuntime;
   positionFen: string;
   reviewedMove: ReviewedMoveTarget | null;
   persistedHuman: HumanAnalysis | undefined;
@@ -53,7 +55,6 @@ export function useReviewHuman({
   initialTargetElo: number;
   initialModel: MaiaModel;
 }) {
-  const localAi = useLocalAiHealth();
   const [mode, setMode] = useState<AnalysisMode>("stockfish");
   const [targetElo, setTargetEloState] = useState(initialTargetElo);
   const [model, setModelState] = useState<MaiaModel>(initialModel);

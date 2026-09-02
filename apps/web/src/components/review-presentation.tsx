@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { GameAnalysisV2, GamePhase, MoveAnnotation, MoveQuality } from "@chess-review/shared";
-import { QualityIcon, QUALITY_META } from "@chess-review/ui";
+import type { GameAnalysisV2, GamePhase, MoveQuality } from "@chess-review/shared";
+import { classificationForAnnotation, QualityIcon, QUALITY_META } from "@chess-review/ui";
+import { ANNOTATION_LABEL, ANNOTATION_ORDER, displayedMoveQualityLabel } from "../lib/move-quality-label";
 
 const PHASES: Array<{ key: GamePhase; label: string }> = [
   { key: "opening", label: "Opening" },
@@ -11,16 +12,6 @@ const PHASES: Array<{ key: GamePhase; label: string }> = [
 ];
 
 const QUALITY_ORDER: MoveQuality[] = ["best", "excellent", "good", "inaccuracy", "mistake", "blunder"];
-const ANNOTATION_ORDER: MoveAnnotation[] = ["brilliant", "critical", "book", "forced", "sacrifice", "missed_win", "missed_mate"];
-const ANNOTATION_LABEL: Record<MoveAnnotation, string> = {
-  brilliant: "Brilliant",
-  critical: "Critical",
-  book: "Book",
-  forced: "Forced",
-  sacrifice: "Sacrifice",
-  missed_win: "Missed win",
-  missed_mate: "Missed mate",
-};
 
 function accuracy(value: number | undefined): string {
   return value === undefined ? "—" : value.toFixed(1);
@@ -57,13 +48,22 @@ export function ReviewOverview({
       <div className="accuracy-table">
         <div className="accuracy-head"><span /><strong>White</strong><strong>Black</strong></div>
         <div className="accuracy-row overall"><span>Overall</span><strong>{accuracy(analysis.white.accuracy)}</strong><strong>{accuracy(analysis.black.accuracy)}</strong></div>
-        {PHASES.map(({ key, label }) => (
-          <div className="accuracy-row" key={key}>
-            <span>{label}</span>
-            <strong>{accuracy(analysis.white.phaseAccuracy[key])}</strong>
-            <strong>{accuracy(analysis.black.phaseAccuracy[key])}</strong>
-          </div>
-        ))}
+        {PHASES.map(({ key, label }) => {
+          const openingOnly = analysis.division.middlePly === undefined;
+          const white = key === "opening" && openingOnly
+            ? analysis.white.phaseAccuracy.opening ?? analysis.white.accuracy
+            : analysis.white.phaseAccuracy[key];
+          const black = key === "opening" && openingOnly
+            ? analysis.black.phaseAccuracy.opening ?? analysis.black.accuracy
+            : analysis.black.phaseAccuracy[key];
+          return (
+            <div className="accuracy-row" key={key}>
+              <span>{label}</span>
+              <strong>{accuracy(white)}</strong>
+              <strong>{accuracy(black)}</strong>
+            </div>
+          );
+        })}
       </div>
 
       <div className="classification-summary">
@@ -71,7 +71,7 @@ export function ReviewOverview({
         <div className="classification-heading"><span /><span /><strong>White</strong><strong>Black</strong></div>
         {counts.map(({ quality, white, black }) => (
           <div className="classification-count" key={quality}>
-            <QualityIcon classification={quality} size={23} />
+            <QualityIcon classification={quality} size={23} decorative />
             <span>{QUALITY_META[quality].label}</span>
             <strong>{white}</strong>
             <strong>{black}</strong>
@@ -81,12 +81,19 @@ export function ReviewOverview({
 
       {annotations.length > 0 && <div className="annotation-summary">
         <div className="eyebrow">ANNOTATIONS</div>
-        <div className="annotation-heading"><span /><strong>White</strong><strong>Black</strong></div>
-        {annotations.map(({ annotation, white, black }) => <div className="annotation-count" key={annotation}><span>{ANNOTATION_LABEL[annotation]}</span><strong>{white}</strong><strong>{black}</strong></div>)}
+        <div className="annotation-heading"><span /><span /><strong>White</strong><strong>Black</strong></div>
+        {annotations.map(({ annotation, white, black }) => (
+          <div className="annotation-count" key={annotation}>
+            <QualityIcon classification={classificationForAnnotation(annotation)} size={23} decorative title={ANNOTATION_LABEL[annotation]} />
+            <span>{ANNOTATION_LABEL[annotation]}</span>
+            <strong>{white}</strong>
+            <strong>{black}</strong>
+          </div>
+        ))}
       </div>}
 
       {analysis.division.middlePly === undefined && (
-        <p className="phase-note">This game never crossed the structural middlegame boundary, so phase Accuracy is intentionally omitted.</p>
+        <p className="phase-note">This game stayed in the opening structurally. Opening Accuracy matches overall Accuracy; middlegame and endgame remain omitted.</p>
       )}
 
       <div className="critical-list">
@@ -96,11 +103,23 @@ export function ReviewOverview({
         ) : analysis.criticalMoments.slice(0, 3).map((critical) => {
           const move = analysis.moves[critical.ply - 1];
           if (!move) return null;
+          const swing = critical.winPercentSwing;
+          const iconClassification = move.annotations.includes("critical") ? "great" : critical.classification;
           return (
-            <button type="button" key={critical.ply} onClick={() => onSelectPly(critical.ply)}>
-              <QualityIcon classification={critical.classification} size={25} />
+            <button
+              type="button"
+              key={critical.ply}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                onSelectPly(critical.ply);
+                event.currentTarget.closest(".context-panel")?.scrollTo({ top: 0 });
+              }}
+            >
+              <QualityIcon classification={iconClassification} size={25} title="Critical" />
               <span>{Math.ceil(critical.ply / 2)}{move.color === "white" ? "." : "…"} {move.san}</span>
-              <strong>−{critical.winPercentSwing.toFixed(1)}%</strong>
+              <strong className={swing > 0 ? "critical-loss" : "critical-quiet"}>
+                {swing > 0 ? `−${swing.toFixed(1)}%` : "Only reasonable move"}
+              </strong>
             </button>
           );
         })}
@@ -137,7 +156,9 @@ export function ReviewMoves({
           <span className="move-number">{Math.ceil(move.ply / 2)}{move.color === "white" ? "." : "…"}</span>
           <QualityIcon classification={move.classification} size={24} />
           <strong>{move.san}</strong>
-          <span className="move-quality" title={move.annotations.length === 0 ? "No special annotations" : `Annotations: ${move.annotations.map((annotation) => ANNOTATION_LABEL[annotation]).join(", ")}`}>{QUALITY_META[move.quality].label}</span>
+          <span className="move-quality" title={move.annotations.length === 0 ? QUALITY_META[move.quality].label : `Annotations: ${move.annotations.map((annotation) => ANNOTATION_LABEL[annotation]).join(", ")}`}>
+            {displayedMoveQualityLabel(move)}
+          </span>
           <small>{move.accuracy.toFixed(0)}</small>
         </button>
       ))}

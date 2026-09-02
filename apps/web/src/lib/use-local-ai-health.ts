@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getLocalAiHealth, type LocalAiHealth } from "./local-ai";
 
 export type LocalAiConnectionState = "checking" | "online" | "offline";
+
+export interface LocalAiHealthRuntime {
+  state: LocalAiConnectionState;
+  health: LocalAiHealth | null;
+  refresh: (signal?: AbortSignal) => Promise<LocalAiHealth | null>;
+}
 
 /**
  * Keeps optional native capabilities in sync with reality. A browser cannot
@@ -45,5 +51,7 @@ export function useLocalAiHealth(pollIntervalMs = 5_000) {
     };
   }, [pollIntervalMs, refresh]);
 
-  return { state, health, refresh };
+  // Keep the runtime identity stable so consumers can share this poller
+  // without retriggering their request callbacks on every health update.
+  return useMemo<LocalAiHealthRuntime>(() => ({ state, health, refresh }), [health, refresh, state]);
 }

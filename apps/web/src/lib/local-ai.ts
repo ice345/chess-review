@@ -26,6 +26,7 @@ export interface LocalAiHealth {
     ollamaModels: string[];
     openaiCompatible: "configured" | "not-configured";
   };
+  identity?: { product: string; version: string };
 }
 
 interface MaiaRequestConfig {
@@ -59,6 +60,14 @@ export class LocalAiRequestError extends Error {
 }
 
 const LOCAL_AI_URL = (process.env.NEXT_PUBLIC_LOCAL_AI_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+const LOCAL_AI_TOKEN = process.env.NEXT_PUBLIC_LOCAL_AI_TOKEN ?? "";
+
+function localAiHeaders(json = false): HeadersInit {
+  const headers: Record<string, string> = {};
+  if (json) headers["Content-Type"] = "application/json";
+  if (LOCAL_AI_TOKEN) headers["X-Open-Chess-Review-Token"] = LOCAL_AI_TOKEN;
+  return headers;
+}
 
 async function responseJson(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
@@ -78,10 +87,17 @@ function errorFromResponse(response: Response, body: unknown): LocalAiRequestErr
 }
 
 export async function getLocalAiHealth(signal?: AbortSignal): Promise<LocalAiHealth> {
-  const response = await fetch(`${LOCAL_AI_URL}/health`, signal === undefined ? {} : { signal });
+  const response = await fetch(`${LOCAL_AI_URL}/health`, {
+    headers: localAiHeaders(),
+    ...(signal === undefined ? {} : { signal }),
+  });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);
-  return body as LocalAiHealth;
+  const health = body as LocalAiHealth;
+  if (health.identity && health.identity.product !== "open-chess-review-local-ai") {
+    throw new LocalAiRequestError("The process on the local-ai port is not Open Chess Review.", 503, "local-service-identity-mismatch");
+  }
+  return health;
 }
 
 interface ApiMaiaCandidate {
@@ -152,7 +168,7 @@ export async function reviewMaiaMove(
 ): Promise<MaiaMoveReview> {
   const response = await fetch(`${LOCAL_AI_URL}/maia/move-review`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: localAiHeaders(true),
     body: JSON.stringify({
       ...maiaConfigBody(request),
       fen_before: request.fenBefore,
@@ -187,7 +203,7 @@ export async function analyzeMaiaPosition(
 ): Promise<MaiaPositionAnalysis> {
   const response = await fetch(`${LOCAL_AI_URL}/maia/position-analysis`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: localAiHeaders(true),
     body: JSON.stringify({ ...maiaConfigBody(request), fen: request.fen }),
     ...(signal === undefined ? {} : { signal }),
   });
@@ -214,7 +230,7 @@ export async function analyzeMaiaPosition(
 export async function downloadMaiaModel(model: MaiaModel, signal?: AbortSignal): Promise<MaiaModelState> {
   const response = await fetch(`${LOCAL_AI_URL}/maia/models/${model}/download`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: localAiHeaders(true),
     body: JSON.stringify({ confirm: true }),
     ...(signal === undefined ? {} : { signal }),
   });
@@ -266,7 +282,7 @@ async function coachRequest<T>(
 ): Promise<T> {
   const response = await fetch(`${LOCAL_AI_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: localAiHeaders(true),
     body: JSON.stringify({
       factsVersion: 1,
       facts,

@@ -16,7 +16,14 @@ export function PlayerStrip({ player }: { player: ReviewPlayerIdentity }) {
         {player.avatarUrl && (
           // Provider avatars come from arbitrary public hosts, so Next Image's
           // static remote-host allowlist is not the right boundary here.
-          <img src={player.avatarUrl} alt="" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.hidden = true; }} />
+          <img
+            key={`${player.color}:${player.username}:${player.avatarUrl}`}
+            src={player.avatarUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            onLoad={(event) => { event.currentTarget.hidden = false; }}
+            onError={(event) => { event.currentTarget.hidden = true; }}
+          />
         )}
       </span>
       <span className="player-name">

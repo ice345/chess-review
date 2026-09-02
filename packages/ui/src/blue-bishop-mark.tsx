@@ -5,7 +5,8 @@ export interface BlueBishopMarkProps {
 }
 
 /** Original project mark: a bishop silhouette whose quiet inner wing follows
- * the piece's diagonal cut. It is deliberately simple enough for 16px use. */
+ * the piece's diagonal cut. Dusty-periwinkle, cream and pale gold keep it
+ * readable at 16px without becoming a literal bird. */
 export function BlueBishopMark({ size = 32, title = "Open Chess Review", decorative = false }: BlueBishopMarkProps) {
   return (
     <svg
@@ -24,7 +25,7 @@ export function BlueBishopMark({ size = 32, title = "Open Chess Review", decorat
       <path d="m19.2 7.8 9.6 9.4" fill="none" stroke="#fbf7ef" strokeWidth="3.1" strokeLinecap="round" />
       <path
         d="M23.4 21.4c5.8-.6 10.2 1.7 12 5.7-4.9-.6-8.8-2.1-12-5.7Zm.3 1.4c.3 3.3-.3 6.3-2.2 9 3.8-1.3 6.2-3.8 7.4-7.4-1.7-.8-3.4-1.4-5.2-1.6Z"
-        fill="#dfeceb"
+        fill="#eadcc0"
         opacity=".92"
       />
       <path d="M7.6 36.2h32.8M10.7 40.1h26.6" fill="none" stroke="currentColor" strokeWidth="3.1" strokeLinecap="round" />

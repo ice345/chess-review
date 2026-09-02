@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { noLegalMoveTerminalStatus, replayUciLine } from "@chess-review/chess-core";
-import { QUALITY_META, QualityIcon } from "@chess-review/ui";
+import type { GameAnalysisV2 } from "@chess-review/shared";
+import { EvaluationGraph, QUALITY_META, QualityIcon } from "@chess-review/ui";
 import { CoachPanel } from "./coach-panel";
 import { AnalysisLensPanel } from "./review/analysis-lens-panel";
 import { CurrentMoveVerdict } from "./review/current-move-verdict";
 import { ReviewMoves, ReviewOverview } from "./review-presentation";
+import { displayedMoveQualityLabel } from "../lib/move-quality-label";
 import { useReviewRuntime } from "./review-runtime";
 import { formatEngineScore } from "../lib/review-format";
 import { selectedBranchNode } from "../lib/analysis-branch";
@@ -100,6 +102,32 @@ function PositionAnalysis() {
   );
 }
 
+function EvaluationTimeline({
+  analysis,
+  currentPly,
+  onSelectPly,
+}: {
+  analysis: GameAnalysisV2;
+  currentPly: number;
+  onSelectPly: (ply: number) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <details
+      className="timeline-panel game-summary-timeline"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        <span className="kicker">The whole game</span>
+        <strong>Evaluation timeline</strong>
+      </summary>
+      <small>Select a point to inspect that ply and return to the canonical game</small>
+      <EvaluationGraph analysis={analysis} currentPly={currentPly} onSelectPly={onSelectPly} />
+    </details>
+  );
+}
+
 export function ObjectiveRoutePanel() {
   const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
@@ -110,11 +138,12 @@ export function ObjectiveRoutePanel() {
   return (
     <div className="route-panel objective-route">
       {move && <CurrentMoveVerdict move={move} />}
+      <PositionAnalysis />
       <section className="game-summary-section" aria-label="Game summary">
         <div className="section-heading"><span className="kicker">Game summary</span><h2>Accuracy, phases and Move Quality</h2></div>
         <ReviewOverview analysis={analysis} onSelectPly={runtime.navigateToPly} allMomentsHref={`/review/${runtime.gameId}/moves`} />
+        <EvaluationTimeline analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} />
       </section>
-      <PositionAnalysis />
     </div>
   );
 }
@@ -130,7 +159,7 @@ export function MovesRoutePanel() {
     <div className="route-panel moves-route">
       <div className="move-filters" aria-label="Move filters">{(["all", "critical", "errors"] as const).map((value) => <button type="button" className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div>
       <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} filter={filter} />
-      {move && <section className="move-evidence"><div><QualityIcon classification={move.classification} size={28} /><span><strong>{move.san} · {QUALITY_META[move.quality].label}</strong><small>{move.annotations.length > 0 ? `Annotations · ${move.annotations.map((annotation) => annotation.replaceAll("_", " ")).join(", ")} · ` : ""}{move.phase} · Accuracy {move.accuracy.toFixed(1)}</small></span></div><dl><div><dt>Quality rule</dt><dd>{(move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule).replaceAll("-", " ")}</dd></div><div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div><div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div><div><dt>Verification</dt><dd>{move.classificationReason.verification?.status ?? "not required"}</dd></div></dl>{move.classificationReason.exclusions.length > 0 && <small>Exclusions · {move.classificationReason.exclusions.join(", ")}</small>}</section>}
+      {move && <section className="move-evidence"><div><QualityIcon classification={move.classification} size={28} /><span><strong>{move.san} · {displayedMoveQualityLabel(move)}</strong><small>{move.annotations.length > 0 ? `Annotations · ${move.annotations.map((annotation) => annotation.replaceAll("_", " ")).join(", ")} · ` : ""}{move.phase} · Accuracy {move.accuracy.toFixed(1)}</small></span></div><dl><div><dt>Quality rule</dt><dd>{(move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule).replaceAll("-", " ")}</dd></div><div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div><div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div><div><dt>Verification</dt><dd>{move.classificationReason.verification?.status ?? "not required"}</dd></div></dl>{move.classificationReason.exclusions.length > 0 && <small>Exclusions · {move.classificationReason.exclusions.join(", ")}</small>}</section>}
     </div>
   );
 }

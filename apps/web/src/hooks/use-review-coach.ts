@@ -15,8 +15,7 @@ import {
   type CoachRequestProvider,
   type LocalAiHealth,
 } from "../lib/local-ai";
-import type { LocalAiConnectionState } from "../lib/use-local-ai-health";
-import { useLocalAiHealth } from "../lib/use-local-ai-health";
+import type { LocalAiConnectionState, LocalAiHealthRuntime } from "../lib/use-local-ai-health";
 import { useReviewStore } from "../store/review-store";
 
 type CoachSettings = Pick<AppSettings, "coachProvider" | "coachLanguage" | "coachModel">;
@@ -43,20 +42,24 @@ export function coachServiceText(
   health: LocalAiHealth | null,
   provider: CoachRequestProvider,
   model: string,
+  language: "en" | "zh-CN" = "en",
 ): string {
-  if (state === "checking") return "Checking the optional coach service…";
-  if (state === "offline") return "Coach offline · start pnpm dev for local generation. Grounded summaries remain available.";
+  const zh = language === "zh-CN";
+  if (state === "checking") return zh ? "正在检查可选讲解服务…" : "Checking the optional coach service…";
+  if (state === "offline") return zh ? "讲解服务离线。可用确定性摘要。" : "Coach offline · start pnpm dev for local generation. Grounded summaries remain available.";
   if (provider === "ollama") {
     if (health?.coach.ollama === "available" && !(health.coach.ollamaModels ?? []).includes(model || health.coach.configuredModel)) {
-      return `${model || health.coach.configuredModel} is not installed. Choose an installed model in Settings.`;
+      return zh
+        ? `${model || health.coach.configuredModel} 未安装。请在设置中选择已安装模型。`
+        : `${model || health.coach.configuredModel} is not installed. Choose an installed model in Settings.`;
     }
     return health?.coach.ollama === "available"
-      ? "Ollama is available. Generation stays on this machine."
-      : "Ollama is offline; deterministic fallback remains available.";
+      ? (zh ? "Ollama 可用。生成过程留在本机。" : "Ollama is available. Generation stays on this machine.")
+      : (zh ? "Ollama 离线；将使用确定性回退。" : "Ollama is offline; deterministic fallback remains available.");
   }
   return health?.coach.openaiCompatible === "configured"
-    ? "OpenAI-compatible Responses provider is configured server-side."
-    : "OpenAI-compatible provider is not configured; deterministic fallback remains available.";
+    ? (zh ? "已配置服务端 OpenAI 兼容接口。" : "OpenAI-compatible Responses provider is configured server-side.")
+    : (zh ? "未配置 OpenAI 兼容接口；将使用确定性回退。" : "OpenAI-compatible provider is not configured; deterministic fallback remains available.");
 }
 
 function sameMoveFacts(analysis: GameAnalysisV2 | null, ply: number, serializedFacts: string): boolean {
@@ -75,8 +78,8 @@ function sameGameFacts(analysis: GameAnalysisV2 | null, serializedFacts: string)
 export function useReviewCoach(
   settings: CoachSettings,
   persistEnrichedAnalysis: (analysis: GameAnalysisV2 | null) => void,
+  localAi: LocalAiHealthRuntime,
 ) {
-  const localAi = useLocalAiHealth();
   const [task, setTask] = useState<ReviewCoachTask | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const activeRequest = useRef<{ kind: "move" | "game"; controller: AbortController } | null>(null);
@@ -103,7 +106,7 @@ export function useReviewCoach(
       if (controller.signal.aborted) return;
       if (!coachProviderReady(currentHealth, provider, selectedModel)) {
         const connectionState: LocalAiConnectionState = currentHealth ? "online" : "offline";
-        throw new Error(coachServiceText(connectionState, currentHealth, provider, selectedModel));
+        throw new Error(coachServiceText(connectionState, currentHealth, provider, selectedModel, language));
       }
       const result = await explainCoachMove(facts, {
         provider,
@@ -154,7 +157,7 @@ export function useReviewCoach(
       if (controller.signal.aborted) return;
       if (!coachProviderReady(currentHealth, provider, selectedModel)) {
         const connectionState: LocalAiConnectionState = currentHealth ? "online" : "offline";
-        throw new Error(coachServiceText(connectionState, currentHealth, provider, selectedModel));
+        throw new Error(coachServiceText(connectionState, currentHealth, provider, selectedModel, language));
       }
       const result = await summarizeCoachGame(facts, {
         provider,

@@ -1,7 +1,15 @@
 /* Phase 5.2 source-aware evaluation and dual move verdicts. */
 
+.eval-stack {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  align-items: stretch;
+  gap: 5px;
+}
 .eval-bar {
   position: relative;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
   border: 1px solid rgba(73, 92, 100, .22);
   border-radius: 10px;
@@ -26,35 +34,20 @@
   background: #f8f3e9;
 }
 
-.eval-bar > span {
-  position: absolute;
-  z-index: 2;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-90deg);
-  color: #334d58;
+.eval-readout {
+  color: #294653;
+  font: 700 13px/1.15 Inter, ui-sans-serif, sans-serif;
+  letter-spacing: -.03em;
+  text-align: center;
+  word-break: break-word;
+}
+.eval-source-label {
+  color: #6d8590;
   font-size: 8px;
-  font-weight: 900;
-  text-shadow: 0 1px rgba(255, 255, 255, .65);
-  white-space: nowrap;
-}
-
-.eval-bar.eval-bottom-black > span {
-  color: #f8f3e9;
-  text-shadow: 0 1px rgba(37, 61, 73, .35);
-}
-
-.eval-bar > small {
-  position: absolute;
-  z-index: 3;
-  top: 7px;
-  left: 50%;
-  transform: translateX(-50%) rotate(-90deg);
-  color: #4e6e76;
-  font-size: 6px;
   font-weight: 800;
-  letter-spacing: .08em;
-  white-space: nowrap;
+  letter-spacing: .04em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .eval-source-maia {
@@ -208,7 +201,7 @@
 }
 
 .game-summary-section {
-  margin: 0 0 30px;
+  margin: 22px 0 0;
   padding: 16px;
   border: 1px solid rgba(117, 145, 146, .24);
   border-radius: 16px 13px 18px 14px;

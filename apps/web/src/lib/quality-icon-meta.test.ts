@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QUALITY_META } from "@chess-review/ui";
+import { classificationForAnnotation, QUALITY_META } from "@chess-review/ui";
 
 describe("Move Quality Annotation System V3 metadata", () => {
   it("uses a distinct silhouette motif for every objective classification", () => {
@@ -13,6 +13,16 @@ describe("Move Quality Annotation System V3 metadata", () => {
       expect(entry.wash).toMatch(/^#[0-9a-f]{6}$/i);
       expect(entry.ink).not.toBe(entry.wash);
     }
+  });
+
+  it("maps independent annotations onto existing V3 silhouettes", () => {
+    expect(classificationForAnnotation("brilliant")).toBe("brilliant");
+    expect(classificationForAnnotation("critical")).toBe("great");
+    expect(classificationForAnnotation("book")).toBe("book");
+    expect(classificationForAnnotation("forced")).toBe("forced");
+    expect(classificationForAnnotation("sacrifice")).toBe("interesting");
+    expect(classificationForAnnotation("missed_win")).toBe("missed_win");
+    expect(classificationForAnnotation("missed_mate")).toBe("missed_mate");
   });
 
   it("keeps the specified elite, positive, informational, warning and severe palettes", () => {

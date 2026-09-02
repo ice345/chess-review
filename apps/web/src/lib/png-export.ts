@@ -129,7 +129,7 @@ function drawBlueBishopMark(context: CanvasRenderingContext2D, x: number, y: num
   context.save();
   context.translate(x, y);
   context.scale(size / 48, size / 48);
-  context.fillStyle = "#608899";
+  context.fillStyle = "#6478a0";
   context.beginPath();
   context.moveTo(24, 3.7);
   context.bezierCurveTo(19.3, 3.7, 15.9, 7.4, 15.9, 11.8);
@@ -147,7 +147,11 @@ function drawBlueBishopMark(context: CanvasRenderingContext2D, x: number, y: num
   context.moveTo(19.2, 7.8);
   context.lineTo(28.8, 17.2);
   context.stroke();
-  context.strokeStyle = "#608899";
+  context.fillStyle = "#eadcc0";
+  context.globalAlpha = 0.92;
+  context.fill(new Path2D("M23.4 21.4c5.8-.6 10.2 1.7 12 5.7-4.9-.6-8.8-2.1-12-5.7Zm.3 1.4c.3 3.3-.3 6.3-2.2 9 3.8-1.3 6.2-3.8 7.4-7.4-1.7-.8-3.4-1.4-5.2-1.6Z"));
+  context.globalAlpha = 1;
+  context.strokeStyle = "#6478a0";
   context.beginPath();
   context.moveTo(7.6, 36.2);
   context.lineTo(40.4, 36.2);
@@ -227,6 +231,25 @@ function toBlob(element: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     element.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG encoding failed.")), "image/png");
   });
+}
+
+export async function renderDisplayedPositionCard(options: {
+  fen: string;
+  orientation: "white" | "black";
+  title: string;
+  subtitle: string;
+}): Promise<Blob> {
+  const [element, context] = canvas();
+  background(context, options.title, options.subtitle);
+  roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
+  drawBoard(context, options.fen, 50, 80, 520, options.orientation);
+  context.fillStyle = "#294653";
+  context.font = "800 28px system-ui";
+  context.fillText("Displayed position", 620, 174);
+  context.fillStyle = "#71848d";
+  context.font = "500 14px system-ui";
+  context.fillText(options.fen, 620, 210);
+  return toBlob(element);
 }
 
 export async function renderPositionCard(

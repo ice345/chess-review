@@ -172,10 +172,18 @@
 .classification-heading { margin-top: 7px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
 .classification-count { margin-top: 5px; font-size: 9px; }
 .classification-heading strong, .classification-count strong { text-align: right; }
-.annotation-heading { margin-top: 7px; display: grid; grid-template-columns: 1fr 30px 30px; gap: 5px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
-.annotation-heading strong { text-align: right; }
-.annotation-count { margin-top: 5px; display: grid; grid-template-columns: 1fr 30px 30px; gap: 5px; font-size: 9px; }
-.annotation-count strong { text-align: right; }
+.annotation-heading,
+.annotation-count {
+  display: grid;
+  grid-template-columns: 24px 1fr 30px 30px;
+  align-items: center;
+  gap: 5px;
+}
+
+.annotation-heading { margin-top: 7px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
+.annotation-count { margin-top: 5px; font-size: 9px; }
+.annotation-heading strong,
+.annotation-count strong { text-align: right; font-variant-numeric: tabular-nums; }
 
 .critical-list { display: grid; gap: 5px; }
 
@@ -192,7 +200,9 @@
   cursor: pointer;
 }
 
-.critical-list button strong { color: #a65a63; font-size: 9px; }
+.critical-list button strong { font-size: 9px; }
+.critical-list button strong.critical-loss { color: #a65a63; }
+.critical-list button strong.critical-quiet { color: #6d8289; font-weight: 650; }
 .view-all-moments { padding: 5px 2px 0; color: #557f91; font-size: 9px; }
 .quiet-empty, .phase-note { margin: 3px 1px 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
 
@@ -218,9 +228,19 @@
 
 .move-filters button.active { background: #fffdf8; color: #426a7c; }
 
-.review-move-list {
-  max-height: 410px;
+.moves-route {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
   display: grid;
+  grid-template-rows: auto minmax(320px, 1fr) auto;
+  gap: 10px;
+}
+.review-move-list {
+  max-height: none;
+  min-height: 0;
+  display: grid;
+  align-content: start;
   gap: 4px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -280,6 +300,17 @@
   display: flex;
   flex-direction: column;
 }
+.coach-game-facts {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #d7e0dd;
+  border-radius: 10px;
+  background: rgba(255, 253, 248, .68);
+}
+.coach-game-facts strong { display: block; color: #344f5a; font-size: 15px; }
+.coach-game-facts p { margin: 6px 0 0; color: #4f6872; font-size: 12px; line-height: 1.45; }
+.coach-game-facts small { display: block; margin-top: 8px; color: var(--muted); font-size: 8px; }
+.coach-move-facts { margin-top: 12px; }
 
 .game-coach-result { order: 1; }
 .coach-result { order: 2; }
@@ -295,6 +326,23 @@
 .coach-heading strong { color: #344f5a; font-size: 15px; }
 .coach-heading > span:first-child { color: #6e828b; font-size: 10px; font-weight: 750; }
 .service-message { margin: 9px 0; color: #788a91; font-size: 10px; line-height: 1.45; }
+
+.coach-configuration-summary {
+  margin: 2px 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  color: #6e828b;
+  font-size: 10px;
+}
+
+.coach-configuration-summary a {
+  color: #527b8d;
+  font-weight: 750;
+  white-space: nowrap;
+}
 
 .coach-actions,
 .engine-actions {
@@ -437,8 +485,9 @@
 .candidate code { color: #4e7789; }
 .candidate small { grid-column: 2 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-@media (max-width: 820px) {
-  .review-move-list { max-height: 520px; }
+@media (max-width: 900px) {
+  .moves-route { height: auto; min-height: 0; max-height: none; grid-template-rows: auto minmax(220px, auto) auto; }
+  .review-move-list { min-height: 220px; }
 }
 
 @media (max-width: 560px) {

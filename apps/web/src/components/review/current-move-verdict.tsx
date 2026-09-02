@@ -5,10 +5,10 @@ import type { MoveAnalysisV2 } from "@chess-review/shared";
 import {
   HUMAN_DIFFICULTY_META,
   HumanDifficultyMark,
-  QUALITY_META,
   QualityIcon,
 } from "@chess-review/ui";
 import { useReviewRuntime } from "../review-runtime";
+import { displayedMoveQualityLabel } from "../../lib/move-quality-label";
 import { formatEngineScore } from "../../lib/review-format";
 
 function percentage(value: number): string {
@@ -32,7 +32,7 @@ export function CurrentMoveVerdict({ move }: { move: MoveAnalysisV2 }) {
           <QualityIcon classification={move.classification} size={40} />
           <div>
             <span>STOCKFISH · OBJECTIVE MOVE QUALITY</span>
-            <strong>{move.ply}. {move.san} · {QUALITY_META[move.quality].label}</strong>
+            <strong>{move.ply}. {move.san} · {displayedMoveQualityLabel(move)}</strong>
             <small>{move.annotations.length > 0 ? `Annotations ${move.annotations.map((annotation) => annotation.replaceAll("_", " ")).join(", ")} · ` : ""}Accuracy {move.accuracy.toFixed(1)} · {formatEngineScore(move.evaluationBefore)} → {formatEngineScore(move.playedMoveScore)}</small>
           </div>
           <details>

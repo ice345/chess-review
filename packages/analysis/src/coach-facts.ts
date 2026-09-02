@@ -390,7 +390,7 @@ export function buildDeterministicMoveCoach(
       summary: `这步的客观标签为 ${facts.move.classification}，准确率 ${facts.move.accuracy.toFixed(1)}。Stockfish 白方视角评分为 ${scoreTransition}。`,
       ...(costly
         ? { whatWentWrong: `这步让行棋方损失了 ${facts.objective.classificationReason.winPercentLoss.toFixed(1)} 个胜率百分点。` }
-        : { whyMoveWorks: "这步保持了核心层记录的客观局面质量。" }),
+        : { whyMoveWorks: "这步保持了已记录的客观局面质量。" }),
       ...(facts.objective.bestMove === undefined || facts.objective.bestMove === facts.move.uci
         ? {}
         : { betterPlan: "可查看下方经过规则验证的引擎最佳变化。" }),
@@ -406,11 +406,11 @@ export function buildDeterministicMoveCoach(
         ? "你的着法直接将军。"
         : facts.boardFacts.isCapture ? "你的着法改变了确定性的子力关系。" : "你的着法应从候选着法与引擎评分变化来理解。",
       ...(costly ? { problem: `问题是这步损失了 ${facts.objective.classificationReason.winPercentLoss.toFixed(1)} 个胜率百分点。` } : {}),
-      ...(facts.boardFacts.futureConsequence === undefined ? {} : { consequence: `核心层提供了一条从走后局面开始、最多四步的合法 Stockfish 后果线。` }),
+      ...(facts.boardFacts.futureConsequence === undefined ? {} : { consequence: `走后局面有一条最多四步的合法 Stockfish 后果线。` }),
       ...(practical === undefined ? {} : {
         practicalAlternative: `${practical.san} 是 Stockfish 第 ${practical.stockfishRank} 候选，客观代价 ${practical.winPercentCost.toFixed(1)} 个胜率百分点；Maia 在 ${facts.human?.targetElo ?? "所选"} Elo 下给出 ${(practical.maiaProbability * 100).toFixed(1)}% 模型概率。`,
       }),
-      takeaway: costly ? "记住：先比较强制应手，再决定候选着法。" : "记住：把着法想法和经过验证的后果线连起来。",
+      takeaway: costly ? "记住：先比较强制应手，再决定候选着法。" : "记住：把这步的想法和经过验证的后续着法连起来。",
       confidence: "high",
       validatedLines: lines,
       grounding: { factsVersion: 1, structuredFactsOnly: true, removedMoveMentions: [], removedUnsupportedClaims: [], validatedLineCount: lines.length },
@@ -479,14 +479,14 @@ export function buildDeterministicGameCoach(
   const criticalMoments = facts.criticalMoments.slice(0, 5).map((moment) => ({
     ply: moment.ply,
     insight: language === "zh-CN"
-      ? `核心层记录了 ${moment.winPercentSwing.toFixed(1)} 个胜率百分点的波动。`
+      ? `记录了 ${moment.winPercentSwing.toFixed(1)} 个胜率百分点的波动。`
       : `The canonical analysis records a ${moment.winPercentSwing.toFixed(1)}-point win-percentage swing.`,
   }));
   if (language === "zh-CN") {
     const trainingRecommendations = [
       ...(tacticalErrors > 0 ? [{ title: "战术扫描", reason: `本局有 ${tacticalErrors} 个严重战术或胜势遗漏。`, focus: "每步检查将军、吃子和直接威胁。" }] : []),
       ...(smallerErrors > 0 ? [{ title: "候选着法比较", reason: `本局有 ${smallerErrors} 个不准确或错误。`, focus: "在安静局面固定比较两个候选计划。" }] : []),
-      { title: "关键节点重放", reason: `核心层标记了 ${facts.criticalMoments.length} 个关键节点。`, focus: "隐藏引擎后重新计算这些局面。" },
+      { title: "关键节点重放", reason: `复盘标记了 ${facts.criticalMoments.length} 个关键节点。`, focus: "隐藏引擎后重新计算这些局面。" },
     ].slice(0, 3);
     return {
       headline: "结构化整盘复盘",

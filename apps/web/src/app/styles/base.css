@@ -21,6 +21,9 @@ button:disabled { opacity: .42; cursor: default; }
 .primary:hover, .primary-link:hover { background: #405f6e; }
 .secondary { border: 1px solid var(--line); background: color-mix(in srgb, var(--surface-paper) 82%, transparent); color: var(--ink-secondary); }
 .secondary:hover { background: var(--wash-blue); }
+.secondary.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, var(--line)); }
+.secondary.danger:hover { background: var(--danger-soft); }
+.text-button.danger { color: var(--danger); }
 .primary-link { display: inline-flex; align-items: center; justify-content: center; }
 .text-button, .text-action { min-height: 32px; padding: 5px 4px; border: 0; background: transparent; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; cursor: pointer; }
 kbd { padding: 2px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-paper); color: var(--ink-muted); font: 9px ui-monospace, monospace; }

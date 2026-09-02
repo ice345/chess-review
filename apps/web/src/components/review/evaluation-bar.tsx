@@ -23,32 +23,35 @@ export function EvaluationBar({
 }) {
   const presentation = evaluationBarPresentation({ mode, stockfish, maia }, orientation);
   const maiaLabel = presentation.maia
-    ? "W" + percent(presentation.maia.whiteWinPercent)
-      + " D" + percent(presentation.maia.drawPercent)
-      + " L" + percent(presentation.maia.blackWinPercent)
+    ? percent(presentation.maia.whiteWinPercent)
+      + "/" + percent(presentation.maia.drawPercent)
+      + "/" + percent(presentation.maia.blackWinPercent)
     : "—";
 
+  const readout = mode === "maia" ? maiaLabel : formatEngineScore(stockfish);
+  const source = mode === "stockfish" ? "SF" : mode === "maia" ? "H-WDL" : "SF+H";
+
   return (
-    <div
-      className={"eval-bar eval-source-" + mode + " eval-bottom-" + presentation.bottomColor}
-      aria-label={presentation.ariaLabel}
-      title={presentation.sourceLabel}
-    >
+    <div className="eval-stack">
       <div
-        className={"eval-top eval-" + presentation.topColor}
-        style={{ height: presentation.topPercent + "%" }}
-      />
-      {mode === "compare" && presentation.maia && (
-        <i
-          className="eval-maia-marker"
-          style={{ top: presentation.maia.markerTopPercent + "%" }}
-          aria-hidden="true"
+        className={"eval-bar eval-source-" + mode + " eval-bottom-" + presentation.bottomColor}
+        aria-label={presentation.ariaLabel}
+        title={presentation.sourceLabel}
+      >
+        <div
+          className={"eval-top eval-" + presentation.topColor}
+          style={{ height: presentation.topPercent + "%" }}
         />
-      )}
-      <span>
-        {mode === "maia" ? maiaLabel : formatEngineScore(stockfish)}
-      </span>
-      <small>{mode === "stockfish" ? "SF" : mode === "maia" ? "H-WDL" : "SF + H"}</small>
+        {mode === "compare" && presentation.maia && (
+          <i
+            className="eval-maia-marker"
+            style={{ top: presentation.maia.markerTopPercent + "%" }}
+            aria-hidden="true"
+          />
+        )}
+      </div>
+      <strong className="eval-readout">{readout}</strong>
+      <small className="eval-source-label">{source}</small>
     </div>
   );
 }
