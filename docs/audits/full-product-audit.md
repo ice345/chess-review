@@ -3,7 +3,7 @@
 Audit date: 2026-08-26
 Repository: `ice345/chess-review`
 Audited commit: `0a46eb6c8da31958abcadfdd69a47583586b49f2` (`master`, equal to `origin/master` at audit start)
-Release judgment: **NO-GO for a public release; suitable for an instrumented private alpha after P0 remediation**
+Release judgment: **NO-GO for hosted public launch.** Path B (public GitHub / self-host) product work for Phase 11 is implemented on the local tree: history-aware Stockfish, local-ai launch token, Chess.com allowlisting, local deletion, promotion chooser, LICENSE. Remaining before recommending the tree to others: land/push the dirty working tree, pin GitHub Actions SHAs, and make CI green on `master`. Desktop CSP and store packages stay Phase 12.
 
 ## Scope and method
 
@@ -75,32 +75,32 @@ The current app was inspected at 1366×768, 1024×768, and 390×844 in addition 
 
 | ID | Severity | Area | Finding | Evidence | Fix size |
 |---|---|---|---|---|---|
-| OCR-001 | P0 | Chess/Stockfish | Repetition history is discarded before engine search | `position fen` only; full-history vs FEN-only repro | L |
-| OCR-002 | P0 | Local-ai security | Model-download POST lacks an authentication/browser-origin boundary | public localhost mutation calls `prepare_model` | M |
-| OCR-003 | P1 | API security | Chess.com archive URLs are fetched without host validation | provider-controlled `archiveUrl` passed to `fetch` | S |
-| OCR-004 | P1 | Privacy/data lifecycle | No review/synced-game deletion, cache clearing, or full local reset | storage libraries expose save/get/list only | M |
-| OCR-005 | P1 | Performance | Full Chess.com sync rereads all stored games for every batch | `saveSyncedGames` calls store-wide `readAll` | M |
-| OCR-006 | P1 | Integration reliability | Chess.com resume cursor uses shifting archive indexes | cursor stores array index + offset | M |
-| OCR-007 | P1 | Export | Position PNG can export the canonical position while showing a branch; FEN export is disabled | export uses `currentAnalysis`, not displayed position | M |
-| OCR-008 | P1 | Board interaction | Underpromotion is supported in core but impossible through UI | click chooses queen; drag omits promotion | M |
-| OCR-009 | P1 | Local service security | Any process answering `/health` can be trusted as local-ai | health probe accepts arbitrary JSON; no session identity | L |
+| OCR-001 | P0 | Chess/Stockfish | Repetition history is discarded before engine search | **Fixed (Phase 11):** `position fen <startFen> moves <uci…>` + history in cache identity + `drawStatus` | L |
+| OCR-002 | P0 | Local-ai security | Model-download POST lacks an authentication/browser-origin boundary | **Fixed (Phase 11):** per-launch token on mutating routes; origin check already shipped | M |
+| OCR-003 | P1 | API security | Chess.com archive URLs are fetched without host validation | **Fixed (Phase 11):** `https` + `api.chess.com` + player/month allowlist | S |
+| OCR-004 | P1 | Privacy/data lifecycle | No review/synced-game deletion, cache clearing, or full local reset | **Fixed (Phase 11):** History delete, cache clear, full reset, disconnect keep-or-delete | M |
+| OCR-005 | P1 | Performance | Full Chess.com sync rereads all stored games for every batch | **Fixed (Phase 11):** per-key get+put upsert | M |
+| OCR-006 | P1 | Integration reliability | Chess.com resume cursor uses shifting archive indexes | **Fixed (Phase 11):** year/month cursor, not reversed array index | M |
+| OCR-007 | P1 | Export | Position PNG can export the canonical position while showing a branch; FEN export is disabled | **Fixed (Phase 11):** displayed FEN/orientation/branch export, including FEN-only | M |
+| OCR-008 | P1 | Board interaction | Underpromotion is supported in core but impossible through UI | **Fixed (Phase 11):** queen/rook/bishop/knight chooser + cancel | M |
+| OCR-009 | P1 | Local service security | Any process answering `/health` can be trusted as local-ai | **Fixed (Phase 11):** product/version/capability nonce + launch token | L |
 | OCR-010 | P1 | Desktop security | Desktop Tauri CSP is `null` | `apps/desktop/src-tauri/tauri.conf.json` | S |
-| OCR-011 | P1 | Accessibility | Global arrow navigation conflicts with focused controls; board is mouse-centric | key handler excludes only form fields | M |
-| OCR-012 | P1 | Accessibility/mobile | Core mobile controls miss minimum touch target guidance | measured 17 controls below 44×44 | S |
+| OCR-011 | P1 | Accessibility | Global arrow navigation conflicts with focused controls; board is mouse-centric | **Partial (Phase 11):** arrows skip focused controls; board remains mouse-first | M |
+| OCR-012 | P1 | Accessibility/mobile | Core mobile controls miss minimum touch target guidance | **Partial (Phase 11):** mute/flip/transport are 44×44; header nav still compact | S |
 | OCR-013 | P1 | API resilience | Routes lack resource limits/rate control and provider parsing fails coarsely | unbounded `request.json`, `JSON.parse` NDJSON | M |
-| OCR-014 | P1 | Privacy UX | Remote coach/off-device facts are not disclosed at the decision point | Settings only says provider is configured | S |
+| OCR-014 | P1 | Privacy UX | Remote coach/off-device facts are not disclosed at the decision point | **Fixed (Phase 11):** Settings discloses off-device facts when choosing OpenAI-compatible | S |
 | OCR-015 | P1 | Persistence | IndexedDB objects are trusted and analysis cache is unbounded | `getAll` casts, no eviction/recovery | L |
 | OCR-016 | P1 | Test quality | Critical chess and worker failure contracts are not covered | no repetition/EP/castling/underpromotion/lifecycle matrix | M |
 | OCR-017 | P1 | Desktop readiness | Desktop is a foundation shell, not the reviewed product | import/status UI only; unsigned artifacts | XL |
 | OCR-018 | P2 | Performance | Review mounts two health pollers and health repeats Ollama catalog calls | Human + Coach each call health hook | S |
 | OCR-019 | P2 | Accessibility | Reduced motion and live progress semantics are incomplete | web has no reduced-motion rule; unlabeled progress | S |
 | OCR-020 | P2 | Audio/product polish | Audited HEAD has no centralized chess audio | no audio asset, resolver, settings, or mute control | M |
-| OCR-021 | P2 | Supply chain/CI | Most Actions use mutable tags; desktop host tests are absent from normal CI | workflow definitions | M |
+| OCR-021 | P2 | Supply chain/CI | Most Actions use mutable tags; desktop host tests are absent from normal CI | **Open:** uv is SHA-pinned; checkout/setup-node/pnpm still use tags | M |
 | OCR-022 | P2 | Provider security | OpenAI-compatible endpoint can be arbitrary cleartext/nonlocal URL | environment base URL is used without transport policy | M |
 | OCR-023 | P2 | Export fidelity | Annotated PGN reconstruction drops original comments/NAGs/variations | export rebuilds mainline | M |
 | OCR-024 | P2 | Performance evidence | 1000-game, all-Maia-size, offline, and long-review budgets are not measured | no performance suite/budget | L |
-| OCR-025 | P2 | Variants | Unsupported variant/Chess960 boundary is implicit | parser does not reject `Variant` explicitly | S |
-| OCR-026 | P2 | Accessibility | Repeated quality icons can add duplicate screen-reader labels | each icon defaults to `role=img` | S |
+| OCR-025 | P2 | Variants | Unsupported variant/Chess960 boundary is implicit | **Fixed (Phase 11):** import rejects named variants / Chess960 | S |
+| OCR-026 | P2 | Accessibility | Repeated quality icons can add duplicate screen-reader labels | **Fixed (Phase 11):** decorative quality icons omit duplicate names | S |
 
 ## Detailed findings
 
@@ -863,3 +863,41 @@ small batches were then started as requested:
    CSRF. It is defense-in-depth, not the final fix: a per-launch capability and
    authenticated service identity from OCR-009 are still required before the P0
    can be closed.
+
+## Follow-up audit — 2026-09-02
+
+This follow-up audits the current working tree on top of the commit described
+above, with emphasis on the connected-history → Training path, Review layout,
+Stockfish branch navigation, and local-development startup. Existing unrelated
+user changes in the dirty worktree were preserved.
+
+### Requested flows
+
+| Area | Result | Evidence |
+|---|---|---|
+| Successful full-history analyses | **Verified** | `loadStudyPlayerSummaries`/`loadStudyPlayerLibrary` repair missing external review links from current cache projections and successful job items; completed items are included in the selected account's Training report while failed items remain excluded. |
+| Failed-game explanation | **Verified** | Training Coverage exposes per-game errors and maps common worker/MultiPV failures to plain-language explanations; invalid provider PGNs are excluded before retry rather than reported as chess errors. |
+| Parallel history analysis | **Verified** | Durable history jobs use two bounded workers (`HISTORY_ANALYSIS_CONCURRENCY = 2`), with scheduler priority preserving current-board responsiveness. |
+| Evaluation timeline placement | **Fixed** | The graph now lives inside Review's Game Summary card in the right contextual panel; the panel owns the scroll on desktop and the layout stacks on mobile. |
+| Variation backtracking | **Fixed** | Engine PVs keep their full display path, while Stockfish history uses only the selected prefix. Stale aborted requests can no longer overwrite a newer branch result; stepping back leaves legal piece selection active. |
+| `pnpm dev` startup | **Improved** | Optional Ollama and local-ai probes/startup run in parallel and are not awaited by the browser shell. `pnpm dev:check` remains synchronous for diagnostics and `--services-only` retains fail-fast behavior. |
+| Review health polling | **Fixed for Review** | Maia and Coach share one memoized local-ai health runtime, removing duplicate intervals and `/health` requests during Review route transitions. |
+
+### Regression checks run
+
+- `pnpm test`: **PASS** — 10 shared, 14 chess-core, 75 analysis, 2 openings,
+  13 Stockfish, and 121 web tests.
+- `pnpm typecheck`: **PASS** across all TypeScript workspaces.
+- `pnpm lint`: **PASS**.
+- `pnpm build`: **PASS** for web, desktop, and mobile frontends.
+- `uv run pytest` in `services/local-ai`: **PASS** — 34 tests (one existing
+  Starlette/httpx deprecation warning).
+- `pnpm test:e2e e2e/workflows.spec.ts`: **PASS** — 29 workflows.
+- `pnpm test:e2e e2e/visual.spec.ts`: **PASS** — visual baselines regenerated
+  for the new right-panel timeline.
+- `pnpm dev:check`: **PASS** with local Ollama/model and local-ai available.
+
+The remaining release gates in the original audit (CI/SHA pinning, desktop CSP,
+resource limits, persistence hardening, large-history benchmarks, and signed
+desktop artifacts) are unchanged and should not be inferred as closed by this
+follow-up.

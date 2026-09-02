@@ -45,14 +45,18 @@ The web product uses Next.js App Router nested layouts:
 /settings
 ```
 
-`/review/[gameId]/layout.tsx` owns the persistent review shell. Client-side transitions replace only the contextual panel, preserving game, current ply, orientation, board position and engine runtime state. The shell is a normal scrolling document: the board and current-position study form the opening spread, followed by a full-width evaluation timeline. The import surface is not mounted inside review routes.
+`/review/[gameId]/layout.tsx` owns the persistent review shell. Client-side transitions replace only the contextual panel, preserving game, current ply, orientation, board position and engine runtime state. The shell places the board beside a scrollable contextual panel; on the Review route, Game Summary contains the evaluation timeline so summary metrics and the graph stay aligned while the panel scrolls. The import surface is not mounted inside review routes.
 
 Imported review records receive a deterministic browser-side ID and are stored in
 IndexedDB. A record points back to PGN or normalized FEN input; it does not
-duplicate `GameAnalysisV2`. Objective cache identity is algorithm version,
-Stockfish version, depth, canonical classification MultiPV, initial FEN and PGN.
+duplicate `GameAnalysisV2`. Concrete objective cache keys still include algorithm
+version, Stockfish version, depth, canonical classification MultiPV, initial FEN
+and the raw PGN string. Review, Moves, Study and Engine resolve a cached analysis
+through game semantic identity first (`initialFen` plus played UCI) and only then
+the concrete key, so harmless PGN/header serialization drift cannot hide a
+compatible historical analysis.
 
-Current-position continuations use the existing `BrowserStockfish.search()` boundary. Search identity includes FEN, engine version, depth and MultiPV. Display length is presentation-only and never changes the cache key. UCI PVs are replayed through `packages/chess-core` before SAN or branch positions are shown. A branch has its own selected path and explicit root FEN; it never mutates the game cursor or canonical analysis.
+Current-position continuations use the existing `BrowserStockfish.search()` boundary. The UCI position command is `position fen <startFen> moves <uci…>` so repetition and fifty-move history reach Stockfish. Search identity includes the resulting FEN, start FEN, UCI history, engine version, depth and MultiPV. Display length is presentation-only and never changes the cache key. UCI PVs are replayed through `packages/chess-core` before SAN or branch positions are shown. A branch has its own selected path and explicit root FEN; it never mutates the game cursor or canonical analysis. `drawStatus(startFen, uciMoves)` reports claimable versus automatic draws without flattening them into centipawns.
 
 The Phase 5.1 runtime replaces the temporary linear variation representation
 with an analysis tree. A tree has an explicit canonical root ply/FEN, immutable nodes

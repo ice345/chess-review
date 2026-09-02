@@ -27,6 +27,11 @@ edge from the selected node. Selecting a Stockfish candidate stores its complete
 validated PV but initially displays the first move, so First/Previous/Next/Last
 can navigate the known continuation without another search.
 
+Only the path through `selectedIndex` is considered played history when a new
+Stockfish request is built. Future nodes from a stored PV remain display-only
+until the user steps into them; this keeps the engine's reconstructed position
+identical to the board position after every backtrack.
+
 ## Legal-move and analysis flow
 
 ```text

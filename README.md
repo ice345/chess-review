@@ -57,7 +57,7 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 
 The web product remains fully usable when local-ai is offline. In that state Stockfish continues in the browser, Maia controls show an explicit offline state, and Coach requests use deterministic canonical copy.
 
-The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **Training** owns cross-game progress, repertoire, weaknesses and queue state; **More → Engine Lab** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
+The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **Training** owns cross-game progress, repertoire, weaknesses and queue state; **Engine** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
 
 ## Setup
 
@@ -124,6 +124,8 @@ The GitHub Actions workflow caches pnpm and uv dependencies, runs TypeScript and
 - Opening/middlegame/endgame division is structural; it is separate from opening-theory recognition.
 - Every move classification carries machine-readable evidence.
 - Screenshot/OCR position import is intentionally outside the roadmap. PNG export is supported.
+
+The project is licensed under the [GNU GPL v3](LICENSE). Stockfish.js and the WintrChess board sounds are GPLv3 components; see [docs/third-party-notes.md](docs/third-party-notes.md).
 
 Current implementation status and acceptance gates live in [docs/roadmap.md](docs/roadmap.md). Contribution work should also follow [AGENTS.md](AGENTS.md).
 

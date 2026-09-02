@@ -100,12 +100,20 @@ shutdown.
 
 An explicit “Import full history” action also creates (or reuses) an
 `unanalyzed` job for that connected account and starts it without waiting for
-the Settings page to stay mounted. Training polls the durable record while the
-job is active, so completed games and cache hits become report data
-incrementally. Incremental Home syncs keep their separate newest-game setting
+the Settings page to stay mounted. Training polls the durable job record every 1.5s while work is active so the
+quiet status line can show `47 / 95 games analyzed · analysis running` on every
+section. Full player-library and report rebuilds are throttled to about 8s and
+run immediately when a job becomes terminal, so a completing game does not
+reload every cached analysis. Incremental Home syncs keep their separate newest-game setting
 and do not create a duplicate full-history run. A failed item keeps its exact
 error text and can be retried on its own; duplicate jobs with the same scope
-and game set are collapsed in the Training list.
+and game set are collapsed in the Training list. A later compatible job that
+covers an older paused, queued or failed job for the same people and settings
+supersedes it in the orchestration layer: the older run is cancelled with
+`supersededBy` and hidden from the primary Coverage card, so a 5-game paused
+resume cannot sit beside a 95-game partial of the same work. Structurally
+invalid provider PGNs are excluded before queueing and, on retry, removed from
+`items` so they cannot keep an otherwise complete range in Partial/Failed.
 
 The Training page keeps the latest active/error run visible and nests older
 finished runs under **Past analysis runs**. Successful game lists are collapsed by

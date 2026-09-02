@@ -4,7 +4,7 @@
 
 The product is route-based rather than a single analysis dashboard:
 
-- `/` owns PGN/FEN import and recent reviews.
+- `/` owns a starting-position board, PGN/FEN import, Chess.com/Lichess connect-and-sync, and recent reviews. Chess.com and Lichess are account actions, not import modes.
 - `/review/[gameId]` is the objective review.
 - `/review/[gameId]/moves` is the move explorer.
 - `/review/[gameId]/coach` is the Study surface for grounded move lessons and whole-game learning (the URL remains stable).
@@ -15,9 +15,9 @@ Import UI is never mounted inside the review workspace. A valid input is normali
 
 ## Persistent review shell
 
-The nested review layout owns the board, evaluation bar, selected ply, orientation, move controls, current verdict and evaluation timeline. Client-side transitions replace only the contextual right panel, so board state persists across Review, Moves, Study and Engine Lab.
+The nested review layout owns the board, evaluation bar, selected ply, orientation, move controls and current verdict. Review's Game Summary owns the evaluation timeline inside the contextual panel. Client-side transitions replace only the contextual right panel, so board state persists across Review, Moves, Study and Engine Lab.
 
-At desktop sizes the review is a normal document, typically about 1.3–1.6 viewports for an ordinary game. The opening spread gives the board roughly 540–610 CSS pixels and places current-position study beside it. The 240–320-pixel plot area sits full-width below. Dense route content extends the document instead of creating a nested scrolling dashboard.
+At desktop sizes the review is a normal document, typically about 1.3–1.6 viewports for an ordinary game. The opening spread gives the board roughly 540–610 CSS pixels and places current-position study beside it. On the Review route, Game Summary and its 220–320-pixel evaluation plot share the contextual panel's scroll, keeping the metrics and graph aligned with the board. Dense route content extends the document on smaller screens instead of creating a nested scrolling dashboard.
 
 Below the tablet breakpoint, the route panel stacks under the board and normal document scrolling resumes. Move navigation remains adjacent to the board. There must be no horizontal document overflow.
 
@@ -29,11 +29,11 @@ The visual language distinguishes three sources:
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
 - Study: generated teaching from canonical facts, with concise provenance and grounding details on demand.
 
-The primary review navigation contains Review, Moves and Study. Engine Lab is deliberately placed under the secondary More menu. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
+The primary review navigation contains Review, Moves, Study and Engine. Settings stays in the titlebar. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with the current move, then the analysis source and compact candidates; whole-game Accuracy, phases, Move Quality and the embedded timeline sit in Game Summary below that desk. Engine Lab remains the advanced depth/MultiPV/raw UCI surface and is not copied into Review. The evaluation timeline is open by default on Review and is not mounted on Moves, Study or Engine. Study shows the current move’s Stockfish evidence before any generated lesson. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
 
 Quality icons come from `packages/ui` and use Move Quality Annotation System V3 across the move list, destination-square overlay, charts, summary and PNG exports. Diamonds identify elite/special moves, circles positive and ring states, rounded squares informational/warning states, and octagons severe errors. The schema classification `great` is presented to users as **Critical**, matching its only-good-move meaning without changing the persisted classification key or algorithm. Silhouette and glyph remain readable at 20–28px without relying on color. The destination-square badge always remains the canonical Stockfish Move Quality icon in Stockfish, Maia and Compare modes; changing analysis source never relabels the played move. Human Find Difficulty keeps its quieter, separate mark family in the evidence panel. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
 
-The project identity is the original Blue Bishop: a simplified bishop silhouette whose diagonal cut continues into a restrained feather/wing gesture. The same geometry is used for the generated Next.js favicon, square app mark, header mark and PNG export signature. The bishop remains legible at 16px; there is no literal bird character or third-party chess artwork.
+The project identity is the original Blue Bishop: a simplified bishop silhouette whose diagonal cut continues into a restrained feather/wing gesture. The mark uses a dusty-periwinkle bishop on warm cream paper, with a pale-gold inner wing. The same geometry is used for the generated Next.js favicon, square app mark, header mark and PNG export signature. The bishop remains legible at 16px; there is no literal bird character or third-party chess artwork.
 
 The visual system uses warm paper, mist blue, dusty pink, sage and cream with blue-gray ink. Surfaces are separated mostly by whitespace and fine rules; this is an editorial study environment, not a glassmorphic dashboard. The reference mood is implemented through original tokens and shapes, without copied characters, frames or branded assets.
 
@@ -47,15 +47,15 @@ the key selector owners so new route-specific styles extend the correct module.
 
 Study move lessons use one decision sequence: What to notice, Your idea, The problem, What happens next, A practical alternative and Remember this. Only slots supported by the response are shown. The short consequence line remains a separate rules-validated UCI/SAN artifact. Review owns the detailed Stockfish/Maia presentation; Study shows only a compact provenance line and places detailed evidence behind “Why this explanation?”. The whole-game lesson is the primary Study action. Review exposes a contextual “Explain this move” action that preserves the board and current ply while opening Study.
 
-Continuation line count (1–5) and displayed PV length (6/8/10/12/16) are configured only in Settings. Review has no separate Top Continuations card: compact Stockfish SAN lines support the board arrows when Stockfish is selected. Arrows are visual hints and are never selected by destination square. An explicit Stockfish row is identified by root FEN, rank, exact UCI and complete PV; an explicit Maia row is identified by FEN, model, target Elo and exact UCI. Selecting a row creates a rules-validated path in the analysis tree. Arrow keys walk that branch and Escape returns to the canonical game.
+Continuation line count (1–5) and displayed PV length (6/8/10/12/16) are configured only in Settings. Review has no separate Top Continuations card: compact Stockfish SAN lines support the board arrows when Stockfish is selected. Arrows are visual hints and are never selected by destination square. An explicit Stockfish row is identified by root FEN, rank, exact UCI and complete PV; an explicit Maia row is identified by FEN, model, target Elo and exact UCI. Selecting a row creates a rules-validated path in the analysis tree. Arrow keys walk the selected branch prefix; stored future PV nodes are only revealed as the user steps forward, and Escape returns to the canonical game.
 
 ## Phase 5.1 workspace contract
 
 The board is the primary interaction surface. The refined desktop composition
-uses one visual column for player strips, board, board-width transport and the
-full Evaluation Timeline. Move quality, move list, critical moments and route
-context form the adjacent column. A modest amount of document scrolling is
-expected; no persistent control may cover a piece.
+uses one visual column for player strips, board and board-width transport; the
+adjacent contextual column contains current-position evidence and, on Review,
+Game Summary with the Evaluation Timeline. A modest amount of panel/document
+scrolling is expected; no persistent control may cover a piece.
 
 Board transport follows First, Previous, Play/Pause, Next and Last. Keyboard
 left/right navigation remains. Autoplay stops at the canonical game end and
@@ -65,9 +65,11 @@ placement and evaluation-bar presentation, never the canonical White-POV score.
 
 Player strips consume PGN headers first and enrich a synced game from its exact
 IndexedDB account/game record. Ratings come from sync metadata or `WhiteElo` /
-`BlackElo`; only the connected player's provider avatar is requested. If that
-remote image is unavailable, the strip keeps a readable initials fallback.
-Opponent profiles are not fetched during sync or ordinary review.
+`BlackElo`. When Site/Link/Source identifies Chess.com or Lichess, or the game
+was imported from a connected account, both players' public avatars are fetched
+through an allowlisted server route and cached in IndexedDB for seven days.
+If a remote image is unavailable, the strip keeps a readable initials fallback.
+Lichess accounts often have no uploaded photo.
 
 Analysis arrows have explicit source semantics. Stockfish arrows are objective
 MultiPV candidates; Maia arrows are policy probabilities at the selected target
@@ -127,22 +129,28 @@ sorts the merged reviewed/pending collection by date and renders at most 60 rows
 per page, with an explicit Load more control for larger collections. Incremental
 sync does not mount or analyze every imported game; an explicit full-history
 import queues local objective Stockfish work and Training reveals its progress.
+History uses the same inline ink statistics and disclosure treatment as Training.
+Its counts describe the currently filtered merged list, including manual review
+records, rather than the platform-sync collection alone.
 
 ## Advanced study and training
 
-`/training` is player-specific. Connected games default to the linked account
-color; manual PGNs expose both meaningful named players. The route contains
-Overview, Rating & Form, Openings, Middlegame, Endgame, Mistakes, Highlights,
-Plan and Coverage tabs. The trend chart links back to each review. Weakness,
-highlight and queue evidence links include the exact canonical ply so Review
-opens on the source decision.
+`/training` is a player-development workspace, not a concatenated report.
+Connected games default to the linked account color; manual PGNs expose both
+meaningful named players. Quiet grouped navigation switches one active view at a
+time: Overview, then Analysis (Rating, Openings, Middlegame, Endgame),
+Improvement (Mistakes, Highlights, Plan) and Data (Coverage). Overview is a
+summary: one paper profile, up to three faint observed-phase washes, Focus now, compact
+highlight counts and a short form strip. Repeated facts in dedicated views use
+ink rows. Phases with zero observed moves are omitted instead of showing an
+Accuracy placeholder. The trend chart links back to each review. Weakness, highlight and
+queue evidence links include the exact canonical ply so Review opens on the
+source decision.
 
-The Overview is a player-development profile before it is a report viewer: the
-selected player, observed platform rating, current form, coverage, phase signal,
-current focus and restrained highlight counts lead the page. Detailed tabs remain
-available below that profile. Advanced filters are kept in one shared population
-scope disclosure (`All platforms · ... · N games`); opening it reveals the full
-filter set without changing the report population.
+Advanced filters are kept in one shared population scope disclosure
+(`All platforms · ... · N games`); opening it reveals the full filter set without
+changing the report population. While analysis is running, a quiet status line
+(`47 / 95 games analyzed · analysis running`) stays visible above the journal.
 
 Whole-history run history is secondary to the resulting data. Active/error runs
 and the latest useful terminal run remain visible; older terminal runs sit under

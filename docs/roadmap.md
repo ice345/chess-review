@@ -59,7 +59,7 @@
 
 - [x] polished Home / Import route
 - [x] import-to-review navigation and persisted review IDs
-- [x] normal-document Review workspace with a prominent board and full-width timeline
+- [x] normal-document Review workspace with a prominent board and Game Summary timeline
 - [x] persistent board across review sub-routes
 - [x] Review / Moves / Study route separation with Human Lens inside Review
 - [x] advanced Engine Lab separation
@@ -101,7 +101,7 @@ alone do not complete an item.
 - [x] orientation-aware evaluation-bar presentation without changing White POV truth
 - [x] board-width First / Previous / Play-Pause / Next / Last transport
 - [x] autoplay with end-of-game and variation pause behavior
-- [x] board/timeline primary column and contextual secondary column
+- [x] board plus scroll-aligned Game Summary timeline and contextual secondary column
 - [x] manual desktop visual validation at 1440×900, 1728×1117 and 1920×1080
 
 ### Milestone C — Stockfish interactive analysis
@@ -501,9 +501,223 @@ of whole-history analysis visible and maintainable.
 - [x] expose stabilize/next-target milestones near 100-point boundaries
 - [x] add deterministic unit and browser coverage for the above behavior
 
-### Follow-ups still outside this pass
+Phase 10.1 follow-ups moved into Phase 11. Feature phases 0–10.1 remain
+completed history; they do not mean the product is approved for public
+release.
 
-- [ ] add Settings-level scoped deletion for objective cache, individual review
-  records, imported account data and full local reset
-- [ ] close the remaining P1 service-authentication, SSRF, export, cursor and
-  persistence findings in `docs/audits/full-product-audit.md`
+## Current tree hygiene (before Phase 11)
+
+The working tree is not the release surface. Do this as an unnumbered
+operations gate, not as a product milestone.
+
+- [ ] land or discard the uncommitted Training/UI/cache/e2e work
+- [ ] push the six local commits ahead of `origin/master`
+- [ ] make GitHub Actions green on `master` (typecheck already passes
+      locally; re-run `pnpm test`, `pnpm lint`, `pnpm build`,
+      `pnpm test:e2e`, and the Python suite on the landed tree)
+- [ ] do not update visual baselines except after an intentional,
+      reviewed visual change
+- [ ] keep `references/` and generated screenshots out of the product
+      commit
+
+This gate does not change chess semantics.
+
+## Phase 11 — Trust and local-first release gate
+
+Phase 11 is the public-readiness gate after Phases 0–10.1. Feature
+phases are complete; this phase makes the shipped web product honest
+enough to recommend to other people.
+
+Success means a Browser Core user can import, review, study, train,
+delete local data, and understand failures without leaking chess.js
+internals or mixing locales. Enhanced Local remains optional. Desktop
+and mobile stay foundation shells.
+
+The intended release path is public GitHub / self-host (path B):
+Browser Core plus documented local-ai, LICENSE, chess-history identity,
+deletion, and Chess.com URL allowlisting. Hosted public deployment
+additionally requires the rate-limit and OAuth-production items in
+Milestone C. Signed desktop and mobile stores are Phase 12 / later.
+
+Non-goals for Phase 11:
+
+- embedding the full Review workspace into Tauri
+- Android/iOS store packages
+- Syzygy tablebases
+- Lc0
+- changing V2 classification, Accuracy, Divider, WinPercent, White POV
+  or Human Find Difficulty
+- replacing Move Quality Annotation System V3
+
+### Milestone 0 — first-session friction (small, user-visible)
+
+Close the holes found in the 2026-09-01 localhost walkthrough. None of
+these change engine truth.
+
+- [x] wrap PGN/FEN import errors in a short user message; keep parser
+      diagnostics in the console
+- [x] stop claiming “Opening position of the pasted game” when
+      `previewFen()` fell back to the starting position
+- [x] make “Load example game” start the review, or rename it so it
+      does not imply analysis has begun
+- [x] use one UI locale for chrome, Settings, Study buttons and Coach
+      copy (English or Simplified Chinese, not both on one screen)
+- [x] if a zh-CN Coach request fails the language gate, keep a valid
+      English explanation when one exists; deterministic fallback must
+      paraphrase facts, not describe “the core layer”
+- [x] stop showing Review opening/middlegame/endgame as “—” while
+      Training calls Opening “Strongest phase” for the same opening-only
+      game; pick one honest empty/partial rule and apply it on both
+      surfaces
+- [x] Critical Moments: do not paint `−0.0%` as a loss; use the
+      Critical annotation mark, not the Book quality icon, and say why
+      the ply is critical
+- [x] replace developer Settings copy (`Configure OAuth in .env.local`,
+      “canonical 3PV”) with user-facing language; keep the technical
+      detail in docs
+- [x] add regression coverage for invalid PGN, example-import, locale
+      consistency and opening-only phase presentation
+
+### Milestone A — chess history identity (OCR-001, P0)
+
+Canonical Stockfish search must see enough history to represent
+repetition and fifty-move state. FEN-only `position fen` is not
+canonical truth.
+
+- [x] introduce a typed engine position command: base FEN plus ordered
+      UCI moves for canonical, current-position and branch searches
+- [x] keep internal scores White POV; do not flatten draws into
+      centipawns
+- [x] add an explicit claimable-versus-automatic draw status in
+      chess-core (threefold, fivefold, fifty, seventy-five)
+- [x] include the history signature in cache identity so the same board
+      with/without repetition cannot collide
+- [x] reject or label Chess960 / named variants at import (OCR-025)
+      rather than silently parsing them as standard chess
+- [x] tests: threefold from start; repetition after a nonstandard FEN;
+      same FEN distinct identity; fifty-move policy; branch repetition;
+      cancellation and cache reuse with history
+
+This is the only Phase 11 item that may touch engine command shape and
+cache keys. Classification thresholds stay unchanged.
+
+### Milestone B — local-service identity (OCR-002 remainder, OCR-009)
+
+Origin + JSON confirmation for model download is already shipped. That
+is not authentication.
+
+- [x] per-launch capability token from the managed launcher / desktop
+      sidecar
+- [x] require the token on mutating local-ai routes (download, Maia
+      inference, Coach)
+- [x] health responses include a product/version/capability nonce the
+      client must verify before sending FEN, moves or coach facts
+- [x] reject a process that only answers JSON `/health` on port 8000
+- [x] tests: missing/wrong/expired token, evil origin, form POST,
+      stale port occupant, authorized success
+
+### Milestone C — connected-platform hardening (OCR-003, OCR-005, OCR-006, OCR-013)
+
+Required before any hosted Next.js deployment; still worth doing for
+self-host.
+
+- [x] allowlist Chess.com archive fetches: `https:` + `api.chess.com` +
+      expected player/month path; no provider-controlled arbitrary URL
+- [x] version the Chess.com cursor on archive year/month (or validated
+      URL), not a reversed array index
+- [x] make `saveSyncedGames` proportional to batch size, not a full
+      store `readAll` per batch
+- [x] bound `request.json` / NDJSON parse size on platform routes;
+      keep typed provider errors for 429/502
+- [x] tests: loopback/private host, non-HTTPS, wrong domain, new month
+      before resume, duplicate upsert, oversized body
+
+### Milestone D — local data lifecycle (OCR-004, OCR-015)
+
+Local-first is incomplete without deletion.
+
+- [x] delete one review record
+- [x] delete games imported from one linked account, with
+      keep-or-delete on disconnect
+- [x] clear derived analysis cache only
+- [x] full local reset (reviews, synced games, jobs, queue, settings)
+      with an explicit confirmation scope
+- [x] document retention defaults
+- [x] optional later: cache eviction policy; do not block D on a
+      perfect LRU
+- [x] tests: History per-review delete in Chromium; disconnect confirm
+      and cache/reset remain confirm-dialog UI
+- [ ] IndexedDB unit coverage for source purge, cache-only clear,
+      all-data reset, and multi-tab refresh
+
+### Milestone E — board, export and legal completeness (OCR-007, OCR-008)
+
+- [x] promotion chooser for click, drag and keyboard: queen/rook/bishop
+      /knight, cancel leaves the position unchanged
+- [x] Position PNG exports the displayed FEN/orientation/branch, not
+      only canonical `currentAnalysis`; FEN-only studies can export
+- [x] remote Coach / off-device facts disclosed at the moment the user
+      chooses a cloud provider (OCR-014)
+- [x] tests: queen/rook/bishop/knight chooser plus cancel in Chromium;
+      capture-underpromotion and PNG identity remain unit/manual
+- [ ] dedicated capture-underpromotion and canonical-vs-branch PNG e2e
+
+### Milestone F — accessibility and small-viewport (OCR-011, OCR-012, OCR-019, OCR-026)
+
+- [x] 44×44 CSS px minimum for mute, flip and transport controls
+- [x] stop exposing 32 disabled dnd-kit piece buttons on the Home
+      preview board
+- [x] arrow-key game navigation must not steal keys from focused
+      controls or custom boards
+- [x] mobile copy cannot say “Hover for details”
+- [x] mobile review chrome: one Settings entry, visible Export or an
+      explicit overflow menu; nav must not collide with the mark
+- [x] decorative quality icons do not add duplicate accessible names
+- [x] desktop Review: the board, eval bar, player strips and transport
+      must be reachable without scrolling away the board at 1440×900
+
+### Milestone G — open-source packaging
+
+- [x] add a root LICENSE consistent with Stockfish.js (GPLv3) and the
+      WintrChess sound files already documented in
+      `docs/third-party-notes.md`
+- [x] README points at LICENSE and third-party notes
+- [ ] pin GitHub Actions to commit SHAs where practical (OCR-021)
+- [x] no secrets in the tree; `.env.example` remains the only env
+      template
+
+### Milestone H — acceptance gate
+
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`
+- [x] `uv run --project services/local-ai --extra dev pytest services/local-ai/tests`
+- [x] Chromium workflow e2e for invalid PGN, example import, deletion,
+      promotion, opening-only phase presentation, and Review desk
+      layout (`e2e/workflows.spec.ts` subset; `visual.spec.ts` not
+      re-baselined)
+- [x] manual visual pass at 390×844 and 1440×900; 1728×1117 not
+      re-shot this pass
+- [x] update `docs/audits/full-product-audit.md` statuses; do not
+      claim public release until A–G that are in-scope for path B
+      are checked
+- [x] this gate still does not ship signed desktop or mobile stores
+
+## Phase 12 — Desktop as the reviewed product (deferred)
+
+Do not start Phase 12 until Phase 11 path B is accepted.
+
+- [ ] reuse the web Review/Moves/Study/Training workspace inside the
+      Tauri shell (no second analysis semantics)
+- [ ] non-null CSP (OCR-010)
+- [ ] sidecar uses the same per-launch token as Milestone B
+- [ ] signed/notarized distribution is a release-operations follow-up,
+      not an implementation checkbox
+
+## Explicitly later
+
+- Syzygy ≤7-piece (already documented in Phase 9)
+- Chess960 as a supported variant (Phase 11 only rejects it)
+- 1000-game performance budget suite (OCR-024)
+- annotated PGN comment/NAG round-trip (OCR-023)
+- OpenAI-compatible base-URL transport policy (OCR-022)
+- unbounded IndexedDB eviction (partially covered by D)
+- production mobile device/store gate
