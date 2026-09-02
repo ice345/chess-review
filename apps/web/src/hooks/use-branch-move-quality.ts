@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { classifyExploratoryMove } from "@chess-review/analysis";
 import { BrowserStockfish } from "@chess-review/stockfish";
 import { analysisScheduler } from "../lib/analysis-scheduler";
-import { selectedBranchNode } from "../lib/analysis-branch";
+import { selectedBranchNode, uciPathBeforeNode } from "../lib/analysis-branch";
 import { useReviewStore } from "../store/review-store";
 
 export function useBranchMoveQuality(depth: number, multiPv: number) {
@@ -57,12 +57,21 @@ export function useBranchMoveQuality(depth: number, multiPv: number) {
           && canonicalRoot.lines.length > 0
           ? canonicalRoot
           : null;
+        const game = latest.game;
+        const history = {
+          startFen: game?.initialFen ?? activeNode.move.fenBefore,
+          moves: [
+            ...(game?.plies.slice(0, activeBranch.rootPly).map((ply) => ply.uci) ?? []),
+            ...uciPathBeforeNode(activeBranch, activeNode.id),
+          ],
+        };
         const rootAnalysis = reusableRoot ?? await analysisScheduler.run(
           "interactive-position",
           () => engine.current!.search(activeNode.move!.fenBefore, {
             depth,
             multiPv,
             signal: controller.signal,
+            ...history,
           }),
           controller.signal,
         );
@@ -74,6 +83,7 @@ export function useBranchMoveQuality(depth: number, multiPv: number) {
             multiPv: 1,
             searchMoves: [activeNode.move!.uci],
             signal: controller.signal,
+            ...history,
           }),
           controller.signal,
         );

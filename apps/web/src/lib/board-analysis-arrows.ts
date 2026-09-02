@@ -85,12 +85,28 @@ export function matchingHumanCandidate(
   return result.candidates.find((candidate) => candidate.uci === identity.uci) ?? null;
 }
 
+function arrowPriority(color: string): number {
+  if (color.includes(".98")) return 2;
+  if (color.includes("76, 126, 126")) return 1;
+  return 0;
+}
+
+function uniqueArrows(arrows: Arrow[]): Arrow[] {
+  const byKey = new Map<string, Arrow>();
+  for (const arrow of arrows) {
+    const key = `${arrow.startSquare}-${arrow.endSquare}`;
+    const existing = byKey.get(key);
+    if (!existing || arrowPriority(arrow.color) > arrowPriority(existing.color)) byKey.set(key, arrow);
+  }
+  return [...byKey.values()];
+}
+
 export function stockfishCandidateArrows(
   result: StockfishMoveAnalysis | null,
   lineCount: number,
   selectedUci?: string,
 ): Arrow[] {
-  return (result?.lines ?? []).slice(0, lineCount).flatMap((line, index) => {
+  return uniqueArrows((result?.lines ?? []).slice(0, lineCount).flatMap((line, index) => {
     const move = arrowMove(line.pv[0]);
     if (!move) return [];
     const selected = selectedUci === line.pv[0];
@@ -98,7 +114,7 @@ export function stockfishCandidateArrows(
       ...move,
       color: selected ? "rgba(45, 91, 111, .98)" : OBJECTIVE_ARROW_COLORS[index] ?? OBJECTIVE_ARROW_COLORS.at(-1)!,
     }];
-  });
+  }));
 }
 
 export function humanCandidateArrows(
@@ -106,7 +122,7 @@ export function humanCandidateArrows(
   lineCount: number,
   selectedUci?: string,
 ): Arrow[] {
-  return (result?.candidates ?? []).slice(0, lineCount).flatMap((candidate, index) => {
+  return uniqueArrows((result?.candidates ?? []).slice(0, lineCount).flatMap((candidate, index) => {
     const move = arrowMove(candidate.uci);
     if (!move) return [];
     const selected = selectedUci === candidate.uci;
@@ -114,7 +130,7 @@ export function humanCandidateArrows(
       ...move,
       color: selected ? "rgba(80, 117, 86, .98)" : HUMAN_ARROW_COLORS[index] ?? HUMAN_ARROW_COLORS.at(-1)!,
     }];
-  });
+  }));
 }
 
 export function analysisModeArrows({
@@ -132,17 +148,33 @@ export function analysisModeArrows({
 }): Arrow[] {
   if (mode === "stockfish") return stockfishCandidateArrows(stockfish, lineCount, selectedUci);
   if (mode === "maia") return humanCandidateArrows(human, lineCount, selectedUci);
-  const objective = stockfishCandidateArrows(stockfish, lineCount, selectedUci);
-  const humanArrows = humanCandidateArrows(human, lineCount, selectedUci);
   const objectiveUcis = (stockfish?.lines ?? []).slice(0, lineCount).map((line) => line.pv[0]);
   const humanUcis = (human?.candidates ?? []).slice(0, lineCount).map((candidate) => candidate.uci);
   const sharedUcis = new Set(objectiveUcis.filter((uci): uci is string => typeof uci === "string" && humanUcis.includes(uci)));
-  return [
-    ...objective.map((arrow, index) => sharedUcis.has(objectiveUcis[index] ?? "")
-      ? { ...arrow, color: "rgba(76, 126, 126, .96)" }
-      : arrow),
-    ...humanArrows.filter((_, index) => !sharedUcis.has(humanUcis[index] ?? "")),
-  ];
+  const arrows: Arrow[] = [];
+  for (const [index, uci] of objectiveUcis.entries()) {
+    const move = arrowMove(uci);
+    if (!move) continue;
+    const selected = selectedUci === uci;
+    arrows.push({
+      ...move,
+      color: selected
+        ? "rgba(45, 91, 111, .98)"
+        : sharedUcis.has(uci ?? "")
+          ? "rgba(76, 126, 126, .96)"
+          : OBJECTIVE_ARROW_COLORS[index] ?? OBJECTIVE_ARROW_COLORS.at(-1)!,
+    });
+  }
+  for (const [index, uci] of humanUcis.entries()) {
+    if (sharedUcis.has(uci)) continue;
+    const move = arrowMove(uci);
+    if (!move) continue;
+    arrows.push({
+      ...move,
+      color: selectedUci === uci ? "rgba(80, 117, 86, .98)" : HUMAN_ARROW_COLORS[index] ?? HUMAN_ARROW_COLORS.at(-1)!,
+    });
+  }
+  return uniqueArrows(arrows);
 }
 
 export function overlappingCandidateUcis(

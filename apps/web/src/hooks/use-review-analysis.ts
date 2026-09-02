@@ -13,10 +13,21 @@ import type { ReviewRunState } from "../components/review-runtime";
 import { getCachedAnalysis, putCachedAnalysis } from "../lib/analysis-cache";
 import { analysisScheduler } from "../lib/analysis-scheduler";
 import type { AppSettings } from "../lib/app-settings";
+import { selectedBranchMoves } from "../lib/analysis-branch";
 import { analyzeObjectiveGame } from "../lib/objective-game-analysis";
 import { markSyncedGameAnalyzed } from "../lib/platform-library";
 import { getReviewRecord } from "../lib/review-library";
 import { useReviewStore } from "../store/review-store";
+
+function positionSearchHistory(review: ReturnType<typeof useReviewStore.getState>) {
+  const game = review.game;
+  if (!game) return {};
+  const prefix = game.plies.slice(0, review.branch ? review.branch.rootPly : review.currentPly).map((ply) => ply.uci);
+  // A stored engine PV may extend beyond the currently selected node. Only
+  // the selected prefix is real played history for this search position.
+  const branch = review.branch ? selectedBranchMoves(review.branch).map((move) => move.uci) : [];
+  return { startFen: game.initialFen, moves: [...prefix, ...branch] };
+}
 
 type ReviewAnalysisSettings = Pick<
   AppSettings,
@@ -177,13 +188,15 @@ export function useReviewAnalysis({
           depth: reviewDepth,
           multiPv: reviewMultiPv,
           signal: controller.signal,
+          ...positionSearchHistory(review),
         }),
         controller.signal,
       );
+      if (engineAbort.current !== controller) return;
       if (useReviewStore.getState().positionFen === fen) setEngineOutput({ fen, result });
       setEngineState("idle");
     } catch (error) {
-      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) setEngineState("idle");
+      if (controller.signal.aborted || engineAbort.current !== controller || (error instanceof Error && error.name === "AbortError")) return;
       else {
         setEngineState("error");
         setEngineError(error instanceof Error ? error.message : "Stockfish analysis failed.");
@@ -210,13 +223,15 @@ export function useReviewAnalysis({
           depth: reviewDepth,
           multiPv: continuationLines,
           signal: controller.signal,
+          ...positionSearchHistory(review),
         }),
         controller.signal,
       );
+      if (continuationAbort.current !== controller) return;
       if (useReviewStore.getState().positionFen === fen) setContinuationOutput({ fen, result });
       setContinuationState("idle");
     } catch (error) {
-      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) setContinuationState("idle");
+      if (controller.signal.aborted || continuationAbort.current !== controller || (error instanceof Error && error.name === "AbortError")) return;
       else {
         setContinuationState("error");
         setContinuationError(error instanceof Error ? error.message : "Continuation analysis failed.");

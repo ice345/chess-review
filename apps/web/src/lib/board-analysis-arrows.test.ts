@@ -99,6 +99,33 @@ describe("Stockfish board arrows", () => {
     expect(analysisModeArrows({ mode: "stockfish", stockfish: result, human: null, lineCount: 3 })).toEqual(stockfishCandidateArrows(result, 3));
   });
 
+  it("keeps a selected underpromotion color when collapsing shared promotion squares", () => {
+    const promotion: StockfishMoveAnalysis = {
+      ...result,
+      lines: [
+        { rank: 1, score: result.score, depth: 12, pv: ["g7g8q"] },
+        { rank: 2, score: result.score, depth: 12, pv: ["g7g8n"] },
+      ],
+    };
+    const arrows = stockfishCandidateArrows(promotion, 2, "g7g8n");
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]).toMatchObject({ startSquare: "g7", endSquare: "g8", color: expect.stringContaining(".98") });
+  });
+
+  it("collapses promotion variants that share the same start and end squares", () => {
+    const promotion: StockfishMoveAnalysis = {
+      ...result,
+      lines: [
+        { rank: 1, score: result.score, depth: 12, pv: ["g7g8q"] },
+        { rank: 2, score: result.score, depth: 12, pv: ["g7g8n"] },
+        { rank: 3, score: result.score, depth: 12, pv: ["e7e8q"] },
+      ],
+    };
+    const arrows = stockfishCandidateArrows(promotion, 3);
+    expect(arrows).toHaveLength(2);
+    expect(arrows.map((arrow) => `${arrow.startSquare}-${arrow.endSquare}`)).toEqual(["g7-g8", "e7-e8"]);
+  });
+
   it("keeps both candidate families visible in Compare mode", () => {
     const arrows = analysisModeArrows({ mode: "compare", stockfish: result, human, lineCount: 2 });
     expect(arrows).toHaveLength(3);

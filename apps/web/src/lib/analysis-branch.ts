@@ -73,6 +73,34 @@ export function activeBranchMoves(tree: AnalysisBranchTree): ReplayedUciMove[] {
   });
 }
 
+/**
+ * Returns only the moves that have actually been selected in the branch.
+ *
+ * Engine PVs are stored as a complete path so the user can step through the
+ * continuation, but nodes after `selectedIndex` are future display data. They
+ * must not be sent as played history to a new Stockfish search at the current
+ * node, otherwise the engine receives a position that no longer matches the
+ * displayed board.
+ */
+export function selectedBranchMoves(tree: AnalysisBranchTree): ReplayedUciMove[] {
+  return tree.activePath.slice(1, tree.selectedIndex + 1).flatMap((id) => {
+    const move = tree.nodes[id]?.move;
+    return move ? [move] : [];
+  });
+}
+
+/** UCI path from the branch root to `nodeId`, excluding that node's own move. */
+export function uciPathBeforeNode(tree: AnalysisBranchTree, nodeId: string): string[] {
+  const ucis: string[] = [];
+  let current = tree.nodes[nodeId];
+  while (current?.parentId) {
+    const parent = tree.nodes[current.parentId];
+    if (parent?.move) ucis.push(parent.move.uci);
+    current = parent;
+  }
+  return ucis.reverse();
+}
+
 function sameSource(left: AnalysisBranchSource, right: AnalysisBranchSource): boolean {
   if (left.kind !== right.kind) return false;
   if (left.kind === "stockfish" && right.kind === "stockfish") return left.rank === right.rank;

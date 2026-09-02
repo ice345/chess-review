@@ -6,6 +6,7 @@ import {
   appendBranchMove,
   createAnalysisBranch,
   selectedBranchNode,
+  selectedBranchMoves,
   setBranchMoveQuality,
   stepAnalysisBranch,
 } from "./analysis-branch";
@@ -34,6 +35,21 @@ describe("analysis branch tree", () => {
     expect(second.nodes.root?.childIds).toHaveLength(2);
     expect(selectedBranchNode(second).move?.uci).toBe("d2d4");
     expect(selectedBranchNode(second).sources).toContainEqual({ kind: "stockfish", rank: 2 });
+  });
+
+  it("keeps future engine PV nodes out of the selected search history", () => {
+    const branch = appendBranchLine(
+      createAnalysisBranch(0, INITIAL_FEN),
+      replayUciLine(INITIAL_FEN, ["e2e4", "e7e5", "g1f3"]),
+      1,
+    );
+
+    expect(branch.selectedIndex).toBe(1);
+    expect(activeBranchMoves(branch).map((move) => move.uci)).toEqual(["e2e4", "e7e5", "g1f3"]);
+    expect(selectedBranchMoves(branch).map((move) => move.uci)).toEqual(["e2e4"]);
+
+    const stepped = stepAnalysisBranch(branch, 1);
+    expect(selectedBranchMoves(stepped).map((move) => move.uci)).toEqual(["e2e4", "e7e5"]);
   });
 
   it("continues a user line from the selected engine node without changing the root", () => {

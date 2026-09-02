@@ -59,6 +59,19 @@ describe("review analysis branch store", () => {
     expect(branch && selectedBranchNode(branch).move?.san).toBe("Bb5");
   });
 
+  it("backtracks an engine PV and accepts a new board move from the restored node", () => {
+    const rootFen = useReviewStore.getState().positionFen;
+    useReviewStore.getState().startEngineLine(1, replayUciLine(rootFen, ["g1f3", "b8c6", "f1b5"]));
+    useReviewStore.getState().stepBranch(2);
+    expect(useReviewStore.getState().branch?.selectedIndex).toBe(3);
+
+    useReviewStore.getState().stepBranch(-2);
+    expect(useReviewStore.getState().branch?.selectedIndex).toBe(1);
+    expect(useReviewStore.getState().positionFen).toBe(replayUciLine(rootFen, ["g1f3"])[0]?.fenAfter);
+    expect(useReviewStore.getState().playAnalysisMove("d7", "d5")).toBe(true);
+    expect(selectedBranchNode(useReviewStore.getState().branch!).move?.uci).toBe("d7d5");
+  });
+
   it("stores Maia probability as model-source evidence, not objective quality", () => {
     expect(useReviewStore.getState().playHumanCandidate("g1f3", 1600, 0.27)).toBe(true);
     const branch = useReviewStore.getState().branch;
