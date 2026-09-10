@@ -17,6 +17,7 @@ import "./styles/coach.css";
 import "./styles/visual-identity.css";
 import "./styles/study.css";
 import "./styles/notebook.css";
+import "./styles/practice.css";
 
 export const metadata: Metadata = {
   title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },

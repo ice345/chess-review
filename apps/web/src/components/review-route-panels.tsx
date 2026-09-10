@@ -15,6 +15,7 @@ import { formatEngineScore } from "../lib/review-format";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { useReviewStore } from "../store/review-store";
 import { stockfishCandidateIdentity } from "../lib/board-analysis-arrows";
+import { MistakePractice } from "./mistake-practice";
 
 function AnalysisGate({ section }: { section: string }) {
   const runtime = useReviewRuntime();
@@ -150,6 +151,7 @@ export function ObjectiveRoutePanel() {
           <Link href={`/review/${runtime.gameId}/coach${firstMove ? `?ply=${firstMove.ply}` : ""}`}>{firstMove ? "Study this move →" : "Study this game →"}</Link>
         </div>
       </section>}
+      <MistakePractice analysis={analysis} />
       {move && <CurrentMoveVerdict move={move} />}
       <PositionAnalysis />
       <section className="game-summary-section" aria-label="Game summary">

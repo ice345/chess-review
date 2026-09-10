@@ -13,6 +13,7 @@ Open Chess Review is a free, open-source chess game review and coaching workspac
 - Builds player-specific multi-game trends, color-separated opening repertoire, evidence-bearing recurring weaknesses, and a persistent training queue from completed reviews.
 - Syncs complete public Chess.com archives and authorized Lichess game history into a local IndexedDB library with resumable checkpoints.
 - Saves personal position notes, bookmarks and legal variation lines in a local Notebook, with explicit save/conflict recovery.
+- Offers [Mistake practice](docs/mistake-practice.md): hide answers, try a better move, check alternatives with Stockfish and distinguish solved, hinted, revealed and skipped positions within a session.
 - Exports original/annotated PGN, canonical JSON, position PNGs, game-review PNGs, and portable library backups (v2, with v1 restore support).
 
 ![Stockfish and Maia comparison](e2e/__screenshots__/combined-stockfish-maia-1440.png)

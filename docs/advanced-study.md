@@ -83,6 +83,10 @@ position and Continue resume from that ledger, including across games. Reopening
 or confirming twice does not add credit. All source positions must be confirmed
 for review completion; there is no scored answer, mastery or spaced repetition.
 
+The separate [Mistake practice](mistake-practice.md) flow now lets users solve
+errors within a single analyzed game. Its session-only results do not count as
+Training V3 reviewed positions and do not yet schedule future reviews.
+
 Saved tasks are visible independently of cache/report availability. Legacy V1/V2
 manual completions are identified as manual, and their aggregate counts are not
 converted to specific reviewed positions. Concurrent acknowledgements use a

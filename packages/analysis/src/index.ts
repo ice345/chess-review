@@ -11,3 +11,4 @@ export * from "./study";
 export * from "./study-v2";
 export * from "./verification";
 export * from "./win-percent";
+export * from "./mistake-practice";

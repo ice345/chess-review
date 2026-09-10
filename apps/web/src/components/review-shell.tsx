@@ -417,6 +417,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     generateGameCoach: coachRuntime.generateGame,
     retryBranchMoveQuality: branchQualityRuntime.retry,
     navigateToPly,
+    pausePlayback,
     openNotebookPosition: (rootPly: number, line: string[]) => {
       playback.pause();
       state.openNotebookPosition(rootPly, line);

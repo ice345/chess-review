@@ -77,6 +77,7 @@ export interface ReviewRuntimeValue {
   generateGameCoach: () => Promise<void>;
   retryBranchMoveQuality: () => void;
   navigateToPly: (ply: number) => void;
+  pausePlayback: () => void;
   openNotebookPosition: (rootPly: number, line: string[]) => void;
   playContinuation: (identity: StockfishCandidateIdentity, result?: StockfishMoveAnalysis | null) => void;
   playHumanCandidate: (identity: HumanCandidateIdentity) => void;

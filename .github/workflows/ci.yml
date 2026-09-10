@@ -73,7 +73,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm exec playwright test e2e/workflows.spec.ts e2e/r1.spec.ts e2e/r2.spec.ts e2e/r2-layout.spec.ts e2e/r3.spec.ts e2e/r4.spec.ts e2e/s1-notebook.spec.ts
+      - run: pnpm exec playwright test e2e/workflows.spec.ts e2e/r1.spec.ts e2e/r2.spec.ts e2e/r2-layout.spec.ts e2e/r3.spec.ts e2e/r4.spec.ts e2e/s1-notebook.spec.ts e2e/mistake-practice.spec.ts
       - name: Build public Browser Core
         run: pnpm build
         env:
