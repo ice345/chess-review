@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible problem with Open Chess Review.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "This report is public. Do not include tokens, cookies, or personal library backups. Only attach a minimal PGN if you want to share it."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the page, expected behavior, and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the actions that lead to the problem.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and environment
+      placeholder: "Browser/version, OS, Browser Core or Enhanced Local"
+    validations:
+      required: true
+  - type: textarea
+    id: optional
+    attributes:
+      label: Optional screenshot or minimal PGN
+      description: Remove information you do not want to publish.

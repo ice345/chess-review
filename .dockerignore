@@ -1,0 +1,17 @@
+# An allowlist keeps local models, native build outputs and credentials out.
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!apps/
+!apps/web/
+!apps/web/**
+!packages/
+!packages/**
+**/node_modules
+**/.next
+**/dist
+**/.env*
+**/.DS_Store
+**/tsconfig.tsbuildinfo

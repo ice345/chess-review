@@ -25,9 +25,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - name: Check production dependency advisories
+        run: pnpm audit --prod --audit-level high
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: python3 -m unittest discover -s deploy/nuc -p "test_*.py"
       - run: pnpm build
 
   local-ai:
@@ -69,8 +72,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm exec playwright test e2e/workflows.spec.ts
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm exec playwright test e2e/workflows.spec.ts e2e/r1.spec.ts e2e/r2.spec.ts e2e/r2-layout.spec.ts e2e/r3.spec.ts e2e/r4.spec.ts e2e/s1-notebook.spec.ts
+      - name: Build public Browser Core
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_APP_MODE: browser-core
+      - run: pnpm exec playwright test --config playwright.release.config.ts
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -81,3 +89,30 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  nuc-container:
+    name: NUC standalone container and proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build Linux amd64 release
+        run: deploy/nuc/build.sh chess-review:ci "$GITHUB_SHA"
+      - name: Configure isolated local ingress
+        run: |
+          python3 deploy/nuc/release.py init
+          python3 - <<'PYCONFIG'
+          from pathlib import Path
+          path = Path('deploy/nuc/.env')
+          path.write_text(path.read_text().replace('DOMAIN=\n', 'DOMAIN=chess-ci.example.org\n').replace('LICHESS_CLIENT_ID=\n', 'LICHESS_CLIENT_ID=chess-ci.example.org\n'))
+          PYCONFIG
+      - name: Start and verify actual proxy without following OAuth redirect
+        run: |
+          python3 deploy/nuc/release.py deploy chess-review:ci
+          python3 deploy/nuc/release.py check
+          python3 deploy/nuc/smoke.py
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker logs --tail 100 chess-review-web-1 || true
+          docker logs --tail 100 chess-review-gateway-1 || true

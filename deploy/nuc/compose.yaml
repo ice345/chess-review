@@ -1,0 +1,53 @@
+name: chess-review
+services:
+  web:
+    image: ${APP_IMAGE:?Use release.py deploy IMAGE}
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: https://${DOMAIN:?Set DOMAIN}
+      LICHESS_CLIENT_ID: ${LICHESS_CLIENT_ID:-}
+      LICHESS_SESSION_SECRET: ${LICHESS_SESSION_SECRET:?Run release.py init}
+      TRUST_PROXY_ORIGIN: "1"
+      PLATFORM_CLIENT_IP_HEADER: x-real-ip
+    mem_limit: 1536m
+    cpus: 2.0
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  gateway:
+    image: nginx:1.28-alpine
+    user: '101:101'
+    entrypoint: [nginx, -g, 'daemon off;']
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${PORT:-8080}:8080'
+    volumes:
+      - type: bind
+        source: ./.state/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    read_only: true
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      web: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
