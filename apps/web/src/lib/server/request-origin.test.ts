@@ -12,6 +12,21 @@ it('ignores forwarding headers unless the deployment explicitly trusts its ingre
   vi.stubEnv('TRUST_PROXY_ORIGIN', '');
   expect(requestOrigin(incoming())).toBe('http://0.0.0.0:3000');
 });
+it.each(['localhost:3000', '127.0.0.1:3000', '[::1]:3000'])('accepts direct loopback Host %s despite a standalone listen URL', (host) => {
+  vi.stubEnv('TRUST_PROXY_ORIGIN', '');
+  const request = incoming({ host, origin: `http://${host}`, 'sec-fetch-site': 'same-origin' }, 'POST');
+  expect(requestOrigin(request)).toBe(`http://${host}`);
+  expect(sameOriginMutation(request)).toBe(true);
+});
+it.each(['evil.example:3000', 'localhost:4000', 'localhost:3000/evil', 'user@localhost:3000'])('does not widen local origin trust to %s', (host) => {
+  vi.stubEnv('TRUST_PROXY_ORIGIN', '');
+  expect(sameOriginMutation(incoming({ host, origin: `http://${host}` }, 'POST'))).toBe(false);
+});
+it('still rejects a different browser origin or cross-site request on a loopback host', () => {
+  vi.stubEnv('TRUST_PROXY_ORIGIN', '');
+  expect(sameOriginMutation(incoming({ host: '127.0.0.1:3000', origin: 'http://localhost:3000' }, 'POST'))).toBe(false);
+  expect(sameOriginMutation(incoming({ host: '127.0.0.1:3000', origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'cross-site' }, 'POST'))).toBe(false);
+});
 it('uses the configured public HTTPS origin behind standalone and a trusted gateway', () => {
   trusted();
   expect(lichessOrigin(incoming())).toBe('https://chess.example.org');

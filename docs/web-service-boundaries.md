@@ -150,3 +150,13 @@ The release script verifies liveness/version and can roll back images; the
 local smoke checks verify actual proxy headers and OAuth start without following
 the external authorization redirect. Actual Cloudflare HTTPS and signed-in
 account flows remain a separate deployment acceptance step.
+
+## Local address validation follow-up (2026-09-10)
+
+Direct local requests may use localhost, 127.0.0.1 or IPv6 loopback even when Next
+constructs its request URL from a different listen address. `requestOrigin` accepts
+only a loopback Host on the same protocol/port in that case. It does not accept an
+arbitrary Host or forwarded host, and browser Origin must still match exactly.
+Public Cloudflare/NGINX ingress continues to require the explicit trusted-proxy
+configuration. A mismatch now explains the website-origin failure instead of
+implying Chess.com could not be reached. Saved games are unaffected.

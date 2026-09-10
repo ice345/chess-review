@@ -56,7 +56,7 @@ export async function platformRequest(request: Request, handler: (request: Reque
   const timer = setTimeout(() => timeout.abort(), 20_000);
   let release: (() => void) | undefined;
   try {
-    if (!sameOriginMutation(request)) return Response.json({ error: "Open this website to change its platform connection." }, { status: 403 });
+    if (!sameOriginMutation(request)) return Response.json({ error: "The page address does not match this server's accepted origin. Reload from the configured website address; if this persists, check the deployment origin and proxy settings. Your saved games are unchanged." }, { status: 403 });
     checkPlatformRate(request);
     const signal = AbortSignal.any([request.signal, timeout.signal]);
     if (provider) release = await acquireProvider(provider, signal);
