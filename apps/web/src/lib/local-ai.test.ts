@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadMaiaModel } from "./local-ai";
+import { downloadMaiaModel, getLocalAiHealth } from "./local-ai";
+vi.mock("./deployment", () => ({ localAiAccess: () => ({ state: "enabled", url: "http://127.0.0.1:8000" }) }));
 
 describe("local-ai client", () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it.each([null, {}, { status: "ok", maia: "available", coach: { ollamaModels: "invalid" } }])("rejects invalid capability responses before UI consumers receive them: %j", async (body) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
+    await expect(getLocalAiHealth()).rejects.toMatchObject({ code: "invalid-health-response" });
+  });
 
   it("sends an explicit JSON confirmation for model downloads", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -21,6 +27,7 @@ describe("local-ai client", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirm: true }),
+        signal: expect.any(AbortSignal),
       },
     );
   });

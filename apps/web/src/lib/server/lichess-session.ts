@@ -1,3 +1,4 @@
+import { requestOrigin } from "./request-origin";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 export const LICHESS_SESSION_COOKIE = "ocr_lichess_session";
@@ -59,4 +60,25 @@ export function base64UrlSha256(value: string): string {
 
 export function randomBase64Url(bytes = 32): string {
   return randomBytes(bytes).toString("base64url");
+}
+
+/** The encrypted cookie is server-owned, but validate expiry and shape before using its credential. */
+export function readLichessSession(sealed: string): LichessSession {
+  const session = openLichessValue<LichessSession>(sealed);
+  if (!session || typeof session.accessToken !== "string" || !session.accessToken.length
+    || !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= Date.now()
+    || typeof session.account?.id !== "string" || !/^[\w-]{2,32}$/.test(session.account.id)
+    || typeof session.account.username !== "string") throw new Error("The Lichess session is expired or invalid. Connect again.");
+  return session;
+}
+
+export function lichessOrigin(request: Request): string {
+  const requested = new URL(requestOrigin(request));
+  const configured = process.env.APP_ORIGIN?.trim();
+  const origin = new URL(configured || requested.origin);
+  if (origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash) throw new Error("The website origin is not configured correctly.");
+  if (origin.protocol !== "https:" && !(origin.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname))) throw new Error("Lichess sign-in requires HTTPS or a local development address.");
+  if (configured && origin.origin !== requested.origin) throw new Error("Open the configured website address to connect Lichess.");
+  if (!configured && process.env.NODE_ENV === "production" && !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)) throw new Error("Lichess sign-in is not configured for this website address.");
+  return origin.origin;
 }

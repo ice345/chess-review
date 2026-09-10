@@ -1,7 +1,9 @@
+import { fetchProvider, readProviderText } from "../../../../../lib/server/platform-response";
+import { platformRequest, readSyncInput } from "../../../../../lib/server/platform-request";
 import { cookies } from "next/headers";
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
-import { LICHESS_SESSION_COOKIE, openLichessValue, type LichessSession } from "../../../../../lib/server/lichess-session";
-import { encodeLichessCursor, lichessUntil, readBoundedJson, type PlatformSyncMode } from "../../../../../lib/platform-sync";
+import { LICHESS_SESSION_COOKIE, readLichessSession, type LichessSession } from "../../../../../lib/server/lichess-session";
+import { encodeLichessCursor, lichessUntil } from "../../../../../lib/platform-sync";
 
 interface LichessGame {
   id: string;
@@ -24,23 +26,19 @@ function resultFor(color: "white" | "black", winner: LichessGame["winner"]): str
 }
 
 export async function POST(request: Request) {
+  return platformRequest(request, handleRequest, "lichess");
+}
+
+async function handleRequest(request: Request, signal: AbortSignal) {
   let session: LichessSession;
   try {
     const sealed = (await cookies()).get(LICHESS_SESSION_COOKIE)?.value;
     if (!sealed) return Response.json({ error: "Connect Lichess before syncing." }, { status: 401 });
-    session = openLichessValue<LichessSession>(sealed);
+    session = readLichessSession(sealed);
   } catch {
     return Response.json({ error: "The Lichess session is invalid. Connect again." }, { status: 401 });
   }
-  let body: { since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
-  try {
-    body = await readBoundedJson(request);
-  } catch (error) {
-    if (error instanceof Error && error.name === "PayloadTooLargeError") {
-      return Response.json({ error: "Request body is too large." }, { status: 413 });
-    }
-    throw error;
-  }
+  const body = await readSyncInput(request, "lichess", signal);
   const limit = Math.max(1, Math.min(100, body?.limit ?? 50));
   const mode = body?.mode ?? "incremental";
   const url = new URL(`https://lichess.org/api/games/user/${encodeURIComponent(session.account.id)}`);
@@ -52,13 +50,13 @@ export async function POST(request: Request) {
   if (mode === "incremental" && body?.since) url.searchParams.set("since", String(Date.parse(body.since)));
   const until = lichessUntil(body?.cursor);
   if (until !== null) url.searchParams.set("until", String(until));
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${session.accessToken}`, Accept: "application/x-ndjson" }, cache: "no-store", signal: request.signal });
+  const response = await fetchProvider(url, { headers: { Authorization: `Bearer ${session.accessToken}`, Accept: "application/x-ndjson" }, cache: "no-store", signal, redirect: "error" });
   if (response.status === 429) return Response.json(
     { error: "Lichess rate limit reached. Sync can resume from the saved game checkpoint." },
     { status: 429, headers: { "Retry-After": response.headers.get("Retry-After") ?? "60" } },
   );
   if (!response.ok) return Response.json({ error: `Lichess game export failed (${response.status}).` }, { status: response.status === 401 ? 401 : 502 });
-  const raw = await response.text();
+  const raw = await readProviderText(response, signal);
   const rawGames = raw.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line) as LichessGame);
   const now = new Date().toISOString();
   const account: PlatformAccount = {

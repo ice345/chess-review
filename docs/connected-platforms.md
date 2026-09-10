@@ -40,7 +40,7 @@ Lichess uses OAuth 2 Authorization Code with PKCE for a public client, following
 - no client secret and no refresh-token assumption
 - empty/minimal scope for identity and the user's public game export
 
-Configure `LICHESS_CLIENT_ID` and `LICHESS_SESSION_SECRET` in `apps/web/.env.local`; `apps/web/.env.example` documents both values. The verifier/state lives in a short-lived encrypted HttpOnly cookie. The access token lives only in a separate encrypted HttpOnly cookie. Disconnect attempts remote token revocation and always clears the local session. A future Tauri implementation must use OS credential storage.
+Configure `LICHESS_CLIENT_ID`, `LICHESS_SESSION_SECRET` and the public deployment's `APP_ORIGIN` server-side; `apps/web/.env.example` documents them. The verifier/state lives in a 10-minute encrypted HttpOnly cookie. The access token lives only in a separate encrypted HttpOnly cookie, with expiry checked before sync. Cookies are Secure on HTTPS. Disconnect attempts remote token revocation and clears the local session after request admission, reporting unconfirmed revocation distinctly. A future Tauri implementation must use OS credential storage.
 
 Copied Lichess PGNs may also request public profile photos from
 `https://lichess.org/api/user/{username}`. Many Lichess accounts have none;
@@ -79,3 +79,25 @@ as `syncing` by a closed browser is converted to `paused` on the next load.
 The Library filters the full local collection but mounts it progressively in
 60-record pages. This avoids rendering thousands of rows at once while retaining
 local source/status/time-control/result filters.
+
+## Web R1 request and cleanup boundaries (2026-09-06)
+
+Chess.com link/sync and Lichess sync use a common error boundary. Sync inputs
+validate object shape, mode, a bounded integer limit, date and provider cursor;
+Chess.com additionally validates its public account identity and username.
+Invalid JSON/fields return 400, bodies over 1 MiB of UTF-8 return 413, and provider
+network/response failures return 502. Requests have a 20-second upstream deadline
+(504 on timeout). Request cancellation is propagated. Archive-list and monthly
+archive 429 responses retain Retry-After and the browser's saved checkpoint.
+The JSON reader bounds streamed bytes before retaining the complete request.
+Public Chess.com account responses remain ownership-unverified.
+
+Disconnect with game deletion atomically removes the local account, sync state,
+linked reviews and learning references along with its source games. Shared
+analysis referenced by another retained game remains. Other open pages must
+reload after cleanup; old in-flight writes are rejected by the database epoch.
+R4 adds per-process rate limits, bounded serial provider queues, response sizes,
+429 cooldowns and same-origin mutation checks to every platform route. See
+[web-service-boundaries.md](web-service-boundaries.md) for exact limits and trusted
+ingress requirements. Real HTTPS/OAuth and deployment-wide acceptance remain R5
+release gates; fixture OAuth tests do not substitute for a real account login.

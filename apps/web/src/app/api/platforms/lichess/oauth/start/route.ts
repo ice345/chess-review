@@ -1,6 +1,8 @@
+import { platformRequest } from "../../../../../../lib/server/platform-request";
 import { NextResponse } from "next/server";
 import {
   base64UrlSha256,
+  lichessOrigin,
   LICHESS_PKCE_COOKIE,
   randomBase64Url,
   requireLichessClientId,
@@ -8,10 +10,12 @@ import {
   type LichessPkceState,
 } from "../../../../../../lib/server/lichess-session";
 
-export async function GET(request: Request) {
+export async function GET(request: Request) { return platformRequest(request, start); }
+
+async function start(request: Request) {
   try {
     const clientId = requireLichessClientId();
-    const requestUrl = new URL(request.url);
+    const requestUrl = new URL(lichessOrigin(request));
     const redirectUri = `${requestUrl.origin}/api/platforms/lichess/oauth/callback`;
     const verifier = randomBase64Url(48);
     const state = randomBase64Url(24);
@@ -34,6 +38,6 @@ export async function GET(request: Request) {
     });
     return response;
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Lichess OAuth is not configured." }, { status: 503 });
+    return Response.json({ error: error instanceof Error && /Open the configured/.test(error.message) ? error.message : "Lichess sign-in is not configured for this website. PGN import remains available." }, { status: 503 });
   }
 }

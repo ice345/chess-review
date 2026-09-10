@@ -1,3 +1,4 @@
+import { localAiAccess } from "./deployment";
 import type {
   CoachExplanation,
   CoachGameFacts,
@@ -59,9 +60,16 @@ export class LocalAiRequestError extends Error {
   }
 }
 
-const LOCAL_AI_URL = (process.env.NEXT_PUBLIC_LOCAL_AI_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 const LOCAL_AI_TOKEN = process.env.NEXT_PUBLIC_LOCAL_AI_TOKEN ?? "";
 
+function localAiUrl(path: string): string {
+  const access = localAiAccess();
+  if (access.state !== "enabled") throw new LocalAiRequestError(access.message, 503, access.state);
+  return `${access.url}${path}`;
+}
+function requestSignal(signal: AbortSignal | undefined, timeoutMs = 120_000): AbortSignal {
+  return AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeoutMs)]);
+}
 function localAiHeaders(json = false): HeadersInit {
   const headers: Record<string, string> = {};
   if (json) headers["Content-Type"] = "application/json";
@@ -87,13 +95,22 @@ function errorFromResponse(response: Response, body: unknown): LocalAiRequestErr
 }
 
 export async function getLocalAiHealth(signal?: AbortSignal): Promise<LocalAiHealth> {
-  const response = await fetch(`${LOCAL_AI_URL}/health`, {
+  const response = await fetch(localAiUrl("/health"), {
     headers: localAiHeaders(),
-    ...(signal === undefined ? {} : { signal }),
+    signal: requestSignal(signal, 5_000),
   });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);
   const health = body as LocalAiHealth;
+  if (!health || health.status !== "ok" || !["available", "not-installed", "error"].includes(health.maia)
+    || !health.coach || !["available", "offline", "error"].includes(health.coach.ollama)
+    || !["available", "missing", "offline", "error"].includes(health.coach.ollamaModel)
+    || typeof health.coach.configuredModel !== "string"
+    || !Array.isArray(health.coach.ollamaModels) || !health.coach.ollamaModels.every((model) => typeof model === "string")
+    || !["configured", "not-configured"].includes(health.coach.openaiCompatible)
+    || !health.maiaModels || ["maia3-5m", "maia3-23m", "maia3-79m"].some((model) => !["active", "cached", "not-cached", "unavailable", "error"].includes(health.maiaModels[model as MaiaModel]))) {
+    throw new LocalAiRequestError("The local service returned an invalid capability response. Browser review remains available.", 503, "invalid-health-response");
+  }
   if (health.identity && health.identity.product !== "open-chess-review-local-ai") {
     throw new LocalAiRequestError("The process on the local-ai port is not Open Chess Review.", 503, "local-service-identity-mismatch");
   }
@@ -166,7 +183,7 @@ export async function reviewMaiaMove(
   request: MaiaMoveReviewRequest,
   signal?: AbortSignal,
 ): Promise<MaiaMoveReview> {
-  const response = await fetch(`${LOCAL_AI_URL}/maia/move-review`, {
+  const response = await fetch(localAiUrl("/maia/move-review"), {
     method: "POST",
     headers: localAiHeaders(true),
     body: JSON.stringify({
@@ -174,7 +191,7 @@ export async function reviewMaiaMove(
       fen_before: request.fenBefore,
       played_move: request.playedMove,
     }),
-    ...(signal === undefined ? {} : { signal }),
+    signal: requestSignal(signal),
   });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);
@@ -201,11 +218,11 @@ export async function analyzeMaiaPosition(
   request: MaiaPositionAnalysisRequest,
   signal?: AbortSignal,
 ): Promise<MaiaPositionAnalysis> {
-  const response = await fetch(`${LOCAL_AI_URL}/maia/position-analysis`, {
+  const response = await fetch(localAiUrl("/maia/position-analysis"), {
     method: "POST",
     headers: localAiHeaders(true),
     body: JSON.stringify({ ...maiaConfigBody(request), fen: request.fen }),
-    ...(signal === undefined ? {} : { signal }),
+    signal: requestSignal(signal),
   });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);
@@ -228,11 +245,11 @@ export async function analyzeMaiaPosition(
 }
 
 export async function downloadMaiaModel(model: MaiaModel, signal?: AbortSignal): Promise<MaiaModelState> {
-  const response = await fetch(`${LOCAL_AI_URL}/maia/models/${model}/download`, {
+  const response = await fetch(localAiUrl(`/maia/models/${model}/download`), {
     method: "POST",
     headers: localAiHeaders(true),
     body: JSON.stringify({ confirm: true }),
-    ...(signal === undefined ? {} : { signal }),
+    signal: requestSignal(signal, 15 * 60_000),
   });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);
@@ -280,7 +297,7 @@ async function coachRequest<T>(
   options: CoachRequestOptions,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(`${LOCAL_AI_URL}${path}`, {
+  const response = await fetch(localAiUrl(path), {
     method: "POST",
     headers: localAiHeaders(true),
     body: JSON.stringify({
@@ -290,7 +307,7 @@ async function coachRequest<T>(
       ...(options.model === undefined || options.model.trim() === "" ? {} : { model: options.model.trim() }),
       language: options.language,
     }),
-    ...(signal === undefined ? {} : { signal }),
+    signal: requestSignal(signal),
   });
   const body = await responseJson(response);
   if (!response.ok) throw errorFromResponse(response, body);

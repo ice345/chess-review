@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { localAiAccess } from "./deployment";
 import { getLocalAiHealth, type LocalAiHealth } from "./local-ai";
 
-export type LocalAiConnectionState = "checking" | "online" | "offline";
+export type LocalAiConnectionState = "checking" | "online" | "offline" | "not-provided" | "not-configured";
 
 export interface LocalAiHealthRuntime {
   state: LocalAiConnectionState;
@@ -21,6 +22,8 @@ export function useLocalAiHealth(pollIntervalMs = 5_000) {
   const [health, setHealth] = useState<LocalAiHealth | null>(null);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
+    const access = localAiAccess();
+    if (access.state !== "enabled") { setHealth(null); setState(access.state); return null; }
     try {
       const result = await getLocalAiHealth(signal);
       setHealth(result);
@@ -37,9 +40,10 @@ export function useLocalAiHealth(pollIntervalMs = 5_000) {
   useEffect(() => {
     const controller = new AbortController();
     void refresh(controller.signal);
-    const interval = window.setInterval(() => void refresh(), pollIntervalMs);
+    if (localAiAccess().state !== "enabled") return () => controller.abort();
+    const interval = window.setInterval(() => { if (!controller.signal.aborted) void refresh(controller.signal); }, pollIntervalMs);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void refresh();
+      if (document.visibilityState === "visible") void refresh(controller.signal);
     };
     window.addEventListener("focus", onVisible);
     document.addEventListener("visibilitychange", onVisible);

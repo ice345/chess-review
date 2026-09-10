@@ -31,7 +31,7 @@ export interface ChessPlatformProvider {
   readonly id: ExternalPlatform;
   link(identity?: string): Promise<PlatformAccount>;
   sync(request: PlatformSyncRequest): Promise<PlatformSyncResult>;
-  disconnect(account: PlatformAccount): Promise<void>;
+  disconnect(account: PlatformAccount): Promise<{ remoteRevoked?: boolean } | void>;
 }
 
 async function jsonOrThrow<T>(response: Response): Promise<T> {
@@ -81,6 +81,6 @@ export const lichessProvider: ChessPlatformProvider = {
     }));
   },
   async disconnect() {
-    await jsonOrThrow<{ ok: true }>(await fetch("/api/platforms/lichess/session", { method: "DELETE" }));
+    return jsonOrThrow<{ ok: true; remoteRevoked?: boolean }>(await fetch("/api/platforms/lichess/session", { method: "DELETE" }));
   },
 };

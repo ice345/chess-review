@@ -1,3 +1,5 @@
+import { fetchProvider, readProviderJson } from "../../../../../lib/server/platform-response";
+import { platformRequest, readSyncInput } from "../../../../../lib/server/platform-request";
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
 import {
   archiveKeyFromUrl,
@@ -6,11 +8,9 @@ import {
   chessComCursor,
   encodeChessComCursor,
   locateChessComArchive,
-  readBoundedJson,
-  type PlatformSyncMode,
 } from "../../../../../lib/platform-sync";
 
-const HEADERS = { Accept: "application/json", "User-Agent": "OpenChessReview/0.1 contact: local-user" };
+const HEADERS = { Accept: "application/json", "User-Agent": "OpenChessReview/0.1 https://github.com/ice345/chess-review" };
 
 interface ChessComGame {
   url?: string;
@@ -31,20 +31,16 @@ function normalizedResult(value: string | undefined): string | undefined {
 }
 
 export async function POST(request: Request) {
-  let body: { account?: PlatformAccount; since?: string; cursor?: string; limit?: number; mode?: PlatformSyncMode } | null;
-  try {
-    body = await readBoundedJson(request);
-  } catch (error) {
-    if (error instanceof Error && error.name === "PayloadTooLargeError") {
-      return Response.json({ error: "Request body is too large." }, { status: 413 });
-    }
-    throw error;
-  }
-  if (!body?.account || body.account.provider !== "chesscom") return Response.json({ error: "A linked Chess.com account is required." }, { status: 400 });
-  const account = body.account;
-  const response = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(account.username.toLowerCase())}/games/archives`, { headers: HEADERS, cache: "no-store", signal: request.signal });
+  return platformRequest(request, handleRequest, "chesscom");
+}
+
+async function handleRequest(request: Request, signal: AbortSignal) {
+  const body = await readSyncInput(request, "chesscom", signal);
+  const account = body.account!;
+  const response = await fetchProvider(`https://api.chess.com/pub/player/${encodeURIComponent(account.username.toLowerCase())}/games/archives`, { headers: HEADERS, cache: "no-store", signal, redirect: "error" });
+  if (response.status === 429) return Response.json({ error: "Chess.com rate limit reached. Retry from the saved checkpoint." }, { status: 429, headers: { "Retry-After": response.headers.get("Retry-After") ?? "60" } });
   if (!response.ok) return Response.json({ error: `Chess.com archive request failed (${response.status}).` }, { status: 502 });
-  const archiveBody = await response.json() as { archives?: string[] };
+  const archiveBody = await readProviderJson(response, signal) as { archives?: string[] };
   const mode = body.mode ?? "incremental";
   const sinceMs = mode === "incremental" && body.since ? Date.parse(body.since) : 0;
   const limit = Math.max(1, Math.min(100, body.limit ?? 50));
@@ -83,13 +79,13 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Chess.com archive URL is invalid." }, { status: 502 });
   }
-  const archiveResponse = await fetch(archiveUrl, { headers: HEADERS, cache: "no-store", signal: request.signal, redirect: "error" });
+  const archiveResponse = await fetchProvider(archiveUrl, { headers: HEADERS, cache: "no-store", signal, redirect: "error" });
   if (archiveResponse.status === 429) return Response.json(
     { error: "Chess.com rate limit reached. Sync can resume from the saved archive checkpoint." },
     { status: 429, headers: { "Retry-After": archiveResponse.headers.get("Retry-After") ?? "60" } },
   );
   if (!archiveResponse.ok) return Response.json({ error: `Chess.com monthly archive failed (${archiveResponse.status}).` }, { status: 502 });
-  const archive = await archiveResponse.json() as { games?: ChessComGame[] };
+  const archive = await readProviderJson(archiveResponse, signal) as { games?: ChessComGame[] };
   const eligibleGames = (archive.games ?? [])
     .filter((game) => !sinceMs || Boolean(game.end_time && game.end_time * 1000 > sinceMs))
     .sort((left, right) => (right.end_time ?? 0) - (left.end_time ?? 0));

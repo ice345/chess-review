@@ -33,11 +33,18 @@ Configuration is server-side:
 
 Selecting Ollama keeps facts local. Selecting the OpenAI-compatible provider is an explicit user action; API keys are never sent to the browser.
 
-`/health` reports the Ollama service, configured default and every installed model returned by `/api/tags`. Settings presents that catalog as a selector, so users are not restricted to `gemma4:12b-it-qat`. An available API with a missing selected model is not coach-ready. The UI directs the user to an explicit `ollama pull <model>` command, but neither the service nor the development launcher downloads a model automatically.
+`/health` reports the Ollama service, configured default and every installed model returned by `/api/tags`. Enhanced Local Settings presents that catalog as a selector, so users are not restricted to `gemma4:12b-it-qat`. An available API with a missing selected model is not coach-ready. Setup guidance lives in Help; neither the service nor the development launcher downloads a model automatically.
 
 For development, `pnpm dev` probes and reuses an existing Ollama API or starts the installed executable with `ollama serve`. It also reuses or owns the optional FastAPI service and Next.js application, and shuts down only processes it created. `pnpm dev:local-ai` is the service-only companion for an already-running web app. `pnpm dev:web` starts Browser Core without managed local services. Review's Maia selection and Study generation retry offline health automatically; provider/model/language defaults live in Settings instead of dominating the Study route.
 
 ## Validation and grounding
+
+Public production defaults to Browser Core. It never probes localhost AI and
+Study builds matching-language summaries from the existing canonical facts on
+request. Provider/model controls are shown only in Enhanced Local on a loopback
+hostname. The interface is English; Coach output is a separate English/Chinese
+preference (new default English, existing preferences preserved). Full capability,
+timeout and data-disclosure rules are in [web-service-boundaries.md](web-service-boundaries.md).
 
 Provider output must first match the strict Pydantic schema. Coach v3 requires the six nullable teaching keys `notice`, `moveIdea`, `problem`, `consequence`, `practicalAlternative` and `takeaway`; a provider that silently returns the old shape fails validation. Both move explanations and whole-game summaries are validated against the requested language. A Chinese request that contains no meaningful Chinese output fails closed to deterministic Chinese copy. The UI presents the available values in that order and keeps source cards and validated lines separate from the teaching prose.
 
