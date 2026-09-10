@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
@@ -9,6 +9,7 @@ import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
 import { BoardQualityBadge, QUALITY_META } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
+import { TrainingSession } from "./training-session";
 import { ReviewRuntimeProvider } from "./review-runtime";
 import { BoardFlipButton } from "./review/board-flip-button";
 import { EvaluationBar } from "./review/evaluation-bar";
@@ -22,6 +23,7 @@ import { useReviewCoach } from "../hooks/use-review-coach";
 import { useReviewHuman } from "../hooks/use-review-human";
 import { useReviewPlayback } from "../hooks/use-review-playback";
 import { useReviewRecord } from "../hooks/use-review-record";
+import { useReviewNotebook } from "../hooks/use-review-notebook";
 import { loadAppSettings } from "../lib/app-settings";
 import { useLocalAiHealth } from "../lib/use-local-ai-health";
 import {
@@ -43,6 +45,9 @@ import { useReviewStore } from "../store/review-store";
 export function ReviewShell({ children }: { children: ReactNode }) {
   const params = useParams<{ gameId: string }>();
   const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const query = new URLSearchParams(search);
+  const trainingId = query.get("training");
   const gameId = params.gameId;
   const state = useReviewStore();
   const settings = useMemo(() => loadAppSettings(), []);
@@ -92,6 +97,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     setReviewState: analysisRuntime.setReviewState,
   });
   const players = usePlayerIdentities(record, state.game);
+  const notebook = useReviewNotebook(loadState === "ready" ? record : null);
   const orderedPlayers = orderPlayersForBoard(players, state.orientation);
   const totalPlies = state.game?.plies.length ?? 0;
   const playback = useReviewPlayback({
@@ -142,6 +148,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   }, [humanRuntime.moveReview, reviewedAnalysis]);
   const currentHuman = matchingStoredHuman ?? liveHuman;
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const exporting = useRef(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
   const pendingPromotionRef = useRef(pendingPromotion);
   pendingPromotionRef.current = pendingPromotion;
@@ -162,12 +171,16 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loadState !== "ready" || !state.game) return;
-    const identity = `${gameId}:${window.location.search}`;
+    const identity = `${gameId}:${search}`;
     if (requestedPlyApplied.current === identity) return;
     requestedPlyApplied.current = identity;
-    const requested = Number(new URLSearchParams(window.location.search).get("ply"));
+    const rawPly = new URLSearchParams(search).get("ply");
+    // Removing a deep-link query during section navigation must not reset the
+    // persistent board or discard an exploratory line (Number(null) is zero).
+    if (rawPly === null || !/^\d+$/.test(rawPly)) return;
+    const requested = Number(rawPly);
     if (Number.isInteger(requested) && requested >= 0) state.goToPly(requested);
-  }, [gameId, loadState, state.game, state.goToPly]);
+  }, [gameId, loadState, search, state.game, state.goToPly]);
 
   useEffect(() => {
     if (!state.analysis) return;
@@ -228,6 +241,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
           <span className="brand-mark"><BlueBishopMark decorative /></span>
           <h1>{loadState === "missing" ? "Review not found" : loadState === "error" ? "Unable to open review" : "Preparing workspace"}</h1>
           <p>{loadError ?? (loadState === "missing" ? "This browser has no record for that review ID." : "Loading the persisted game and analysis cache…")}</p>
+          {loadState === "error" && <button type="button" className="secondary" onClick={() => window.location.reload()}>Retry opening review</button>}
           {loadState !== "loading" && <Link href="/">Return home →</Link>}
         </section>
       </main>
@@ -248,6 +262,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     { href: root, label: "Review" },
     { href: `${root}/moves`, label: "Moves" },
     { href: `${root}/coach`, label: "Study" },
+    { href: `${root}/notebook`, label: "Notebook" },
     { href: `${root}/engine`, label: "Engine" },
   ];
   const selectedBranchMove = selectedBranch?.move ?? null;
@@ -261,6 +276,14 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   function downloadText(content: string, mimeType: string, filename: string) {
     downloadBlob(new Blob([content], { type: `${mimeType};charset=utf-8` }), filename);
+  }
+
+  async function runExport(label: string, action: () => void | Promise<void>) {
+    if (exporting.current) return;
+    exporting.current = true; setExportBusy(true); setExportError(null);
+    try { await action(); }
+    catch (cause) { setExportError(`${label} export failed. ${cause instanceof Error ? cause.message : "Please try again."}`); }
+    finally { exporting.current = false; setExportBusy(false); }
   }
 
   function playBoardMove(from: string, to: string, promotion?: "q" | "r" | "b" | "n") {
@@ -346,6 +369,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const runtime = {
     gameId,
     record,
+    notebook,
     reviewState,
     reviewError,
     reviewProgress,
@@ -393,6 +417,10 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     generateGameCoach: coachRuntime.generateGame,
     retryBranchMoveQuality: branchQualityRuntime.retry,
     navigateToPly,
+    openNotebookPosition: (rootPly: number, line: string[]) => {
+      playback.pause();
+      state.openNotebookPosition(rootPly, line);
+    },
     playContinuation: (identity: StockfishCandidateIdentity, result: StockfishMoveAnalysis | null = candidateResult) => {
       const line = matchingStockfishCandidate(result, identity);
       if (!line) return;
@@ -419,23 +447,30 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         <div className="review-titlebar">
           <div><span className="kicker">{record.kind === "pgn" ? "Game review" : "Position study"}</span><strong>{record.title}</strong><small>{record.subtitle}</small></div>
           <nav className="review-nav" aria-label="Review sections">
-            {primary.map((item) => <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={item.href} key={item.href}>{item.label}{item.label === "Study" && coachRuntime.task?.status === "running" ? <small>Generating…</small> : null}</Link>)}
+            {primary.map((item) => <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={trainingId ? `${item.href}?${new URLSearchParams({ training: trainingId, position: query.get("position") ?? "", ply: String(state.currentPly) })}` : item.href} key={item.href}>{item.label}{item.label === "Study" && coachRuntime.task?.status === "running" ? <small>Generating…</small> : null}</Link>)}
           </nav>
           <div className="review-actions">
             <details key={`export-${pathname}`}><summary>Export</summary><div className="action-menu">
-              <button type="button" disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json"))}>Canonical JSON</button>
-              <button type="button" disabled={!state.analysis} onClick={() => state.analysis && downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn"))}>Annotated PGN</button>
-              <button type="button" onClick={() => void exportPositionPng()}>Position PNG</button>
-              <button type="button" disabled={!state.analysis} onClick={() => void exportReviewPng()}>Review PNG</button>
+              {record.kind === "pgn" && <button type="button" disabled={exportBusy} onClick={() => void runExport("Original PGN", () => downloadText(record.originalPgn ?? record.input, "application/x-chess-pgn", `review-${record.id}-original.pgn`))}>Original PGN</button>}
+              {record.kind === "pgn" && <small className="export-note">Original keeps imported comments and variations. Annotated adds analysis to the mainline.</small>}
+              <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Canonical JSON", () => { if (state.analysis) downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json")); })}>Canonical JSON</button>
+              <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Annotated PGN", () => { if (state.analysis) downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn")); })}>Annotated PGN</button>
+              <button type="button" disabled={exportBusy} onClick={() => void runExport("Position PNG", exportPositionPng)}>Position PNG</button>
+              <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Review PNG", exportReviewPng)}>Review PNG</button>
+              {exportBusy && <small role="status">Preparing export…</small>}
             </div></details>
             <Link className="review-settings-link" href="/settings">Settings</Link>
           </div>
         </div>
 
+        {exportError && <div className="review-export-error" role="alert"><p className="error">{exportError} Open Export to retry.</p><button type="button" className="text-button" onClick={() => setExportError(null)}>Dismiss export error</button></div>}
+
         <div className="review-workspace">
           <div className="analysis-column">
             <section className="position-workspace" aria-label="Persistent board workspace">
-              <div className="board-toolbar">
+              <div className="board-player-header">
+                <PlayerStrip player={orderedPlayers.top} />
+                <div className="board-toolbar">
                 <button
                   type="button"
                   className="sound-toggle-button"
@@ -452,8 +487,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                   </svg>
                 </button>
                 <BoardFlipButton onFlip={flipBoard} />
+                </div>
               </div>
-              <PlayerStrip player={orderedPlayers.top} />
               <div className="board-stage">
                 <EvaluationBar
                   mode={humanRuntime.mode}
@@ -566,6 +601,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                   </span>
                   {state.branch && <button type="button" className="return-to-game" onClick={() => { playback.pause(); state.returnToGame(); }}>Return to game <kbd>Esc</kbd></button>}
                 </div>
+                {state.branch && <p className="branch-session-note">Temporary variation · not saved automatically. <Link href={trainingId ? `${root}/notebook?${new URLSearchParams({ training: trainingId, position: query.get("position") ?? "", ply: String(state.currentPly) })}` : `${root}/notebook`}>Save this position in Notebook →</Link></p>}
                 <MoveTransport
                   isPlaying={playback.isPlaying}
                   inVariation={state.branch !== null}
@@ -583,7 +619,10 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
           </div>
 
-          <aside className={`context-panel${pathname === `${root}/moves` ? " moves-context" : ""}`}>{children}</aside>
+          <aside className={`context-panel${pathname === `${root}/moves` ? " moves-context" : ""}${trainingId ? " training-context" : ""}`}>
+            {trainingId && <TrainingSession taskId={trainingId} positionKey={query.get("position")} record={record} />}
+            {children}
+          </aside>
         </div>
       </main>
     </ReviewRuntimeProvider>

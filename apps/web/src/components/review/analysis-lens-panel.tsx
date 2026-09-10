@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { replayUciLine } from "@chess-review/chess-core";
 import type { MaiaModel, StockfishMoveAnalysis } from "@chess-review/shared";
 import { useReviewRuntime } from "../review-runtime";
@@ -99,7 +100,9 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
                   {runtime.humanModelSetupState === "running" ? "Downloading model…" : "Download selected model"}
                 </button>
               ) : (
-                <button type="button" className="secondary" onClick={() => void runtime.refreshHumanService()}>Check Maia service</button>
+                runtime.humanServiceState === "not-provided" || runtime.humanServiceState === "not-configured"
+                  ? <Link className="text-button" href="/help#enhanced-local">Enhanced Local help →</Link>
+                  : <button type="button" className="secondary" onClick={() => void runtime.refreshHumanService()}>Check Maia service</button>
               )}
             </div>
           </details>

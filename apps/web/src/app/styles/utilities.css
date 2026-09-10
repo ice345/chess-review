@@ -66,3 +66,46 @@
   .history-list > article { grid-template-columns: 44px minmax(0, 1fr) auto; }
   .history-list time { display: none; }
 }
+
+.library-backup { margin: 16px 0 24px; padding: 16px 0; border-block: 1px solid var(--line); }
+.library-backup h3 { margin: 0; font-size: 19px; }
+.library-backup p, .library-backup small { font-size: 13px; line-height: 1.6; }
+.library-backup button { min-height: 44px; }
+.backup-preview { margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-paper); }
+.backup-preview h4 { margin: 0; font-size: 17px; }
+.backup-preview table { width: 100%; margin: 12px 0; border-collapse: collapse; font-size: 12px; }
+.backup-preview th, .backup-preview td { padding: 7px 4px; text-align: left; border-bottom: 1px solid var(--line); }
+.backup-preview label { margin-top: 12px; }
+.backup-preview select { min-height: 44px; max-width: 100%; }
+.backup-preview .backup-preferences { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.backup-preferences input { width: 20px; height: 20px; }
+.backup-preview li { overflow-wrap: anywhere; }
+
+/* Long model choices and restore controls must shrink inside narrow settings. */
+.settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-card, .settings-card label, .library-backup, .backup-preview { min-width: 0; }
+.settings-card select, .settings-card input { min-width: 0; max-width: 100%; }
+.settings-card code { overflow-wrap: anywhere; }
+.backup-preview table { table-layout: fixed; overflow-wrap: anywhere; }
+@media (max-width: 820px) { .settings-grid { grid-template-columns: minmax(0, 1fr); } }
+.data-card { grid-template-columns: minmax(0, 1fr); }
+.data-card .account-sync-actions { grid-column: auto; }
+.backup-preview th:first-child { width: 43%; }
+
+.help-content { width: min(900px, calc(100% - 40px)); margin: 0 auto; font-size: 15px; line-height: 1.75; }
+.help-content nav { display: flex; flex-wrap: wrap; gap: 8px 22px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.help-content nav a, .help-content .primary-link { min-height: 44px; display: inline-flex; align-items: center; }
+.help-content section { margin-block: 32px; scroll-margin-top: 24px; }
+.help-content h2 { font-size: 24px; line-height: 1.3; }
+.help-content a:not(.primary-link), .utility-heading .text-button { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.help-content li { margin-bottom: 10px; }
+.help-content code { overflow-wrap: anywhere; }
+.data-destinations { display: grid; gap: 18px; }
+.data-destinations > div { padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.data-destinations dt { font-weight: 750; }
+.data-destinations dd { margin: 6px 0 0; }
+.product-help-link { width: min(1060px, calc(100% - 40px)); margin: 20px auto; font-size: 13px; }
+.product-help-link a { min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; }
+@media (min-width: 821px) {
+  .browser-core-settings > .settings-card:first-child { grid-row: span 2; }
+}

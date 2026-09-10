@@ -1,5 +1,19 @@
 # Roadmap
 
+## Free/open-source Web release — R1–R5 + S1 (2026-09-08)
+
+The current scope and remaining launch gates are tracked in the
+[stable-release audit](audits/2026-09-08-free-stable-release.md) and
+[Web release roadmap](web-release-roadmap.md). R1–R5 have been implemented and
+locally verified. S1 adds personal notebooks and fixes section navigation and
+export failure feedback. Existing pieces, palette and chess algorithms remain.
+
+The first public release is free Browser Core, with local browser storage and
+portable backups. Payment, accounts, cloud sync and hosted AI are not launch
+requirements. Real Debian NUC / Cloudflare HTTPS / OAuth / physical-device
+acceptance is still required; local test results are not proof of public launch.
+The phases below are implementation history, not an independent current backlog.
+
 ## Phase 0 — runnable baseline
 
 - [x] pnpm monorepo and canonical package boundaries
@@ -339,7 +353,7 @@ mobile gate rather than this exploration phase.
 
 Each algorithm step ships with deterministic fixtures and documentation before the next phase depends on it. Phases 5–5.3 do not change Accuracy, Divider, WinPercent, score POV or objective classification semantics.
 
-## Release-readiness remediation (active)
+## Release-readiness remediation (historical; see Phase 11 and R1–R5)
 
 The 2026-08-26 full-product audit is the release gate after the numbered feature
 phases. “Complete” above means the documented phase scope was implemented; it
@@ -352,10 +366,10 @@ with CSP, service authentication and signed distribution.
   enabled/volume/theme settings, quick mute, source-pinned assets and resolver
   tests
 - [x] add immediate model-download origin and strict JSON confirmation defenses
-- [ ] add per-launch local-service authentication and identity
-- [ ] preserve repetition-sensitive history through Stockfish and cache identity
-- [ ] close the P1 deletion, SSRF, export, promotion, cursor, persistence and
-  accessibility findings in `docs/audits/full-product-audit.md`
+- [x] add per-launch local-service authentication and identity (Phase 11 B)
+- [x] preserve repetition-sensitive history through Stockfish and cache identity (Phase 11 A)
+- [x] implement the Web fixes for deletion, SSRF, export, promotion, cursor, persistence and
+  accessibility (Phase 11, R1–R5; remaining acceptance below and in the current audit)
 
 This remediation does not change Accuracy, Divider, WinPercent, score POV,
 objective classification or Human Find Difficulty.
@@ -405,7 +419,8 @@ computing after browser shutdown.
 - [x] persist deterministic queued/running/paused/cancelled/failed/completed jobs
 - [x] resume after refresh, reuse current cache, retry individual failures and deduplicate games
 - [x] keep whole-history Stockfish at the scheduler's lowest bounded priority
-- [x] analyze up to two history games in parallel while persisting successes independently of failures
+- [x] persist each history-game success independently; R5 now limits background
+      analysis to one job, reserving the second engine slot for foreground work
 - [x] show partial Training data immediately and keep per-item failure reasons secondary
 - [x] add compact analysis-cache projections and storage/coverage accounting
 
@@ -505,13 +520,13 @@ Phase 10.1 follow-ups moved into Phase 11. Feature phases 0–10.1 remain
 completed history; they do not mean the product is approved for public
 release.
 
-## Current tree hygiene (before Phase 11)
+## Historical tree hygiene (before Phase 11)
 
-The working tree is not the release surface. Do this as an unnumbered
-operations gate, not as a product milestone.
+This was the pre-Phase-11 Git snapshot, not the current commit count. Use actual
+Git status and the current release audit for today’s operations gate.
 
 - [ ] land or discard the uncommitted Training/UI/cache/e2e work
-- [ ] push the six local commits ahead of `origin/master`
+- [ ] publish the reviewed release commits (check current branch state first)
 - [ ] make GitHub Actions green on `master` (typecheck already passes
       locally; re-run `pnpm test`, `pnpm lint`, `pnpm build`,
       `pnpm test:e2e`, and the Python suite on the landed tree)
@@ -647,8 +662,8 @@ Local-first is incomplete without deletion.
       perfect LRU
 - [x] tests: History per-review delete in Chromium; disconnect confirm
       and cache/reset remain confirm-dialog UI
-- [ ] IndexedDB unit coverage for source purge, cache-only clear,
-      all-data reset, and multi-tab refresh
+- [x] IndexedDB unit coverage for source purge, cache-only clear,
+      all-data reset, and multi-tab refresh (R1/R3)
 
 ### Milestone E — board, export and legal completeness (OCR-007, OCR-008)
 

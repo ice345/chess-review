@@ -133,10 +133,23 @@ export function ObjectiveRoutePanel() {
   const analysis = useReviewStore((store) => store.analysis);
   const currentPly = useReviewStore((store) => store.currentPly);
   const branch = useReviewStore((store) => store.branch);
-  if (!analysis) return <div className="route-panel objective-route"><PositionAnalysis /><AnalysisGate section="Objective review" /></div>;
+  if (!analysis) return <div className="route-panel objective-route"><AnalysisGate section="Objective review" /><PositionAnalysis /></div>;
   const move = branch || currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
+  const firstMoment = analysis.criticalMoments.find((moment) => analysis.moves[moment.ply - 1]);
+  const firstMove = firstMoment ? analysis.moves[firstMoment.ply - 1] : undefined;
   return (
     <div className="route-panel objective-route">
+      {currentPly === 0 && !branch && <section className="review-next-step" aria-label="Review next step">
+        <span className="kicker">Your review is ready</span>
+        <h2>{firstMove ? "Start with a key moment" : "Walk through your game"}</h2>
+        <p>{firstMove ? `${firstMove.color === "white" ? "White" : "Black"} played ${firstMove.san} on move ${Math.ceil(firstMove.ply / 2)} · ${displayedMoveQualityLabel(firstMove)}. See the position and Stockfish’s evidence.` : "No critical moment was flagged. Explore the moves, then open Study for the game’s learning notes."}</p>
+        <div>{firstMove ? <button type="button" className="primary" onClick={(event) => {
+          runtime.navigateToPly(firstMove.ply);
+          event.currentTarget.closest(".context-panel")?.scrollTo({ top: 0 });
+        }}>Review key moment →</button> : <Link href={`/review/${runtime.gameId}/moves`}>Explore moves →</Link>}
+          <Link href={`/review/${runtime.gameId}/coach${firstMove ? `?ply=${firstMove.ply}` : ""}`}>{firstMove ? "Study this move →" : "Study this game →"}</Link>
+        </div>
+      </section>}
       {move && <CurrentMoveVerdict move={move} />}
       <PositionAnalysis />
       <section className="game-summary-section" aria-label="Game summary">

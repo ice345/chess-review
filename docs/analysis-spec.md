@@ -15,9 +15,8 @@ Each line contains rank, White-POV score, depth, optional nodes and UCI PV. Brow
 
 Full-game browser review evaluates every position with a one-worker pool under the
 lowest scheduler priority. The shared scheduler permits at most two engine
-tasks at once and orders interactive position/variation work first, so history
-review can process two games in parallel without creating an unbounded worker
-fan-out. The baseline
+tasks at once, with at most one background game, reserving capacity for
+interactive position/variation work without an unbounded worker fan-out. The baseline
 classification configuration is always MultiPV=3. If the played move is absent,
 a second root search restricted with UCI `searchmoves` obtains that move's score.
 The independently searched resulting-position score is never substituted for the

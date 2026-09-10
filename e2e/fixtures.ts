@@ -1,3 +1,4 @@
+import { DATABASE_NAME, DATABASE_VERSION, DATA_STORES, LOCAL_META_STORE } from "../apps/web/src/lib/browser-storage";
 import type { Page } from "@playwright/test";
 import { buildGameAnalysis, divideGame, OBJECTIVE_ALGORITHM_VERSION } from "../packages/analysis/src/index";
 import { parsePgn } from "../packages/chess-core/src/index";
@@ -119,13 +120,13 @@ export async function reviewFixture({ visualLabels = false } = {}): Promise<{
   return { record, analysis, cacheKey };
 }
 
-async function writeStores(page: Page, values: Record<string, Array<[IDBValidKey, unknown]>>): Promise<void> {
+export async function writeStores(page: Page, values: Record<string, Array<[IDBValidKey, unknown]>>): Promise<void> {
   await page.goto("/");
-  await page.evaluate(async ({ values }) => {
+  await page.evaluate(async ({ values, name, version, stores }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 6);
+      const request = indexedDB.open(name, version);
       request.onupgradeneeded = () => {
-        for (const name of ["objective-analyses", "objective-analysis-index", "review-records", "platform-accounts", "synced-games", "platform-sync-state", "training-queue", "history-analysis-jobs", "player-avatars"]) {
+        for (const name of stores) {
           if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name);
         }
       };
@@ -140,7 +141,7 @@ async function writeStores(page: Page, values: Record<string, Array<[IDBValidKey
       transaction.onerror = () => reject(transaction.error);
     })));
     database.close();
-  }, { values });
+  }, { values, name: DATABASE_NAME, version: DATABASE_VERSION, stores: [...DATA_STORES, LOCAL_META_STORE] });
 }
 
 export async function seedReview(page: Page, options: { visualLabels?: boolean } = {}) {
@@ -394,7 +395,7 @@ export async function seedPartialHistoryJob(page: Page): Promise<void> {
   const job = await seedPausedHistoryJob(page, ["chesscom:fixture-0", "chesscom:fixture-1"]);
   await page.evaluate(async ({ jobId, analysisId }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 6);
+      const request = indexedDB.open("open-chess-review");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

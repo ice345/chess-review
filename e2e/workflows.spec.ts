@@ -183,7 +183,7 @@ test("History summary counts the filtered merged library", async ({ page }) => {
   await seedConnectedLibrary(page, 3);
   await page.goto("/history");
 
-  await expect(page.locator(".history-summary span").filter({ hasText: "All games" }).locator("strong")).toHaveText("4");
+  await expect(page.locator(".history-summary span").filter({ hasText: "All records" }).locator("strong")).toHaveText("4");
   await expect(page.locator(".history-summary")).toContainText("1 Manual");
   await expect(page.locator(".history-summary")).toContainText("3 Chess.com");
 });
@@ -206,6 +206,10 @@ test("keeps Review desk priorities and fits Moves to the board workspace", async
     moves: document.querySelector(".moves-route")?.getBoundingClientRect().height ?? 0,
   }));
   expect(Math.abs(heights.position - heights.moves)).toBeLessThan(1);
+  await page.getByRole("button", { name: "Next move" }).click();
+  const evidence = await page.locator(".move-evidence").boundingBox();
+  const panel = await page.locator(".moves-context").boundingBox();
+  expect(evidence!.y + evidence!.height).toBeLessThanOrEqual(panel!.y + panel!.height + 1);
 });
 
 test("navigates, flips, explores a branch, and returns to canonical play", async ({ page }) => {
@@ -318,7 +322,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
 
   await expect.poll(async () => page.evaluate(async (key) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 6);
+      const request = indexedDB.open("open-chess-review");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -378,7 +382,7 @@ test("keeps Coach generation alive across review routes, guards rapid calls, and
   await page.goto(`/review/${record.id}/coach`);
   await page.getByRole("button", { name: "Next move" }).click();
   await page.evaluate(() => {
-    const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent?.includes("讲解 e4"));
+    const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent?.includes("Explain e4"));
     button?.click();
     button?.click();
   });
@@ -387,10 +391,10 @@ test("keeps Coach generation alive across review routes, guards rapid calls, and
   await expect(page).toHaveURL(`/review/${record.id}/moves`);
   await expect(page.getByRole("link", { name: /Study/ })).toBeVisible();
   await page.getByRole("link", { name: /Study/ }).click();
-  await expect(page.getByText(/已使用确定性中文回退/)).toBeVisible();
+  await expect(page.getByText(/Deterministic fallback used/)).toBeVisible();
   expect(mocked.requests.filter((request) => request.path === "/coach/explain")).toHaveLength(1);
-  await page.getByRole("button", { name: "生成整盘学习计划" }).click();
-  await expect(page.locator(".game-coach-result")).toContainText("训练建议");
+  await page.getByRole("button", { name: "Build whole-game study" }).click();
+  await expect(page.locator(".game-coach-result")).toContainText("Training recommendations");
   expect(mocked.requests.filter((request) => request.path === "/coach/game-summary")).toHaveLength(1);
 
   await page.getByRole("button", { name: "Flip board" }).click();
@@ -466,7 +470,7 @@ test("removes only a finished run record and keeps synced data", async ({ page }
   };
   await page.evaluate(async (value) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("open-chess-review", 6);
+      const request = indexedDB.open("open-chess-review");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -585,15 +589,17 @@ test("builds advanced study evidence and persists an actionable training queue",
   await expect(page.getByRole("status")).toContainText("added to the training queue");
   await expect(page.locator(".training-list")).toContainText("Missed opportunities");
 
-  await page.locator(".training-list").getByRole("button", { name: "Start" }).click();
-  await expect(page.locator(".training-list")).toContainText("in progress");
-  await page.reload();
-  await page.getByRole("button", { name: "Plan", exact: true }).click();
-  await expect(page.locator(".training-list")).toContainText("in progress");
-
-  await page.locator(".training-sources a").first().click();
-  await expect(page).toHaveURL(new RegExp(`/review/(?:${fixtures[0]!.record.id}|${fixtures[1]!.record.id})/moves\\?ply=3$`));
+  await page.locator(".training-list").getByRole("button", { name: "Start review" }).click();
   await expect(page.locator(".move-status")).toContainText("2. Nf3");
+  await expect(page.getByRole("region", { name: "Position review task" })).toContainText("0 / 2 positions reviewed");
+  await page.getByRole("button", { name: "Mark position reviewed" }).click();
+  await expect(page.getByRole("region", { name: "Position review task" })).toContainText("1 / 2 positions reviewed");
+  await page.getByRole("link", { name: "Pause and return to Training" }).click();
+  await expect(page).toHaveURL(/\/training$/);
+  await page.reload();
+  await page.locator(".training-list").getByRole("button", { name: "Continue review" }).click();
+  await expect(page.locator(".move-status")).toContainText("2. Nf3");
+  await expect(page.getByRole("button", { name: "Mark position reviewed" })).toBeEnabled();
 });
 
 test("ANNOTATIONS use quality icons and the played-move label follows Brilliant", async ({ page }) => {

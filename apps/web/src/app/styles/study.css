@@ -267,3 +267,14 @@
   .study-profile-heading, .study-focus header, .study-highlights-summary header { align-items: start; flex-direction: column; }
   .study-nav-group { padding-inline: 12px; }
 }
+
+.training-queue-panel { width: min(1220px, calc(100% - 32px)); margin: 16px auto 24px; padding: 18px 0; border-block: 1px solid var(--line); }
+.training-queue-panel h2 { margin: 0 0 8px; font-size: 23px; }
+.training-queue-panel > p { color: var(--ink-secondary); font-size: 13px; line-height: 1.5; }
+.training-queue-panel .training-actions button { min-height: 44px; }
+.training-session { width: 100%; margin: 0 0 16px; padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-paper); }
+.training-session h2 { margin: 4px 0; font-size: 20px; }
+.training-session p { margin: 4px 0; font-size: 13px; line-height: 1.5; }
+.training-session-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; max-width: 100%; }
+.training-session-actions button, .training-session-actions a { min-height: 44px; display: inline-flex; align-items: center; }
+.training-session-actions small { flex-basis: 100%; font-size: 12px; }

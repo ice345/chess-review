@@ -5,6 +5,8 @@ import { CLASSIFICATION_MULTI_PV } from "@chess-review/analysis";
 import type { NormalizedGame } from "@chess-review/chess-core";
 import type { GameDivision, OpeningInfo } from "@chess-review/shared";
 import type { ReviewRunState } from "../components/review-runtime";
+import { recordRestoredAnalysis } from "../lib/review-runs";
+import { markSyncedGameAnalyzed } from "../lib/platform-library";
 import { getCachedAnalysis } from "../lib/analysis-cache";
 import type { AppSettings } from "../lib/app-settings";
 import { getReviewRecord, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
@@ -61,9 +63,13 @@ export function useReviewRecord({
         const cached = await getCachedAnalysis(review.game, {
           depth: settings.reviewDepth,
           multiPv: CLASSIFICATION_MULTI_PV,
-        }).catch(() => null);
+        });
         if (!active) return;
         if (cached) {
+          await recordRestoredAnalysis(gameId, cached.engine.depth);
+          if (loaded.external) await markSyncedGameAnalyzed(`${loaded.external.provider}:${loaded.external.externalGameId}`, loaded.id,
+            { algorithmVersion: cached.algorithmVersion, depth: cached.engine.depth });
+          if (!active) return;
           review.setAnalysis(cached);
           setReviewState("cached");
         } else if (shouldAnalyze) {

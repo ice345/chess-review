@@ -235,6 +235,12 @@ export function ConnectedAccounts({
     }
   }
 
+  useEffect(() => {
+    const stop = () => { for (const controller of controllers.current.values()) controller.abort(); };
+    window.addEventListener("open-chess-review-invalidated", stop);
+    return () => window.removeEventListener("open-chess-review-invalidated", stop);
+  }, []);
+
   function pause(account: PlatformAccount) {
     controllers.current.get(account.id)?.abort();
   }
@@ -242,14 +248,18 @@ export function ConnectedAccounts({
   async function disconnect(account: PlatformAccount) {
     if (!beginAction(account.id)) return;
     try {
-      await providerFor(account).disconnect(account);
-      const removeGames = window.confirm(`Disconnect ${account.username}. Delete games imported from this account too?`);
+      const result = await providerFor(account).disconnect(account);
+      const pendingRevocation = result?.remoteRevoked === false;
+      const removeGames = window.confirm(`Disconnect ${account.username}. Delete imported games, linked reviews and training references too? Background work will pause.`);
       const { deleteSyncedGamesForAccount } = await import("../lib/local-data");
-      if (removeGames) await deleteSyncedGamesForAccount(account.id);
+      if (removeGames) {
+        await deleteSyncedGamesForAccount(account.id, true);
+        if (pendingRevocation) window.location.assign("/settings?lichess=disconnected");
+        else window.location.reload();
+        return;
+      }
       await removePlatformAccount(account.id);
-      setNotice(removeGames
-        ? `${account.username} disconnected and its imported games were deleted.`
-        : `${account.username} disconnected. Imported games remain in your browser.`);
+      setNotice(`${account.username} disconnected. Imported games remain in your browser.${pendingRevocation ? " Remote revocation could not be confirmed; revoke this application in Lichess account settings. See Help for the link." : ""}`);
       await load();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to disconnect account.");

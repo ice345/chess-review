@@ -2,33 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import { normalizeFen, parsePgn } from "@chess-review/chess-core";
-import { BlueBishopMark } from "@chess-review/ui";
+import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
+import { externalGameKey } from "../lib/review-status";
 import type { SyncedGame } from "@chess-review/shared";
 import { AppHeader } from "./app-header";
+import { EXAMPLE_PGN } from "../lib/example-game";
+import { inspectPgnImport, readPgnFile, type PgnChoice } from "../lib/pgn-import";
 import { ConnectedAccounts } from "./connected-accounts";
 import { loadAppSettings } from "../lib/app-settings";
 import { autoAnalyzeSyncedGames } from "../lib/auto-analysis";
-import { listSyncedGames } from "../lib/platform-library";
 import type { PlatformSyncMode } from "../lib/platform-sync";
 import {
   buildReviewRecord,
   buildReviewRecordFromSyncedGame,
-  listReviewRecords,
   saveReviewRecord,
-  type ReviewRecord,
   type ReviewRecordKind,
 } from "../lib/review-library";
-
-const SAMPLE_PGN = `[Event "Open Review Sample"]
-[White "Ada"]
-[Black "Mikhail"]
-[Result "*"]
-
-1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5
-7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 *`;
 
 const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -46,49 +38,71 @@ export function HomeWorkspace() {
   const router = useRouter();
   const [kind, setKind] = useState<ReviewRecordKind>("pgn");
   const [input, setInput] = useState("");
-  const [recent, setRecent] = useState<ReviewRecord[]>([]);
-  const [syncedGames, setSyncedGames] = useState<SyncedGame[]>([]);
+  const { snapshot, error: libraryError, loading: libraryLoading, refresh: refreshLibrary } = useLibrarySnapshot();
+  const recent = snapshot?.records.slice(0, 3) ?? [];
+  const syncedGames = snapshot?.games.slice(0, 6) ?? [];
+  function completedReviewId(game: SyncedGame): string | undefined {
+    const record = snapshot?.records.find((record) => record.external && externalGameKey(record.external) === externalGameKey(game.external));
+    return record && snapshot?.statuses.get(record.id)?.analyzed ? record.id : undefined;
+  }
   const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [readingFile, setReadingFile] = useState(false);
+  const reading = useRef(false);
+  const [choices, setChoices] = useState<PgnChoice[]>([]);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const busy = status === "saving" || readingFile;
+
+  function applyPgnChoices(next: PgnChoice[], notice: string) {
+    setKind("pgn"); setChoices(next.length > 1 ? next : []);
+    setInput(next.length === 1 ? next[0]!.pgn : "");
+    setFileNotice(notice); setError(null);
+  }
+
+  async function chooseFile(files: FileList | File[]) {
+    if (saving.current || reading.current) return;
+    if (files.length !== 1) { setError("Choose one PGN file at a time."); return; }
+    const file = files[0]!;
+    reading.current = true; setReadingFile(true); setError(null);
+    try { applyPgnChoices(await readPgnFile(file), file.name); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "This file could not be read. Try again."); }
+    finally { reading.current = false; setReadingFile(false); }
+  }
   const preview = useMemo(() => previewImport(kind, input), [kind, input]);
   const fen = preview.fen;
   const ready = input.trim() !== "";
 
-  function refreshLibrary() {
-    void listReviewRecords().then((records) => setRecent(records.slice(0, 3))).catch(() => undefined);
-    void listSyncedGames().then((games) => setSyncedGames(games.slice(0, 6))).catch(() => undefined);
-  }
-
-  useEffect(() => { refreshLibrary(); }, []);
-
-  async function openReview(value = input) {
-    if (saving.current) return;
+  async function openReview(value = input, sourceKind = kind) {
+    if (saving.current || reading.current) return;
     saving.current = true;
     setStatus("saving");
     setError(null);
     try {
-      const record = await saveReviewRecord(await buildReviewRecord(kind, value));
+      if (sourceKind === "pgn") {
+        const games = inspectPgnImport(value);
+        if (games.length > 1) {
+          applyPgnChoices(games, "Multiple pasted games");
+          saving.current = false; setStatus("idle"); return;
+        }
+      }
+      const record = await saveReviewRecord(await buildReviewRecord(sourceKind, value), { restoreDeleted: true });
       if (record.kind === "pgn") window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(record.kind === "pgn" ? `/review/${record.id}` : `/review/${record.id}/engine`);
     } catch (requestError) {
       saving.current = false;
-      const message = requestError instanceof Error ? requestError.message : "";
-      const known = message === "This PGN could not be parsed."
-        || message === "This product only supports standard chess."
-        || message.includes("at least one move")
-        || message.includes("Unable to replay");
-      if (!known) console.error(requestError);
-      setError(known ? message : "This chess record could not be imported.");
+      setError(requestError instanceof Error ? requestError.message : "This chess record could not be imported. Try again.");
       setStatus("idle");
     }
   }
 
   function loadExample() {
     setKind("pgn");
-    setInput(SAMPLE_PGN);
+    setInput(EXAMPLE_PGN); setChoices([]); setFileNotice(null);
     setError(null);
-    void openReview(SAMPLE_PGN);
+    void openReview(EXAMPLE_PGN, "pgn");
   }
 
   function loadStartingPosition() {
@@ -98,12 +112,12 @@ export function HomeWorkspace() {
   }
 
   async function openSyncedGame(game: SyncedGame) {
-    if (saving.current) return;
+    if (saving.current || reading.current) return;
     saving.current = true;
     setStatus("saving");
     setError(null);
     try {
-      const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game));
+      const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game), { restoreDeleted: true });
       window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(`/review/${record.id}`);
     } catch (requestError) {
@@ -127,18 +141,61 @@ export function HomeWorkspace() {
       <AppHeader />
       <section className="home-hero">
         <div className="home-copy">
-          <div className="home-chess-identity" aria-hidden="true">
-            <BlueBishopMark size={52} decorative />
-            <span><b>Position by position</b><small>Stockfish · Maia · grounded Coach</small></span>
-          </div>
-          <span className="kicker">Open Chess Review</span>
-          <h1>Review a chess game.<br /><em>See what mattered.</em></h1>
-          <p>The board is ready. Paste a PGN, load an example, or connect an account and sync recent games.</p>
+          <h1>Review a game. <em>See what mattered.</em></h1>
+          <p>Paste a PGN, open a file, or try a complete example.</p>
+          {recent[0] && <Link className="home-resume" href={recent[0].kind === "pgn" ? `/review/${recent[0].id}` : `/review/${recent[0].id}/engine`}>Continue last review · {recent[0].title} →</Link>}
         </div>
 
         <div className="home-stage">
+          <form
+            className={`import-card${dragging ? " drag-active" : ""}`}
+            aria-busy={busy}
+            onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
+            onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setDragging(false); }}
+            onDrop={(event) => { event.preventDefault(); setDragging(false); void chooseFile(event.dataTransfer.files); }}
+            aria-labelledby="import-title"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void openReview();
+            }}
+          >
+            <div className="import-heading"><span className="kicker">New review</span><h2 id="import-title">Bring in a game</h2></div>
+            <div className="source-tabs" role="group" aria-label="Import source">
+              <button type="button" disabled={busy} aria-pressed={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => { if (kind === "pgn") return; setKind("pgn"); setInput(""); setChoices([]); setFileNotice(null); setError(null); }}>PGN</button>
+              <button type="button" disabled={busy} aria-pressed={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => { if (kind === "fen") return; setKind("fen"); setInput(""); setChoices([]); setFileNotice(null); setError(null); }}>FEN</button>
+            </div>
+            {kind === "pgn" && <div className="file-import">
+              <input ref={fileInput} type="file" accept=".pgn" aria-label="Choose PGN file" hidden onChange={(event) => { if (event.target.files?.length) void chooseFile(event.target.files); event.target.value = ""; }} />
+              <button type="button" className="secondary" disabled={busy} onClick={() => fileInput.current?.click()}>{readingFile ? "Reading file…" : "Open PGN file"}</button>
+              <span>or drop one here · up to 1 MiB</span>
+            </div>}
+            {fileNotice && <p className="import-file-notice" role="status">{fileNotice}{choices.length > 1 ? ` · ${choices.length} games. Choose one to analyze.` : " · Ready to analyze."}</p>}
+            {choices.length > 1 && <label className="game-choice"><span id="pgn-choice-label">Choose a game</span><select disabled={busy} aria-labelledby="pgn-choice-label" aria-describedby="pgn-choice-help" value={choices.findIndex((choice) => choice.pgn === input)} onChange={(event) => setInput(choices[Number(event.target.value)]?.pgn ?? "")}>
+              <option value={-1} disabled>Select one game…</option>{choices.map((choice, index) => <option key={index} value={index}>{choice.label}</option>)}
+            </select><small id="pgn-choice-help">Other games remain in your file; they are not imported automatically.</small></label>}
+            <label className="import-field">
+              <span>{kind === "pgn" ? "Paste a complete PGN" : "Paste an explicit FEN"}</span>
+              <textarea
+                value={input}
+                disabled={busy}
+                aria-describedby={error ? "import-error" : "import-help"}
+                aria-invalid={Boolean(error)}
+                onChange={(event) => { setInput(event.target.value); setChoices([]); setFileNotice(null); setError(null); }}
+                placeholder={kind === "pgn" ? "Paste a complete PGN…" : "Paste a FEN…"}
+                spellCheck={false}
+              />
+            </label>
+            {error && <p id="import-error" className="error" role="alert">{error}</p>}
+            <button type="submit" className="primary import-submit" disabled={!ready || busy}>
+              {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
+            </button>
+            <button type="button" className="text-action" disabled={busy} onClick={kind === "pgn" ? loadExample : loadStartingPosition}>
+              {kind === "pgn" ? "Load example game" : "Use starting position"}
+            </button>
+            <small id="import-help" className="import-note">{kind === "pgn" ? "Example: Morphy’s 17-move Opera Game. " : "FEN opens a position study. "}Your library is saved in this browser.</small>
+          </form>
           <figure className="home-board">
-            <div className="home-board-frame" aria-hidden="true">
+            <div className="home-board-frame" aria-hidden="true" inert>
               <Chessboard options={{
                 position: fen,
                 allowDragging: false,
@@ -161,40 +218,10 @@ export function HomeWorkspace() {
             }</figcaption>
           </figure>
 
-          <form
-            className="import-card"
-            aria-labelledby="import-title"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void openReview();
-            }}
-          >
-            <div className="import-heading"><span className="kicker">New review</span><h2 id="import-title">Bring in a game</h2></div>
-            <div className="source-tabs" role="group" aria-label="Import source">
-              <button type="button" aria-pressed={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => { if (kind === "pgn") return; setKind("pgn"); setInput(""); setError(null); }}>PGN</button>
-              <button type="button" aria-pressed={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => { if (kind === "fen") return; setKind("fen"); setInput(""); setError(null); }}>FEN</button>
-            </div>
-            <label className="import-field">
-              <span>{kind === "pgn" ? "Paste a complete PGN" : "Paste an explicit FEN"}</span>
-              <textarea
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                placeholder={kind === "pgn" ? "Paste a complete PGN…" : "Paste a FEN…"}
-                spellCheck={false}
-              />
-            </label>
-            {error && <p className="error" role="alert">{error}</p>}
-            <button type="submit" className="primary import-submit" disabled={!ready || status === "saving"}>
-              {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
-            </button>
-            <button type="button" className="text-action" onClick={kind === "pgn" ? loadExample : loadStartingPosition}>
-              {kind === "pgn" ? "Load example game" : "Use starting position"}
-            </button>
-            <small className="import-note">Game and analysis records stay in this browser unless you explicitly choose a cloud coach provider.</small>
-          </form>
         </div>
       </section>
 
+      {libraryError && <p className="error" role="alert">{libraryError} <button type="button" className="text-button" disabled={libraryLoading} onClick={() => void refreshLibrary()}>Retry loading games</button></p>}
       <ConnectedAccounts compact onGamesUpdated={applySyncAnalysisPolicy} />
 
       {syncedGames.length > 0 && <section className="synced-games-section">
@@ -203,25 +230,26 @@ export function HomeWorkspace() {
           <span className={`platform-label ${game.external.provider}`}>{game.external.provider === "chesscom" ? "Chess.com" : "Lichess"}</span>
           <strong>{game.white.username} <i>vs</i> {game.black.username}</strong>
           <small>{game.timeClass ?? "game"} · {new Date(game.playedAt).toLocaleDateString()}</small>
-          {game.analyzed && game.analysisId ? <Link href={`/review/${game.analysisId}`}>Open review →</Link> : <button type="button" className="text-button" disabled={status === "saving"} onClick={() => void openSyncedGame(game)}>Analyze this game →</button>}
+          {completedReviewId(game) ? <Link href={`/review/${completedReviewId(game)}`}>Open review →</Link> : <button type="button" className="text-button" disabled={status === "saving"} onClick={() => void openSyncedGame(game)}>Analyze this game →</button>}
         </article>)}</div>
       </section>}
 
       <section className="recent-section">
         <div><span className="kicker">Continue learning</span><h2>Recent reviews</h2></div>
-        {recent.length === 0 ? (
+        {libraryLoading && !snapshot ? <p role="status">Loading saved games…</p> : libraryError && !snapshot ? null : recent.length === 0 ? (
           <div className="recent-empty">Your imported games will appear here.</div>
         ) : (
           <div className="recent-grid">
             {recent.map((record) => (
               <Link href={record.kind === "pgn" ? `/review/${record.id}` : `/review/${record.id}/engine`} key={record.id}>
-                <span>{record.kind.toUpperCase()}</span><strong>{record.title}</strong><small>{record.subtitle}</small><em>Open →</em>
+                <span>{record.kind.toUpperCase()}</span><strong>{record.title}</strong><small>{record.subtitle} · {snapshot?.statuses.get(record.id)?.label}</small><em>Open →</em>
               </Link>
             ))}
           </div>
         )}
         {recent.length > 0 && <Link className="view-history" href="/history">View all history →</Link>}
       </section>
-    </main>
+    <p className="product-help-link"><Link href="/help">Help, capabilities and data privacy →</Link></p>
+      </main>
   );
 }

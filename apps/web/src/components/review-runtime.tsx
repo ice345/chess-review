@@ -22,12 +22,14 @@ import type {
 import type { MaiaServiceState } from "../lib/human-lens-state";
 import type { LocalAiConnectionState } from "../lib/use-local-ai-health";
 import type { ReviewCoachTask } from "../hooks/use-review-coach";
+import type { ReviewNotebookRuntime } from "../hooks/use-review-notebook";
 
 export type ReviewRunState = "idle" | "running" | "complete" | "cached" | "error";
 
 export interface ReviewRuntimeValue {
   gameId: string;
   record: ReviewRecord;
+  notebook: ReviewNotebookRuntime;
   reviewState: ReviewRunState;
   reviewError: string | null;
   reviewProgress: GameReviewProgress | null;
@@ -75,6 +77,7 @@ export interface ReviewRuntimeValue {
   generateGameCoach: () => Promise<void>;
   retryBranchMoveQuality: () => void;
   navigateToPly: (ply: number) => void;
+  openNotebookPosition: (rootPly: number, line: string[]) => void;
   playContinuation: (identity: StockfishCandidateIdentity, result?: StockfishMoveAnalysis | null) => void;
   playHumanCandidate: (identity: HumanCandidateIdentity) => void;
   persistEnrichedAnalysis: (analysis: GameAnalysisV2 | null) => void;

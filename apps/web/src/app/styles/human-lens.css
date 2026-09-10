@@ -2,7 +2,7 @@
    semantically separate from the objective Stockfish family. */
 
 .analysis-lens-panel {
-  margin: 16px 0 4px;
+  margin: 2px 0 4px;
   padding: 14px;
   border: 1px solid rgba(133, 155, 146, .26);
   border-radius: 14px 17px 13px 16px;
@@ -38,13 +38,13 @@
 }
 
 .lens-switch button {
-  min-height: 28px;
+  min-height: 40px;
   padding: 4px 9px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: #788a8d;
-  font-size: 9px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -62,7 +62,7 @@
   border-radius: 8px;
   background: rgba(255, 253, 248, .68);
   color: #637b7d;
-  font-size: 8px;
+  font-size: 12px;
   cursor: pointer;
   list-style: none;
 }
@@ -90,7 +90,7 @@
   flex-wrap: wrap;
   gap: 7px 14px;
   color: #738587;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .lens-legend span {
@@ -124,7 +124,7 @@
   display: grid;
   gap: 4px;
   color: #728486;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .human-lens-controls select {
@@ -161,13 +161,13 @@
 .human-root-wdl > div span,
 .human-root-wdl small {
   color: #7d8c8c;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .human-root-wdl strong,
 .human-root-wdl b {
   color: #4f6f65;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .human-service-state {
@@ -176,7 +176,7 @@
   align-items: center;
   gap: 8px;
   color: #718386;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -203,16 +203,16 @@
 
 .recommendation-evidence strong {
   color: #3d5b61;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .recommendation-evidence span {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .recommendation-evidence small {
   color: #7d8c8c;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -226,7 +226,7 @@
   border-top: 1px solid rgba(129, 151, 143, .2);
   border-bottom: 1px solid rgba(129, 151, 143, .2);
   color: #6e8081;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .played-probability strong {
@@ -237,7 +237,7 @@
 .played-probability small {
   grid-column: 1 / -1;
   color: #869293;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .human-lens-candidates {
@@ -264,13 +264,13 @@
 .human-lens-candidates button > small {
   grid-column: 2 / -1;
   color: #82908d;
-  font-size: 7px;
+  font-size: 12px;
 }
 
 .human-lens-candidates button > code {
   overflow: hidden;
   color: #7d8c8c;
-  font-size: 7px;
+  font-size: 12px;
   text-overflow: ellipsis;
 }
 
@@ -282,7 +282,7 @@
 .human-lens-candidates button > span,
 .human-lens-candidates em {
   color: #7c8d89;
-  font-size: 8px;
+  font-size: 12px;
   font-style: normal;
   font-variant-numeric: tabular-nums;
 }
@@ -305,7 +305,7 @@
   margin-top: 9px;
   display: block;
   color: #839090;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.5;
 }
 

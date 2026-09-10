@@ -127,8 +127,8 @@ and Training progress stores traceable game/ply evidence rather than prose. See
 Phase 5.1 uses one shared browser scheduler with two logical slots and three
 priorities: current interactive board, interactive branch, then background
 full-game review. Full-game pools use one worker and the scheduler allows at
-most two engine tasks at once, so history review can make progress in parallel
-without unbounded browser CPU use. Queued jobs are priority ordered and stale
+most two engine tasks at once. R5 limits background games to one, leaving a
+slot available for foreground work even while History has a backlog. Queued jobs are priority ordered and stale
 current/continuation work is cancelled with `AbortSignal`. Maia remains
 optional and is never allowed to replace Stockfish score/classification
 ownership. See

@@ -1,12 +1,12 @@
-.app-header { height: 66px; padding: 0 clamp(18px,4vw,64px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(81, 111, 122, .13); background: rgba(251, 248, 241, .82); backdrop-filter: blur(16px); }
-.app-header.compact { height: 54px; padding: 0 22px; }
+.app-header { min-height: 66px; padding: 0 clamp(18px,4vw,64px); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(81, 111, 122, .13); background: rgba(251, 248, 241, .82); backdrop-filter: blur(16px); }
+.app-header.compact { min-height: 48px; padding: 0 22px; }
 .brand { display: flex; align-items: center; gap: 11px; }
 .brand > span:last-child { display: grid; gap: 1px; }
 .brand > span:last-child { transform: none; }
 .brand strong { color: #2e4956; font-size: 14px; letter-spacing: -.01em; }
 .brand small { color: #839198; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
 .app-header nav { display: flex; gap: 6px; }
-.app-header nav a { padding: 8px 11px; border-radius: 9px; color: #72838b; font-size: 12px; }
+.app-header nav a { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 11px; border-radius: 9px; color: #72838b; font-size: 12px; }
 .app-header nav a:hover { background: rgba(215, 229, 227, .7); color: #31515f; }
 .page-scroll { min-height: 100dvh; }
 
@@ -17,4 +17,13 @@
 
 @media (max-width: 560px) {
   .app-header nav a { padding-inline: 7px; font-size: 10px; }
+}
+
+@media (max-width: 560px) {
+  .app-header, .app-header.compact { min-height: 56px; padding: 6px 12px; gap: 4px; flex-wrap: wrap; }
+  .brand { min-width: 0; gap: 6px; }
+  .brand strong { font-size: 12px; }
+  .brand-mark { width: 30px; height: 30px; }
+  .app-header nav { gap: 0; }
+  .app-header nav a { padding-inline: 6px; font-size: 12px; }
 }

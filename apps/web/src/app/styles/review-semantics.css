@@ -43,7 +43,7 @@
 }
 .eval-source-label {
   color: #6d8590;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: .04em;
   text-align: center;
@@ -118,7 +118,7 @@
   justify-self: end;
   padding: 3px 1px;
   color: #4f7889;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -148,7 +148,7 @@
 
 .move-verdict > div > span {
   color: #829096;
-  font-size: 7px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: .08em;
 }
@@ -162,7 +162,7 @@
 
 .move-verdict small {
   color: #72868e;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -172,7 +172,7 @@
 
 .move-verdict summary {
   color: #527b8d;
-  font-size: 8px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -187,7 +187,7 @@
   background: #fffdf8;
   box-shadow: 0 10px 30px rgba(58, 77, 83, .12);
   color: #71828a;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -239,7 +239,7 @@
 .quality-fixture-page header > span,
 .quality-fixture-page header p {
   color: #71858d;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .quality-fixture-page h1 {
@@ -271,7 +271,7 @@
 .quality-fixture-grid > section > div small {
   margin-left: auto;
   color: #849296;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .quality-fixture-grid article {
@@ -285,7 +285,7 @@
 }
 
 .quality-fixture-grid article > span {
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .quality-fixture-grid .paper { background: #fffaf0; }

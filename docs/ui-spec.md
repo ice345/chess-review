@@ -4,7 +4,7 @@
 
 The product is route-based rather than a single analysis dashboard:
 
-- `/` owns a starting-position board, PGN/FEN import, Chess.com/Lichess connect-and-sync, and recent reviews. Chess.com and Lichess are account actions, not import modes.
+- `/` owns PGN/FEN import, a decorative position preview, Chess.com/Lichess connect-and-sync, and recent reviews. Chess.com and Lichess are account actions, not import modes.
 - `/review/[gameId]` is the objective review.
 - `/review/[gameId]/moves` is the move explorer.
 - `/review/[gameId]/coach` is the Study surface for grounded move lessons and whole-game learning (the URL remains stable).
@@ -13,11 +13,24 @@ The product is route-based rather than a single analysis dashboard:
 
 Import UI is never mounted inside the review workspace. A valid input is normalized, saved as a deterministic IndexedDB review record, and navigated to its review route. The objective cache remains separate and is not duplicated by routing.
 
+Home places paste, Open PGN file, Analyze game and the complete Opera Game
+example in its opening section. File selection/drop and pasted collections share
+an explicit multi-game chooser. Mobile reading/tab order puts the form before
+the non-interactive board preview. Returning users have a Continue last review
+link above the form. See [PGN import and export](pgn-import-export.md) for limits,
+source preservation and selection behavior.
+
 ## Persistent review shell
 
 The nested review layout owns the board, evaluation bar, selected ply, orientation, move controls and current verdict. Review's Game Summary owns the evaluation timeline inside the contextual panel. Client-side transitions replace only the contextual right panel, so board state persists across Review, Moves, Study and Engine Lab.
 
-At desktop sizes the review is a normal document, typically about 1.3–1.6 viewports for an ordinary game. The opening spread gives the board roughly 540–610 CSS pixels and places current-position study beside it. On the Review route, Game Summary and its 220–320-pixel evaluation plot share the contextual panel's scroll, keeping the metrics and graph aligned with the board. Dense route content extends the document on smaller screens instead of creating a nested scrolling dashboard.
+At desktop sizes the opening review fits the players, board and move transport
+within the viewport at the R2 acceptance sizes. Board size responds to both
+width and available height: measured 424px at 1280×720, 472px at 1366×768,
+540px at 1440×900 and 600px at 1920×1080. Sound/flip share the upper player row;
+the titlebar is compact. The contextual column scrolls within the board column's
+height. On Review, Game Summary and its 220px evaluation plot remain together
+inside that column. No timeline is added below the board.
 
 Below the tablet breakpoint, the route panel stacks under the board and normal document scrolling resumes. Move navigation remains adjacent to the board. There must be no horizontal document overflow.
 
@@ -29,7 +42,7 @@ The visual language distinguishes three sources:
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
 - Study: generated teaching from canonical facts, with concise provenance and grounding details on demand.
 
-The primary review navigation contains Review, Moves, Study and Engine. Settings stays in the titlebar. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with the current move, then the analysis source and compact candidates; whole-game Accuracy, phases, Move Quality and the embedded timeline sit in Game Summary below that desk. Engine Lab remains the advanced depth/MultiPV/raw UCI surface and is not copied into Review. The evaluation timeline is open by default on Review and is not mounted on Moves, Study or Engine. Study shows the current move’s Stockfish evidence before any generated lesson. Exports are grouped in one menu and retain Canonical JSON, Annotated PGN, Position PNG and Game Review PNG.
+The primary review navigation contains Review, Moves, Study and Engine. Settings stays in the titlebar. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with the current move, then the analysis source and compact candidates; whole-game Accuracy, phases, Move Quality and the embedded timeline sit in Game Summary below that desk. Before full-game analysis, its Analyze action precedes position candidates. After analysis at ply zero, a next-step section links to the first canonical critical moment and its Study facts; with no flagged moment, it offers ordinary exploration without claiming one exists. Engine Lab remains the advanced depth/MultiPV/raw UCI surface and is not copied into Review. The evaluation timeline is open by default on Review and is not mounted on Moves, Study or Engine. Study shows the current move’s Stockfish evidence before any generated lesson. Exports are grouped in one menu: Original PGN (PGN records), Canonical JSON, Annotated PGN, Position PNG and Game Review PNG. Menu copy distinguishes original source preservation from analysis annotations on the mainline.
 
 Quality icons come from `packages/ui` and use Move Quality Annotation System V3 across the move list, destination-square overlay, charts, summary and PNG exports. Diamonds identify elite/special moves, circles positive and ring states, rounded squares informational/warning states, and octagons severe errors. The schema classification `great` is presented to users as **Critical**, matching its only-good-move meaning without changing the persisted classification key or algorithm. Silhouette and glyph remain readable at 20–28px without relying on color. The destination-square badge always remains the canonical Stockfish Move Quality icon in Stockfish, Maia and Compare modes; changing analysis source never relabels the played move. Human Find Difficulty keeps its quieter, separate mark family in the evidence panel. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
 
@@ -88,7 +101,7 @@ moves and rings for captures; clicking a destination moves it. Dragging remains
 available. Either interaction from any historical position creates or extends a
 runtime analysis branch. The UI clearly leaves canonical autoplay, retains the branch
 root ply, automatically analyzes each resulting FEN with the active Review source,
-and offers Return to Game. Canonical PGN,
+and offers Return to Game with a visible “Temporary variation · not saved” notice. Canonical PGN,
 Accuracy, classifications and cached canonical game analysis are never edited by this
 interaction. Promotion drops currently default to a queen; the rules helper
 already accepts an explicit underpromotion for a future chooser. The branch
@@ -97,7 +110,16 @@ implementation status for each workspace part is kept in `docs/roadmap.md`.
 
 ## Service states
 
-Browser Core remains useful when local-ai is offline. Review's Maia selector and Coach use short capability-specific copy, poll for recovery, and never hide objective review. Settings lists every model returned by Ollama's local catalog and lets the user choose one. Maia Settings separately shows 5M/23M/79M cache status and an explicit Download model action. Selecting either an Ollama or Maia model never triggers a silent download.
+Public Browser Core never probes localhost AI. Settings omits provider/model
+controls and Study offers grounded summaries using existing analysis. Enhanced
+Local on a loopback hostname distinguishes checking, ready, unreachable and
+misconfigured services; missing models have a separate setup state. Its Maia
+selector and Coach poll for recovery without hiding objective review. Settings
+lists the installed Ollama catalog and 5M/23M/79M Maia cache states. Choosing a
+model never downloads it silently. Health responses are validated before UI use.
+The interface is English; Coach output has an independent English/Chinese
+preference, preserving existing choices. Home and Settings link to Help for
+setup, capabilities, data destinations, backups and manual feedback.
 
 ## Chess audio
 
@@ -162,5 +184,12 @@ must be cancelled before removal.
 No weakness is presented as recurring until the deterministic signal occurs in
 at least two distinct games. Move-quality icons and labels reuse the shared V3
 system. Training status supports queued, in progress and completed, remains in
-IndexedDB after refresh, and is never inferred from Coach text. At mobile width,
+IndexedDB after refresh, and is never inferred from Coach text. Start review and
+Continue review open the first pending source position. A task panel beside the
+desktop board (below it on mobile) offers explicit confirmation, saved progress,
+Next position and Pause. Confirmation requires the canonical task position and
+loaded objective evidence. Repeated visits never add credit. Completed means
+all positions were explicitly reviewed, not solved or mastered; historical manual
+completions remain labelled separately. Tasks remain available without analysis
+caches, including after [backup restoration](library-backup.md). At mobile width,
 all sections stack without document-level horizontal overflow.

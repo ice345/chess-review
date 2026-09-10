@@ -16,12 +16,12 @@ import type {
   PlatformAccount,
   StudyWeaknessKind,
   SyncedGame,
-  TrainingQueueItemV1,
-  TrainingQueueItemV2,
-  TrainingQueueStatus,
+  TrainingQueueItemV3,
 } from "@chess-review/shared";
 import { QUALITY_META, QualityIcon } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
+import { TrainingQueuePanel } from "./training-queue-panel";
+import { subscribeLocalData } from "../lib/browser-storage";
 import {
   loadStudyPlayerLibrary,
   loadStudyPlayerSummaries,
@@ -47,13 +47,11 @@ import { listPlatformAccounts, listSyncedGames } from "../lib/platform-library";
 import {
   createTrainingQueueItem,
   listTrainingQueue,
-  removeTrainingQueueItem,
   saveTrainingQueueItem,
   trainingQueueItemId,
-  transitionTrainingQueueItem,
 } from "../lib/training-queue";
 
-type QueueItem = TrainingQueueItemV1 | TrainingQueueItemV2;
+type QueueItem = TrainingQueueItemV3;
 type StudyTab = "overview" | "ratings" | "openings" | "middlegame" | "endgame" | "mistakes" | "highlights" | "plan" | "coverage";
 
 const NAV_GROUPS: Array<{ id: string; label?: string; tabs: Array<{ id: StudyTab; label: string }> }> = [
@@ -90,18 +88,6 @@ const DEFAULT_FILTERS: StudyReportFiltersV2 = {
 
 function formatted(value: number | undefined, suffix = ""): string {
   return value === undefined ? "—" : `${value.toFixed(1)}${suffix}`;
-}
-
-function queueActionLabel(status: TrainingQueueStatus): string {
-  if (status === "queued") return "Start";
-  if (status === "in-progress") return "Complete";
-  return "Reopen";
-}
-
-function nextQueueStatus(status: TrainingQueueStatus): TrainingQueueStatus {
-  if (status === "queued") return "in-progress";
-  if (status === "in-progress") return "completed";
-  return "queued";
 }
 
 function detailedJobCounts(job: HistoryAnalysisJobV1) {
@@ -152,10 +138,10 @@ type HistoryJobAction = "pause" | "resume" | "cancel" | "retry";
 
 function explainHistoryAnalysisError(error: string): string | null {
   if (/outside MultiPV/i.test(error)) {
-    return "这不是对局非法：Stockfish 的第一轮 MultiPV 没有列出该步，随后用于补齐该步的 restricted search 也没有返回完整主变。属于引擎证据不完整，重试会重新取得该步的独立评分。";
+    return "This game is legal, but Stockfish did not return a complete line for the played move. Retry to retrieve the missing objective evidence.";
   }
   if (/no scored principal variation|completed line|worker exited/i.test(error)) {
-    return "对局已通过规则解析，但引擎没有返回可保存的评分主变；这通常是浏览器 Worker 被中断或资源暂时不足。";
+    return "The game passed rules validation, but the engine returned no complete evaluation line. Retry after other browser analysis has stopped.";
   }
   return null;
 }
@@ -393,7 +379,8 @@ export function AdvancedStudyPage() {
     }).catch((error) => {
       if (active) setNotice(error instanceof Error ? error.message : "Unable to load this player.");
     });
-    return () => { active = false; };
+    const unsubscribe = subscribeLocalData(() => { void listTrainingQueue(playerKey).then((items) => { if (active) setQueue(items); }).catch((error) => { if (active) setNotice(String(error)); }); });
+    return () => { active = false; unsubscribe(); };
   }, [playerKey, playerRevision]);
 
   const hasActiveHistoryJob = jobs.some((job) => !job.supersededBy && (job.status === "running" || job.status === "queued"));
@@ -572,36 +559,10 @@ export function AdvancedStudyPage() {
     queueWorking.current = true;
     setWorkingItem(item.id);
     try {
-      await saveTrainingQueueItem(item);
+      await saveTrainingQueueItem(item, { ifAbsent: true });
       setQueue(await listTrainingQueue(player.key));
       setNotice(`${WEAKNESS_COPY[weakness.kind].title} added to the training queue.`);
-    } finally {
-      queueWorking.current = false;
-      setWorkingItem(null);
-    }
-  }
-
-  async function transition(item: QueueItem) {
-    if (!player || queueWorking.current) return;
-    queueWorking.current = true;
-    setWorkingItem(item.id);
-    try {
-      await saveTrainingQueueItem(transitionTrainingQueueItem(item, nextQueueStatus(item.status)));
-      setQueue(await listTrainingQueue(player.key));
-    } finally {
-      queueWorking.current = false;
-      setWorkingItem(null);
-    }
-  }
-
-  async function remove(item: QueueItem) {
-    if (!player || queueWorking.current) return;
-    queueWorking.current = true;
-    setWorkingItem(item.id);
-    try {
-      await removeTrainingQueueItem(item.id);
-      setQueue(await listTrainingQueue(player.key));
-    } finally {
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save this task. Try again."); } finally {
       queueWorking.current = false;
       setWorkingItem(null);
     }
@@ -632,6 +593,7 @@ export function AdvancedStudyPage() {
       <h1>Training</h1>
       {summaries && summaries.length > 0 && <label className="study-player-select"><span>Player</span><select value={playerKey} onChange={(event) => { playerSelectionTouched.current = true; setPlayerKey(event.target.value); }}>{summaries.map((summary) => <option key={summary.key} value={summary.key}>{summary.name} · {summary.gameCount} games{summary.provider ? ` · ${summary.provider === "chesscom" ? "Chess.com" : "Lichess"}` : " · manual"}</option>)}</select></label>}
     </section>
+    <TrainingQueuePanel />
     {analysisStatus && <p className="study-analysis-status" role="status">{analysisStatus}</p>}
     {notice && <p className="study-notice" role="status">{notice}</p>}
     {loading ? <section className="study-empty">Loading…</section> : summaries.length === 0 ? <>
@@ -723,7 +685,7 @@ export function AdvancedStudyPage() {
         </div>}</section>}
 
         {activeTab === "plan" && <section id="training-plan"><header className="study-section-heading"><h2>Plan</h2><small>Ranked from measurable source positions.</small></header>{report.trainingPlan.length === 0 ? <p className="study-section-empty">No recurring weakness has enough evidence yet.</p> : <div className="weakness-grid">{report.weaknesses.map((weakness, index) => { const itemId = trainingQueueItemId(player.key, weakness.kind); return <article key={weakness.kind}><div className="weakness-head"><span className="weakness-priority">{index + 1}</span><div><strong>{WEAKNESS_COPY[weakness.kind].title}</strong><p>{WEAKNESS_COPY[weakness.kind].description}</p></div></div><div className="weakness-metrics"><span>{formatted(weakness.frequency, "%")} of games</span><span>{weakness.confidence} confidence</span><span>{weakness.trend}</span></div><ul>{weakness.evidence.slice(0, 5).map((item) => <li key={`${item.gameId}:${item.ply}`}><span><strong title={item.san}>{item.san}</strong><small>{item.phase} · −{item.winPercentLoss.toFixed(1)} Win%</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul><button type="button" className="text-button" disabled={queueIds.has(itemId) || workingItem !== null} onClick={() => void addWeakness(weakness)}>{queueIds.has(itemId) ? "In queue" : "Add to queue"}</button></article>; })}</div>}
-          <div className="training-list">{queue.map((item) => <article key={item.id} className={item.status}><div><span className="training-status">{item.status.replace("-", " ")}</span><strong>{WEAKNESS_COPY[item.weaknessKind].title}</strong><small>{item.version === 2 ? `${item.progress.reviewedPositionCount}/${item.progress.totalPositionCount} positions reviewed` : `${item.evidence.length} saved positions`}</small></div><div className="training-sources">{item.evidence.slice(0, 5).map((source) => <Link key={`${source.gameId}:${source.ply}`} href={`/review/${source.gameId}/moves?ply=${source.ply}`}>{source.san} · ply {source.ply}</Link>)}</div><div className="training-actions"><button type="button" className="primary" disabled={workingItem !== null} onClick={() => void transition(item)}>{queueActionLabel(item.status)}</button><button type="button" className="text-button" disabled={workingItem !== null} onClick={() => void remove(item)}>Remove</button></div></article>)}</div>
+
         </section>}
 
         {activeTab === "coverage" && <section id="coverage"><header className="study-section-heading"><h2>Coverage</h2><small>{report.algorithmVersion} · {report.objectiveAlgorithmVersion}</small></header><div className="study-metrics"><article><span>Eligible</span><strong>{report.coverage.eligibleGames}</strong></article><article><span>Current</span><strong>{report.coverage.analyzedGames}</strong><small>{formatted(report.coverage.coverageRate, "%")}</small></article><article><span>Stale</span><strong>{report.coverage.staleGames}</strong></article><article><span>Failed</span><strong>{report.coverage.failedGames}</strong></article></div>{report.coverage.providers && report.coverage.providers.length > 0 && <div className="coverage-provider-grid">{report.coverage.providers.map((item) => <article key={item.provider}><strong>{item.provider === "chesscom" ? "Chess.com" : "Lichess"}</strong><span>{item.analyzedGames}/{item.eligibleGames} current</span><small>{item.staleGames} stale · {item.failedGames} failed</small></article>)}</div>}<p className="study-section-empty">{report.coverage.partial ? "This report is partial. Conclusions use only current compatible analyses." : "This filtered population has complete current analysis coverage."}{report.coverage.excludedGames > 0 ? ` ${report.coverage.excludedGames} provider game${report.coverage.excludedGames === 1 ? "" : "s"} with invalid PGN ${report.coverage.excludedGames === 1 ? "is" : "are"} excluded and do not keep this range incomplete.` : ""}{filters.openingKeys.length > 0 ? " Opening is known only for current analyses, so coverage remains based on the broader synced scope." : ""} Local objective cache: {(cacheBytes / 1024 / 1024).toFixed(1)} MB.</p>

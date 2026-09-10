@@ -1,6 +1,6 @@
 # Open Chess Review
 
-Open Chess Review is an open-source chess game review and coaching workspace. It combines canonical Stockfish analysis, Elo-conditioned Maia-3 move prediction, and a grounded language coach without blurring the responsibility of those three layers.
+Open Chess Review is a free, open-source chess game review and coaching workspace. It combines canonical Stockfish analysis, Elo-conditioned Maia-3 move prediction, and a grounded language coach without blurring the responsibility of those three layers.
 
 ![Open Chess Review home](e2e/__screenshots__/home-connected-1440.png)
 
@@ -12,9 +12,16 @@ Open Chess Review is an open-source chess game review and coaching workspace. It
 - Turns structured facts and validated engine lines into contextual move lessons and a whole-game Study plan, with deterministic copy when the language provider is unavailable.
 - Builds player-specific multi-game trends, color-separated opening repertoire, evidence-bearing recurring weaknesses, and a persistent training queue from completed reviews.
 - Syncs complete public Chess.com archives and authorized Lichess game history into a local IndexedDB library with resumable checkpoints.
-- Exports annotated PGN, canonical JSON, position PNGs, and game-review PNGs.
+- Saves personal position notes, bookmarks and legal variation lines in a local Notebook, with explicit save/conflict recovery.
+- Exports original/annotated PGN, canonical JSON, position PNGs, game-review PNGs, and portable library backups (v2, with v1 restore support).
 
 ![Stockfish and Maia comparison](e2e/__screenshots__/combined-stockfish-maia-1440.png)
+
+The public Browser Core release requires no subscription or Open Chess Review
+account. Games and notebooks stay in each visitor's browser; cloud sync and
+hosted AI are not provided. Optional third-party API coaching uses the provider
+you configure locally. See the [current release audit](docs/audits/2026-09-08-free-stable-release.md)
+and [contribution guide](CONTRIBUTING.md).
 
 ## Architecture
 
@@ -44,6 +51,14 @@ The pnpm workspace keeps those boundaries explicit:
 
 See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/data-model.md) for the detailed contracts.
 
+## Debian / NUC deployment
+
+For a small public Browser Core beta on a Debian NUC behind an existing
+Cloudflare Tunnel, see [the deployment guide and scripts](deploy/nuc/README.md).
+It includes an amd64 standalone image, loopback-only ingress, resource limits,
+configuration checks, release identity and rollback. Actual domain authorization
+and physical-device acceptance remain required before public launch.
+
 ## Runtime modes
 
 | Mode | Command | Available capabilities |
@@ -56,6 +71,14 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 `pnpm dev` is the normal full-development entry point. It reuses healthy services, starts only missing executables, and stops only processes it owns. Ollama is started with `ollama serve`; no Ollama or Maia model is downloaded automatically. Maia-3 5M/23M/79M setup is an explicit Settings/Review action. `pnpm dev:check` reports runtime availability without starting anything.
 
 The web product remains fully usable when local-ai is offline. In that state Stockfish continues in the browser, Maia controls show an explicit offline state, and Coach requests use deterministic canonical copy.
+
+Public production builds default to **Browser Core** and never probe a visitor's
+local AI services. Local development exposes optional enhancements on loopback;
+`pnpm dev:web` starts only the web process. Use `NEXT_PUBLIC_APP_MODE=browser-core`
+to explicitly test the public capability surface. No Hosted AI service is included.
+See [Web service boundaries](docs/web-service-boundaries.md) for production mode,
+Lichess `APP_ORIGIN`/private cookie key, server rate limits and ingress requirements.
+The in-app Help page explains data destinations and library backups.
 
 The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **Training** owns cross-game progress, repertoire, weaknesses and queue state; **Engine** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
 

@@ -68,7 +68,7 @@ export function useReviewHuman({
   const setupInFlight = useRef(false);
   const serviceState: MaiaServiceState = localAi.state === "checking"
     ? "checking"
-    : localAi.health?.maia ?? "offline";
+    : localAi.state === "not-provided" || localAi.state === "not-configured" ? localAi.state : localAi.health?.maia ?? "offline";
   const modelState: MaiaModelState = localAi.health?.maiaModels?.[model]
     ?? (serviceState === "available" ? "not-cached" : "unavailable");
   const modelReady = modelState === "active" || modelState === "cached";

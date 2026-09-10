@@ -76,8 +76,19 @@ deterministic and do not infer narratives from prose.
 Weaknesses require at least two incidents across two games. They expose sample
 size, game frequency, average loss, confidence, early-vs-recent trend and bounded
 evidence. The top three create a deterministic plan backed by up to five exact
-positions. `TrainingQueueItemV2` records only position-review progress; it does
-not claim spaced repetition or a due-date model.
+positions. `TrainingQueueItemV3` records explicit source-position review. Start
+opens the first unreviewed decision; confirmation records game ID, ply and time
+only after the source position and its objective evidence are displayed. Next
+position and Continue resume from that ledger, including across games. Reopening
+or confirming twice does not add credit. All source positions must be confirmed
+for review completion; there is no scored answer, mastery or spaced repetition.
+
+Saved tasks are visible independently of cache/report availability. Legacy V1/V2
+manual completions are identified as manual, and their aggregate counts are not
+converted to specific reviewed positions. Concurrent acknowledgements use a
+transactional read-modify-write; a stale Add to queue cannot reset progress.
+Deleting a source removes its references and acknowledgements while retaining
+other progress. [Library backup](library-backup.md) preserves this ledger.
 
 ## Whole-history jobs
 

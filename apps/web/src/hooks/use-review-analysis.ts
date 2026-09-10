@@ -16,6 +16,7 @@ import type { AppSettings } from "../lib/app-settings";
 import { selectedBranchMoves } from "../lib/analysis-branch";
 import { analyzeObjectiveGame } from "../lib/objective-game-analysis";
 import { markSyncedGameAnalyzed } from "../lib/platform-library";
+import { withReviewRun } from "../lib/review-runs";
 import { getReviewRecord } from "../lib/review-library";
 import { useReviewStore } from "../store/review-store";
 
@@ -81,44 +82,46 @@ export function useReviewAnalysis({
     const controller = new AbortController();
     reviewAbort.current = controller;
     try {
-      const markCurrent = async (analysis: GameAnalysisV2) => {
-        const record = await getReviewRecord(gameId).catch(() => null);
-        if (!record?.external) return;
-        await markSyncedGameAnalyzed(
-          `${record.external.provider}:${record.external.externalGameId}`,
-          record.id,
-          { algorithmVersion: analysis.algorithmVersion, depth: analysis.engine.depth },
-        ).catch(() => undefined);
-      };
-      const cached = await getCachedAnalysis(game, cacheOptions).catch(() => null);
-      if (controller.signal.aborted) return;
-      if (cached) {
-        useReviewStore.getState().setAnalysis(cached);
-        await markCurrent(cached);
-        setReviewState("cached");
-        return;
-      }
-      useReviewStore.getState().setAnalysis(null);
-      // This full-game pool owns one worker. The shared scheduler caps the
-      // total engine workload at two tasks and prioritizes current-board work.
-      const pool = new BrowserStockfishPool(1);
-      reviewPool.current = pool;
-      const analysis = await analysisScheduler.run(
-        "background-game",
-        () => analyzeObjectiveGame(game, pool, {
-          depth,
-          division,
-          opening,
-          signal: controller.signal,
-          onProgress: setReviewProgress,
-        }),
-        controller.signal,
-      );
-      await putCachedAnalysis(game, cacheOptions, analysis).catch(() => undefined);
-      await markCurrent(analysis);
-      if (controller.signal.aborted) return;
-      useReviewStore.getState().setAnalysis(analysis);
-      setReviewState("complete");
+      await withReviewRun(gameId, depth, async (signal, report) => {
+        const markCurrent = async (analysis: GameAnalysisV2) => {
+          const record = await getReviewRecord(gameId);
+          if (!record?.external) return;
+          await markSyncedGameAnalyzed(
+            `${record.external.provider}:${record.external.externalGameId}`,
+            record.id,
+            { algorithmVersion: analysis.algorithmVersion, depth: analysis.engine.depth },
+          );
+        };
+        const cached = await getCachedAnalysis(game, cacheOptions);
+        signal.throwIfAborted();
+        if (cached) {
+          useReviewStore.getState().setAnalysis(cached);
+          await markCurrent(cached);
+          setReviewState("cached");
+          return;
+        }
+        useReviewStore.getState().setAnalysis(null);
+        // This full-game pool owns one worker. The shared scheduler caps the
+        // total engine workload at two tasks and prioritizes current-board work.
+        const pool = new BrowserStockfishPool(1);
+        reviewPool.current = pool;
+        const analysis = await analysisScheduler.run(
+          "background-game",
+          () => analyzeObjectiveGame(game, pool, {
+            depth,
+            division,
+            opening,
+            signal,
+            onProgress: (progress) => { setReviewProgress(progress); report(progress); },
+          }),
+          signal,
+        );
+        await putCachedAnalysis(game, cacheOptions, analysis);
+        await markCurrent(analysis);
+        signal.throwIfAborted();
+        useReviewStore.getState().setAnalysis(analysis);
+      }, controller.signal);
+      setReviewState((state) => state === "cached" ? "cached" : "complete");
     } catch (error) {
       if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
         setReviewState("idle");
@@ -252,7 +255,7 @@ export function useReviewAnalysis({
     void putCachedAnalysis(game, {
       depth: analysis.engine.depth,
       multiPv: analysis.engine.multiPv,
-    }, analysis).catch(() => undefined);
+    }, analysis).catch((error) => setReviewError(error instanceof Error ? error.message : "Unable to save analysis updates."));
   }, []);
 
   return {

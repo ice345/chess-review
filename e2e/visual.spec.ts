@@ -46,10 +46,10 @@ test("representative Phase 5.3 workspace states", async ({ page }) => {
 
   await page.setViewportSize({ width: 1728, height: 1117 });
   await page.goto(`/review/${record.id}/coach?ply=2`);
-  await page.getByRole("button", { name: "讲解 e5" }).click();
-  await expect(page.getByText(/已使用确定性中文回退/)).toBeVisible();
-  await page.getByRole("button", { name: "生成整盘学习计划" }).click();
-  await expect(page.locator(".game-coach-result")).toContainText("训练建议");
+  await page.getByRole("button", { name: "Explain e5" }).click();
+  await expect(page.getByText(/Deterministic fallback used/)).toBeVisible();
+  await page.getByRole("button", { name: "Build whole-game study" }).click();
+  await expect(page.locator(".game-coach-result")).toContainText("Training recommendations");
   await expect(page).toHaveScreenshot("coach-grounded-fallback-1728.png");
 
   await page.setViewportSize({ width: 1920, height: 1080 });

@@ -275,3 +275,10 @@
     flex-direction: column;
   }
 }
+@media (max-width: 480px) {
+  .account-link-grid { grid-template-columns: minmax(0, 1fr); }
+  .account-link-card { min-width: 0; flex-wrap: wrap; }
+  .account-link-card > div { min-width: 0; max-width: 100%; }
+  .account-link-card > div:last-child { flex-wrap: wrap; }
+  .account-link-card input { flex: 1 1 120px; width: 120px; }
+}

@@ -1,8 +1,12 @@
+"use client";
+
+import { LocalDataNotice } from "./local-data-notice";
 import Link from "next/link";
 import { BlueBishopMark } from "@chess-review/ui";
 
 export function AppHeader({ compact = false }: { compact?: boolean }) {
   return (
+    <>
     <header className={`app-header ${compact ? "compact" : ""}`}>
       <Link className="brand" href="/" aria-label="Open Chess Review home">
         <span className="brand-mark"><BlueBishopMark decorative /></span>
@@ -14,5 +18,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
         <Link href="/settings">Settings</Link>
       </nav>
     </header>
+    <LocalDataNotice />
+    </>
   );
 }

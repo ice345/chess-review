@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_DESCRIPTION, SITE_NAME } from "../lib/site-info";
 import type { ReactNode } from "react";
 import "./styles/tokens.css";
 import "./styles/base.css";
@@ -15,10 +16,16 @@ import "./styles/platforms.css";
 import "./styles/coach.css";
 import "./styles/visual-identity.css";
 import "./styles/study.css";
+import "./styles/notebook.css";
 
 export const metadata: Metadata = {
-  title: "Open Chess Review",
-  description: "Objective analysis, human behavior, and explainable coaching.",
+  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  ...(process.env.APP_ORIGIN ? { metadataBase: new URL(process.env.APP_ORIGIN) } : {}),
+  openGraph: { type: "website", title: SITE_NAME, description: SITE_DESCRIPTION, siteName: SITE_NAME, locale: "en_US" },
+  twitter: { card: "summary", title: SITE_NAME, description: SITE_DESCRIPTION },
+  referrer: "strict-origin-when-cross-origin",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
