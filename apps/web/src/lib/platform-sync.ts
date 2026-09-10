@@ -85,13 +85,28 @@ export function retryAt(retryAfterHeader: string | null, now = Date.now()): stri
   return new Date(Number.isFinite(parsed) ? parsed : now + 60_000).toISOString();
 }
 
-export async function readBoundedJson<T>(request: Request, limit = MAX_PLATFORM_JSON_BYTES): Promise<T | null> {
-  const text = await request.text();
-  if (text.length > limit) {
-    const error = new Error("Request body is too large.");
-    error.name = "PayloadTooLargeError";
-    throw error;
-  }
+export async function readBoundedJson<T>(request: Request, limit = MAX_PLATFORM_JSON_BYTES, signal = request.signal): Promise<T | null> {
+  const oversized = () => { const error = new Error("Request body is too large."); error.name = "PayloadTooLargeError"; return error; };
+  if (Number(request.headers.get("Content-Length")) > limit) throw oversized();
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const abort = () => { void reader.cancel(signal.reason).catch(() => undefined); };
+  signal.addEventListener("abort", abort);
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  try {
+    while (true) {
+      signal.throwIfAborted();
+      const chunk = await reader.read();
+      signal.throwIfAborted();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > limit) { await reader.cancel(); throw oversized(); }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally { signal.removeEventListener("abort", abort); reader.releaseLock(); }
   if (!text) return null;
   try {
     return JSON.parse(text) as T;

@@ -26,9 +26,8 @@ function abortError(): Error {
 /**
  * A deliberately small in-browser resource policy. It bounds concurrently
  * active analysis jobs and chooses current-position work before variations,
- * then background game review. Two background jobs may run together so a
- * history import is not needlessly serial; the total engine-task capacity is
- * still bounded, and interactive work keeps the higher queue priority.
+ * then background game review. The application reserves one of its two slots
+ * for interactive work so a backlog cannot occupy every slot for whole games.
  */
 export class AnalysisScheduler {
   private active = 0;
@@ -111,4 +110,4 @@ export class AnalysisScheduler {
   }
 }
 
-export const analysisScheduler = new AnalysisScheduler(2, 2);
+export const analysisScheduler = new AnalysisScheduler(2, 1);

@@ -4,6 +4,13 @@ The source of truth is `packages/shared/src/schema.ts`. Current persisted analys
 uses `GameAnalysisV2` with both `version` and `algorithmVersion`; V1 is retained
 only as a readable stale shape and is never accepted as current objective data.
 
+The web application's `ReviewRecord` is an import/library record, separate from
+canonical analysis. Its optional `originalPgn` field (Web R2) retains the selected
+game's decoded source text for Original PGN export; old records fall back to
+`input`. Record IDs, database version and analysis/cache identity are unchanged.
+Comments and imported variations remain source text rather than additional
+analyzed moves. See [PGN import/export](pgn-import-export.md).
+
 Engine scores are a discriminated union:
 
 ```ts
@@ -77,7 +84,8 @@ Its durable contract is:
 - no objective classification or Accuracy field on exploratory moves.
 
 Returning to the game restores the root canonical position. The tree is runtime
-state in Phase 5.1; future persistence may version it independently without
+state. S1 saves only validated paths and personal text in an independent
+`ReviewNotebookV1`, without
 changing the canonical analysis schema. See
 [`analysis-variations.md`](analysis-variations.md) for node/path invariants and
 Return-to-Game behavior.
@@ -99,11 +107,17 @@ accepts a selected-player projection of multiple canonical records and produces 
 runtime `AdvancedStudyReportV2`. This keeps one-game cache identity independent of
 study presentation. Its provenance carries provider, time-control, rated state,
 player-color, recognized-opening, date-range and minimum-sample filters; one
-filtered population feeds every deterministic section. Persisted training progress uses `TrainingQueueItemV2` in a
+filtered population feeds every deterministic section. Persisted training progress uses `TrainingQueueItemV3` in a
 separate IndexedDB store. Each item records a deterministic player/weakness ID,
 status, priority and up to five `TrainingEvidenceReference` objects containing
 `gameId`, ply, SAN, phase, canonical classification and WinPercent loss. It stores
-no Coach prose and never mutates the source analysis. `HistoryAnalysisJobV1` is a
+no Coach prose and never mutates the source analysis. V3 progress includes
+`positions: { gameId, ply, reviewedAt }[]`; unique current evidence identities
+derive the displayed counters. `completionKind` separates legacy/manual state
+from all-positions-reviewed completion. V1/V2 are read through a compatibility
+normalizer without inventing position credit. The portable library format is
+independently versioned; see [backup and recovery](library-backup.md).
+`HistoryAnalysisJobV1` is a
 separate browser-owned record with explicit scope, status, per-game attempts and
 timestamps; `running` means an open tab currently owns the job. An explicit
 full-history account import automatically creates or reuses an `unanalyzed` job
@@ -113,3 +127,82 @@ independently, allowing Training to show partial results while the
 browser-owned worker continues.
 
 `GameDivision.middlePly` and `endPly` are zero-based indices into positions immediately before moves, matching the selected Divider port. Public move records use one-based `ply`. `phaseForPly()` is the canonical conversion.
+
+## Web R1: review availability and local cleanup (2026-09-06)
+
+Browser database version 7 adds `review-runs` and `local-data-metadata` without
+changing `GameAnalysisV2` or the objective algorithm version. `ReviewRun` is an
+application work record with a request identity, status, depth, stage progress
+and update time. Running work refreshes its lease every five seconds; an expired
+45-second lease is shown as interrupted. Stage progress is work performed, not a
+partial canonical chess result or evidence of a completed review.
+
+Home and History resolve availability from source identity, durable work and
+compatible complete cache projections. Training uses the same compatibility and
+availability resolver when pairing records. A saved PGN is not a completed
+analysis; FEN is a position study. Failed/cancelled attempts cannot borrow another
+record's cached PGN and become successful. A prior completed result remains
+available at its recorded depth if a later attempt fails. A user opening a
+verified cached result records that restoration. Removing the cache removes its
+availability, even if old run metadata still says complete. Projection entries
+without stored payloads do not count. The exact-key cache path now checks the
+same engine/settings/game compatibility and full move count as restoration.
+
+All IndexedDB writes include the local-data epoch in their transaction. Cleanup
+increments this epoch atomically with its changes; old pages and already-open
+connections cannot write results back after cleanup. Cleanup pauses queued or
+running history jobs and active sync work. The initiating page reloads after a
+successful cleanup; other pages show a reload notice and abort ongoing work.
+A missing cross-tab notification does not bypass the durable transaction check.
+The internal epoch is retained after a reset and contains no chess records.
+
+Deleting one review removes its run and training references, and records a
+persistent deletion intent for its review/source identity. An imported source
+can remain available as an unanalyzed game. Legacy link repair respects the
+intent; explicitly importing/opening that source can restore the review.
+Deleting an account's games removes its sources, linked reviews, run/evidence
+references and unreferenced cache payloads/projections. Cache shared by remaining
+records or source games is retained. Cache-only cleanup retains source data;
+full local reset clears every data store, including avatars, plus local
+preferences. Server OAuth cookies are outside the local database reset scope;
+use account disconnect to end that connection.
+
+Storage failures are surfaced as errors with recovery actions, not empty
+libraries or successful writes. Destructive cleanup is a single IndexedDB
+transaction. Preferences live in localStorage, so a preferences-clear failure
+is reported separately after a successful database reset. Memory-only IndexedDB
+regressions use the test-only [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)
+dependency; production dependencies are unchanged.
+
+### R5 disposable library identity
+
+PGN `ReviewRecord.identity` optionally stores `{ version: 1, input, initialFen,
+uciMoves }`, produced by the canonical `parsePgn` result during import. Exact
+input, initial FEN and ply count bind this index to the saved record; a missing
+or mismatched index falls back to parsing. Library snapshots lazily upgrade
+legacy records in short batches, preserve timestamps, check the destructive
+epoch and re-read the current record before writing. Aborted navigation stops
+remaining work; quota failure leaves the readable library usable.
+
+The index is not chess analysis and does not promote unfinished reviews.
+Projection/version/engine/MultiPV compatibility and the durable completion
+ledger still decide analysis availability. Backups omit this disposable field;
+restore ignores supplied indexes and derives them again from validated PGN.
+Index-only upgrades do not create backup conflicts or stale previews. No
+IndexedDB schema version change is required; older code can ignore the field.
+
+
+### S1 personal notebooks
+
+Browser database version 8 adds `review-notebooks`, keyed by `ReviewRecord.id`.
+The separate `ReviewNotebookV1` holds bounded, revisioned entries with a
+canonical root ply, legal UCI path, title, plain-text note and bookmark. No
+objective scores, runtime classification evidence or human predictions are
+stored. Source and entry revision are checked in the same epoch-protected
+transaction as save/delete. Library backup v2 includes notebooks, continues
+reading v1, and rejects orphan or illegal lines before any restore writes.
+
+Deleting a review/account's games removes the corresponding notebooks; cache
+clear retains them. Source games and analysis types are unchanged. The old v7
+client cannot open a v8 database: rollback images must support v8. See
+[Notebook](review-notebook.md) for UI, draft, validation and merge boundaries.

@@ -1,3 +1,4 @@
+import { writeLocalData, notifyLocalDataChanged } from "./browser-storage";
 import { CLASSIFICATION_MULTI_PV, OBJECTIVE_ALGORITHM_VERSION } from "@chess-review/analysis";
 import { parsePgn } from "@chess-review/chess-core";
 import type {
@@ -211,13 +212,10 @@ export function retryFailedHistoryAnalysisJobRecord(
 async function writeJob(job: HistoryAnalysisJobV1): Promise<HistoryAnalysisJobV1> {
   const database = await openReviewDatabase();
   try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(HISTORY_ANALYSIS_JOB_STORE, "readwrite");
+    await writeLocalData(database, HISTORY_ANALYSIS_JOB_STORE, (transaction) => {
       transaction.objectStore(HISTORY_ANALYSIS_JOB_STORE).put(job, job.id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to save the history-analysis job."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("History-analysis job write was aborted."));
     });
+    notifyLocalDataChanged();
     return job;
   } finally {
     database.close();
@@ -286,13 +284,10 @@ export async function removeHistoryAnalysisJob(id: string): Promise<boolean> {
   }
   const database = await openReviewDatabase();
   try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(HISTORY_ANALYSIS_JOB_STORE, "readwrite");
+    await writeLocalData(database, HISTORY_ANALYSIS_JOB_STORE, (transaction) => {
       transaction.objectStore(HISTORY_ANALYSIS_JOB_STORE).delete(id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to remove the history-analysis run."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("History-analysis run removal was aborted."));
     });
+    notifyLocalDataChanged();
     return true;
   } finally {
     database.close();
@@ -306,14 +301,11 @@ export async function clearFinishedHistoryAnalysisJobs(): Promise<number> {
   if (ids.length === 0) return 0;
   const database = await openReviewDatabase();
   try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(HISTORY_ANALYSIS_JOB_STORE, "readwrite");
+    await writeLocalData(database, HISTORY_ANALYSIS_JOB_STORE, (transaction) => {
       const store = transaction.objectStore(HISTORY_ANALYSIS_JOB_STORE);
       for (const id of ids) store.delete(id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to clear finished history-analysis runs."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Finished history-analysis cleanup was aborted."));
     });
+    notifyLocalDataChanged();
     return ids.length;
   } finally {
     database.close();

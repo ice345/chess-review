@@ -1,3 +1,4 @@
+import { writeLocalData, notifyLocalDataChanged } from "./browser-storage";
 import type { ExternalPlatform, PlatformAccount, PlatformSyncState, SyncedGame } from "@chess-review/shared";
 import {
   openReviewDatabase,
@@ -15,13 +16,9 @@ function readAll<T>(database: IDBDatabase, storeName: string): Promise<T[]> {
 }
 
 function write<T>(database: IDBDatabase, storeName: string, key: string, value: T): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(storeName, "readwrite");
+  return writeLocalData(database, storeName, (transaction) => {
     transaction.objectStore(storeName).put(value, key);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error(`Unable to write ${storeName}.`));
-    transaction.onabort = () => reject(transaction.error ?? new Error(`${storeName} write was aborted.`));
-  });
+  }).then(() => notifyLocalDataChanged());
 }
 
 function readOne<T>(database: IDBDatabase, storeName: string, key: string): Promise<T | null> {
@@ -88,13 +85,11 @@ export async function savePlatformAccount(account: PlatformAccount): Promise<Pla
 export async function removePlatformAccount(accountId: string): Promise<void> {
   const database = await openReviewDatabase();
   try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction([PLATFORM_ACCOUNT_STORE, PLATFORM_SYNC_STORE], "readwrite");
+    await writeLocalData(database, [PLATFORM_ACCOUNT_STORE, PLATFORM_SYNC_STORE], (transaction) => {
       transaction.objectStore(PLATFORM_ACCOUNT_STORE).delete(accountId);
       transaction.objectStore(PLATFORM_SYNC_STORE).delete(accountId);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to unlink account."));
     });
+    notifyLocalDataChanged();
   } finally {
     database.close();
   }
@@ -128,8 +123,7 @@ export async function saveSyncedGames(games: SyncedGame[]): Promise<SyncedGame[]
   const database = await openReviewDatabase();
   try {
     const added: SyncedGame[] = [];
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(SYNCED_GAME_STORE, "readwrite");
+    await writeLocalData(database, SYNCED_GAME_STORE, (transaction) => {
       const store = transaction.objectStore(SYNCED_GAME_STORE);
       for (const game of games) {
         const request = store.get(game.id);
@@ -146,10 +140,8 @@ export async function saveSyncedGames(games: SyncedGame[]): Promise<SyncedGame[]
           if (!prior) added.push(game);
         };
       }
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to store synced games."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Synced-game write was aborted."));
     });
+    notifyLocalDataChanged();
     return added;
   } finally {
     database.close();

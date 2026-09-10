@@ -1,3 +1,4 @@
+import { writeLocalData, notifyLocalDataChanged } from "./browser-storage";
 import { COACH_PROMPT_VERSION, OBJECTIVE_ALGORITHM_VERSION } from "@chess-review/analysis";
 import type { NormalizedGame } from "@chess-review/chess-core";
 import type { AnalysisCacheProjectionV1, GameAnalysisV2 } from "@chess-review/shared";
@@ -23,7 +24,7 @@ export function gameMoveIdentity(initialFen: string, uciMoves: readonly string[]
   return [initialFen, ...uciMoves].join("\u0000");
 }
 
-export function projectionMoveIdentity(projection: AnalysisCacheProjectionV1): string | null {
+export function projectionMoveIdentity(projection: Pick<AnalysisCacheProjectionV1, "initialFen" | "uciMoves">): string | null {
   if (projection.initialFen === undefined || projection.uciMoves === undefined) return null;
   return gameMoveIdentity(projection.initialFen, projection.uciMoves);
 }
@@ -41,7 +42,7 @@ export function compatibleAnalysisQuery(
 }
 
 export function isCompatibleAnalysisProjection(
-  projection: AnalysisCacheProjectionV1,
+  projection: Pick<AnalysisCacheProjectionV1, "version" | "algorithmVersion" | "engine" | "initialFen" | "uciMoves">,
   query: CompatibleAnalysisQuery,
 ): boolean {
   if (projection.version !== 1) return false;
@@ -179,14 +180,20 @@ export async function getCachedAnalysis(
   options: AnalysisCacheOptions,
 ): Promise<GameAnalysisV2 | null> {
   const key = await analysisCacheKey(game, options);
+  const query = compatibleAnalysisQuery(game, options);
+  const valid = (cached: GameAnalysisV2 | null): cached is GameAnalysisV2 => Boolean(cached
+    && cached.moves.length === game.plies.length && cached.division.totalPlies === game.plies.length
+    && isCompatibleAnalysisProjection({ version: 1, algorithmVersion: cached.algorithmVersion,
+      engine: cached.engine, initialFen: cached.game.initialFen, uciMoves: cached.moves.map((move) => move.uci) }, query));
   const exact = await readCachedAnalysis(key, false);
-  if (exact) return exact;
+  if (valid(exact)) return exact;
   const matched = selectCompatibleAnalysisProjection(
     await listAnalysisCacheProjections(),
     compatibleAnalysisQuery(game, options),
   );
   if (!matched || matched.cacheKey === key) return null;
-  return readCachedAnalysis(matched.cacheKey, true);
+  const cached = await readCachedAnalysis(matched.cacheKey, true);
+  return valid(cached) ? cached : null;
 }
 
 export async function putCachedAnalysis(
@@ -200,29 +207,31 @@ export async function putCachedAnalysis(
       analysisCacheKey(game, options),
       analysisGameFingerprint(game),
     ]);
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction([ANALYSIS_STORE, ANALYSIS_INDEX_STORE], "readwrite");
+    await writeLocalData(database, [ANALYSIS_STORE, ANALYSIS_INDEX_STORE], (transaction) => {
       transaction.objectStore(ANALYSIS_STORE).put(analysis, key);
       transaction.objectStore(ANALYSIS_INDEX_STORE).put(buildAnalysisCacheProjection(analysis, key, fingerprint), key);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to write the analysis cache."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Analysis cache write was aborted."));
     });
+    notifyLocalDataChanged();
   } finally {
     database.close();
   }
 }
 
-export async function listAnalysisCacheProjections(): Promise<AnalysisCacheProjectionV1[]> {
+export async function listAnalysisCacheProjections(includeStale = false): Promise<AnalysisCacheProjectionV1[]> {
   await backfillAnalysisCacheProjections();
   const database = await openReviewDatabase();
   try {
     return await new Promise((resolve, reject) => {
-      const request = database.transaction(ANALYSIS_INDEX_STORE, "readonly").objectStore(ANALYSIS_INDEX_STORE).getAll();
-      request.onsuccess = () => resolve((request.result as AnalysisCacheProjectionV1[])
-        .filter((item) => item.version === 1 && item.algorithmVersion === OBJECTIVE_ALGORITHM_VERSION)
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)));
-      request.onerror = () => reject(request.error ?? new Error("Unable to list the analysis index."));
+      const tx = database.transaction([ANALYSIS_INDEX_STORE, ANALYSIS_STORE], "readonly");
+      const index = tx.objectStore(ANALYSIS_INDEX_STORE).getAll();
+      const keys = tx.objectStore(ANALYSIS_STORE).getAllKeys();
+      tx.oncomplete = () => {
+        const available = new Set(keys.result.map(String));
+        resolve((index.result as AnalysisCacheProjectionV1[])
+          .filter((item) => available.has(item.cacheKey) && item.version === 1 && (includeStale || item.algorithmVersion === OBJECTIVE_ALGORITHM_VERSION))
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt)));
+      };
+      tx.onerror = tx.onabort = () => reject(tx.error ?? new Error("Unable to list the analysis index."));
     });
   } finally {
     database.close();
@@ -263,13 +272,10 @@ export async function backfillAnalysisCacheProjections(): Promise<number> {
       });
       if (!analysis || analysis.version !== 2 || analysis.algorithmVersion !== OBJECTIVE_ALGORITHM_VERSION || !analysis.game.pgn) continue;
       const fingerprint = await gameFingerprint(analysis.game.initialFen, analysis.game.pgn);
-      await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction(ANALYSIS_INDEX_STORE, "readwrite");
+      await writeLocalData(database, ANALYSIS_INDEX_STORE, (transaction) => {
         transaction.objectStore(ANALYSIS_INDEX_STORE).put(buildAnalysisCacheProjection(analysis, key, fingerprint), rawKey);
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error ?? new Error("Unable to backfill the analysis index."));
-        transaction.onabort = () => reject(transaction.error ?? new Error("Analysis index backfill was aborted."));
       });
+      notifyLocalDataChanged();
       added += 1;
     }
     return added;

@@ -3,6 +3,7 @@ import {
   normalizeFen,
   parsePgn,
   playLegalBoardMove,
+  replayUciLine,
   type NormalizedGame,
   type ReplayedUciMove,
 } from "@chess-review/chess-core";
@@ -49,6 +50,7 @@ interface ReviewState {
   stepBranch: (delta: number) => void;
   setBranchMoveQuality: (nodeId: string, quality: AnalysisBranchMoveQuality) => void;
   returnToGame: () => void;
+  openNotebookPosition: (rootPly: number, line: string[]) => void;
   setMoveHuman: (ply: number, human: HumanAnalysis) => GameAnalysisV2 | null;
   invalidateHumanAnalysis: (model: MaiaModel, targetElo: number) => GameAnalysisV2 | null;
   setMoveCoach: (ply: number, coach: CoachExplanation) => GameAnalysisV2 | null;
@@ -154,6 +156,17 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     const branch = get().branch;
     if (!branch) return;
     set({ branch: null, positionFen: branch.rootFen });
+  },
+  openNotebookPosition: (rootPly, line) => {
+    const current = get();
+    if (!Number.isInteger(rootPly) || rootPly < 0 || rootPly > (current.game?.plies.length ?? 0)) throw new Error("This notebook position is outside the source game.");
+    const rootFen = current.game
+      ? rootPly === 0 ? current.game.initialFen : current.game.plies[rootPly - 1]!.fenAfter
+      : current.branch?.rootFen ?? current.positionFen;
+    const moves = replayUciLine(rootFen, line);
+    let branch = createAnalysisBranch(rootPly, rootFen);
+    for (const move of moves) branch = appendBranchMove(branch, move);
+    set({ currentPly: rootPly, branch: moves.length ? branch : null, positionFen: selectedBranchNode(branch).fen, error: null });
   },
   setMoveHuman: (ply, human) => {
     const analysis = get().analysis;

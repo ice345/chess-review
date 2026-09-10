@@ -1,6 +1,10 @@
 import { ChessImportError, normalizeFen, parsePgn } from "@chess-review/chess-core";
 import type { ExternalGameReference, SyncedGame } from "@chess-review/shared";
-import { openReviewDatabase, REVIEW_STORE } from "./browser-storage";
+import { openReviewDatabase, REVIEW_STORE, LOCAL_META_STORE, writeLocalData, notifyLocalDataChanged } from "./browser-storage";
+
+import { deletedReviewKey, deletedExternalKey } from "./local-data";
+
+import { buildReviewIdentity, type ReviewIdentity } from "./review-identity";
 
 export type ReviewRecordKind = "pgn" | "fen";
 
@@ -8,6 +12,10 @@ export interface ReviewRecord {
   id: string;
   kind: ReviewRecordKind;
   input: string;
+  /** Original selected PGN text; older records fall back to input. */
+  originalPgn?: string;
+  /** Disposable validated PGN index; rebuilt on backup import. */
+  identity?: ReviewIdentity;
   title: string;
   subtitle: string;
   initialFen: string;
@@ -90,6 +98,8 @@ export async function buildReviewRecord(kind: ReviewRecordKind, input: string): 
     id: await reviewId(`pgn\u0000${game.initialFen}\u0000${game.pgn}`),
     kind,
     input: game.pgn,
+    identity: buildReviewIdentity(game.pgn, game),
+    originalPgn: input,
     title: `${white} vs ${black}`,
     subtitle: [event, date, `${game.plies.length} ${game.plies.length === 1 ? "ply" : "plies"}`].filter(Boolean).join(" · "),
     initialFen: game.initialFen,
@@ -99,31 +109,46 @@ export async function buildReviewRecord(kind: ReviewRecordKind, input: string): 
   };
 }
 
-export async function saveReviewRecord(record: ReviewRecord): Promise<ReviewRecord> {
-  const database = await openReviewDatabase();
+export class DeletedReviewError extends Error {
+  constructor() { super("This review was deleted. Import or open the source game explicitly to create a new review."); this.name = "DeletedReviewError"; }
+}
+
+export async function isReviewDeleted(record: ReviewRecord): Promise<boolean> {
+  const db = await openReviewDatabase();
   try {
-    const existing = await new Promise<ReviewRecord | undefined>((resolve, reject) => {
-      const request = database.transaction(REVIEW_STORE, "readonly").objectStore(REVIEW_STORE).get(record.id);
-      request.onsuccess = () => resolve(request.result as ReviewRecord | undefined);
-      request.onerror = () => reject(request.error ?? new Error("Unable to read the review record."));
+    const keys = [deletedReviewKey(record.id), ...(record.external ? [deletedExternalKey(record.external)] : [])];
+    return (await Promise.all(keys.map((key) => new Promise<boolean>((resolve, reject) => {
+      const req = db.transaction(LOCAL_META_STORE).objectStore(LOCAL_META_STORE).get(key);
+      req.onsuccess = () => resolve(Boolean(req.result));
+      req.onerror = () => reject(req.error);
+    })))).some(Boolean);
+  } finally { db.close(); }
+}
+
+export async function saveReviewRecord(record: ReviewRecord, options: { restoreDeleted?: boolean } = {}): Promise<ReviewRecord> {
+  const database = await openReviewDatabase();
+  let saved = record;
+  try {
+    await writeLocalData(database, REVIEW_STORE, (transaction, fail) => {
+      const store = transaction.objectStore(REVIEW_STORE);
+      const meta = transaction.objectStore(LOCAL_META_STORE);
+      const keys = [deletedReviewKey(record.id), ...(record.external ? [deletedExternalKey(record.external)] : [])];
+      const existing = store.get(record.id);
+      const deleted = keys.map((key) => meta.get(key));
+      let pending = deleted.length + 1;
+      const ready = () => {
+        if (--pending) return;
+        if (deleted.some((request) => request.result) && !options.restoreDeleted) { fail(new DeletedReviewError()); return; }
+        if (options.restoreDeleted) for (const key of keys) meta.delete(key);
+        saved = { ...record, subtitle: cleanSubtitle(record.subtitle), createdAt: existing.result?.createdAt ?? record.createdAt, updatedAt: new Date().toISOString() };
+        store.put(saved, saved.id);
+      };
+      existing.onsuccess = ready;
+      for (const request of deleted) request.onsuccess = ready;
     });
-    const saved = {
-      ...record,
-      subtitle: cleanSubtitle(record.subtitle),
-      createdAt: existing?.createdAt ?? record.createdAt,
-      updatedAt: new Date().toISOString(),
-    };
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(REVIEW_STORE, "readwrite");
-      transaction.objectStore(REVIEW_STORE).put(saved, saved.id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to save the review record."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Review record write was aborted."));
-    });
+    notifyLocalDataChanged();
     return saved;
-  } finally {
-    database.close();
-  }
+  } finally { database.close(); }
 }
 
 export async function getReviewRecord(id: string): Promise<ReviewRecord | null> {

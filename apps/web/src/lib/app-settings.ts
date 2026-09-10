@@ -1,3 +1,4 @@
+import { isLocalSessionInvalid, LocalDataChangedError } from "./browser-storage";
 import type { CoachLanguage } from "@chess-review/shared";
 import type { CoachRequestProvider, MaiaModel } from "./local-ai";
 import type { ChessSoundTheme } from "./chess-sound";
@@ -20,7 +21,7 @@ export interface AppSettings {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   coachProvider: "ollama",
-  coachLanguage: "zh-CN",
+  coachLanguage: "en",
   coachModel: "gemma4:12b-it-qat",
   reviewDepth: 10,
   reviewMultiPv: 3,
@@ -34,7 +35,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundTheme: "wintrchess",
 };
 
-const STORAGE_KEY = "open-chess-review-settings-v1";
+export const APP_SETTINGS_STORAGE_KEY = "open-chess-review-settings-v1";
+const STORAGE_KEY = APP_SETTINGS_STORAGE_KEY;
 export const APP_SETTINGS_EVENT = "open-chess-review-settings";
 
 export function loadAppSettings(): AppSettings {
@@ -61,6 +63,7 @@ export function loadAppSettings(): AppSettings {
 }
 
 export function saveAppSettings(settings: AppSettings): void {
+  if (isLocalSessionInvalid()) throw new LocalDataChangedError();
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   window.dispatchEvent(new CustomEvent(APP_SETTINGS_EVENT, { detail: settings }));
 }

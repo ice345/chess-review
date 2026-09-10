@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AnalysisScheduler, type AnalysisJobPriority } from "./analysis-scheduler";
+import { analysisScheduler, AnalysisScheduler, type AnalysisJobPriority } from "./analysis-scheduler";
 
 function deferred() {
   let resolve: () => void = () => undefined;
@@ -105,4 +105,16 @@ describe("AnalysisScheduler", () => {
     gate.resolve();
     await active;
   });
+});
+
+it("keeps foreground work runnable while the application has a background backlog", async () => {
+  const gate = deferred();
+  let foregroundRan = false;
+  const first = analysisScheduler.run("background-game", () => gate.promise);
+  const second = analysisScheduler.run("background-game", () => gate.promise);
+  const foreground = analysisScheduler.run("interactive-position", async () => { foregroundRan = true; });
+  try {
+    await Promise.resolve();
+    expect(foregroundRan).toBe(true);
+  } finally { gate.resolve(); await Promise.all([first, second, foreground]); }
 });

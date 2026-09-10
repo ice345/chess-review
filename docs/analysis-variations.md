@@ -46,8 +46,8 @@ canonical position at ply N
 
 Selecting a side-to-move piece highlights every legal destination with a
 high-contrast dot or capture ring. Illegal clicks/drops are rejected and leave the board/tree unchanged. A pawn move on
-the back rank defaults to queen promotion; the core helper also accepts explicit
-queen, rook, bishop or knight promotion for a future UI chooser.
+the back rank opens the existing queen/rook/bishop/knight chooser; cancel keeps
+the position unchanged. The core helper also supports explicit underpromotion.
 
 Stockfish candidate arrows use one objective blue family. Rank affects visual
 strength only. Selecting an arrow or its compact text line projects the validated
@@ -77,5 +77,18 @@ timeline point intentionally exits the branch and establishes a new canonical
 cursor.
 
 The tree, including temporary Move Quality evidence, is session runtime state.
-If variation persistence is added later, it must use its own versioned record
-rather than extending the canonical game-analysis schema with exploratory classifications.
+The board's move dock labels it “Temporary variation · not saved automatically”
+and links to Notebook. The source PGN export excludes this runtime tree.
+
+## Saved personal lines (S1)
+
+Notebook saves a separate `ReviewNotebookV1` record, with notes/bookmarks and
+`{ rootPly, line: UCI[] }` for each saved endpoint. Only moves through the selected
+node are saved, not future PV nodes or sibling branches. Reopening replays every
+move through chess-core against the original PGN/FEN root. It restores the
+canonical root cursor and a fresh runtime tree, with no saved classifications,
+engine scores, Maia probabilities or generated prose. Normal objective searches
+can then run again. Return to Game restores that canonical root as before.
+
+See [personal notebooks](review-notebook.md) for persistence, conflict handling,
+backup compatibility and limits. This is not a full PGN variation-tree editor.

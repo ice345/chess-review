@@ -1,3 +1,5 @@
+import { indexReviewProjections, resolveReviewStatus } from "./review-status";
+import { listReviewRuns } from "./review-runs";
 import { OBJECTIVE_ALGORITHM_VERSION, type StudyGameInput } from "@chess-review/analysis";
 import { parsePgn } from "@chess-review/chess-core";
 import type { NormalizedGame } from "@chess-review/chess-core";
@@ -23,6 +25,7 @@ import {
   buildReviewRecordFromSyncedGame,
   listReviewRecords,
   saveReviewRecord,
+  isReviewDeleted,
   type ReviewRecord,
 } from "./review-library";
 
@@ -227,29 +230,14 @@ async function recordProjectionPairs(
   records: ReviewRecord[],
   projections: AnalysisCacheProjectionV1[],
 ): Promise<Array<{ record: ReviewRecord; projection: AnalysisCacheProjectionV1 }>> {
-  const latestByFingerprint = new Map<string, AnalysisCacheProjectionV1>();
-  const latestByIdentity = new Map<string, AnalysisCacheProjectionV1>();
-  for (const item of projections) {
-    const prior = latestByFingerprint.get(item.gameFingerprint);
-    if (!prior || item.createdAt.localeCompare(prior.createdAt) > 0) latestByFingerprint.set(item.gameFingerprint, item);
-    const identity = projectionAnalysisIdentity(item);
-    if (identity !== null) {
-      const priorIdentity = latestByIdentity.get(identity);
-      if (!priorIdentity || item.createdAt.localeCompare(priorIdentity.createdAt) > 0) latestByIdentity.set(identity, item);
-    }
-  }
-  const pairs = await Promise.all(records.filter((record) => record.kind === "pgn").map(async (record) => {
-    try {
-      const game = parsePgn(record.input);
-      const fingerprint = await analysisGameFingerprint(game);
-      const item = latestByFingerprint.get(fingerprint)
-        ?? (latestByIdentity.size === 0 ? undefined : latestByIdentity.get(gameAnalysisIdentity(game)));
-      return item ? { record, projection: item } : null;
-    } catch {
-      return null;
-    }
-  }));
-  return pairs.filter((pair): pair is { record: ReviewRecord; projection: AnalysisCacheProjectionV1 } => pair !== null);
+  const index = indexReviewProjections(projections);
+  const byKey = new Map(projections.map((item) => [item.cacheKey, item]));
+  const runs = new Map((await listReviewRuns()).map((run) => [run.reviewId, run]));
+  return records.filter((record) => record.kind === "pgn").flatMap((record) => {
+    const status = resolveReviewStatus(record, index, undefined, runs.get(record.id));
+    const projection = status.cacheKey ? byKey.get(status.cacheKey) : undefined;
+    return projection ? [{ record, projection }] : [];
+  });
 }
 
 function syncedGameKey(game: SyncedGame): string {
@@ -410,7 +398,9 @@ async function ensureConnectedReviewRecords(
   if (candidates.size === 0) return retainedRecords;
   const additions: ReviewRecord[] = [];
   for (const [key, { game, projection }] of candidates) {
-    const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(game));
+    const candidate = await buildReviewRecordFromSyncedGame(game);
+    if (await isReviewDeleted(candidate)) continue;
+    const record = await saveReviewRecord(candidate);
     // Repair the durable reverse link as well. This keeps History/Home's
     // "Open review" action valid when an older run left only cache metadata.
     // The matched projection IS completion evidence, so its algorithm version,

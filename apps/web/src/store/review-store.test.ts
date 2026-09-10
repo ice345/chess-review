@@ -17,6 +17,29 @@ describe("review analysis branch store", () => {
     useReviewStore.getState().goToPly(2);
   });
 
+  it("reopens saved study lines at their canonical root without changing game analysis", () => {
+    const before = useReviewStore.getState();
+    before.openNotebookPosition(2, ["f1c4", "g8f6"]);
+    const after = useReviewStore.getState();
+    expect(after.game).toBe(before.game); expect(after.analysis).toBe(before.analysis);
+    expect(after.branch).toMatchObject({ rootPly: 2, selectedIndex: 2 });
+    expect(after.positionFen).toBe(replayUciLine(before.positionFen, ["f1c4", "g8f6"])[1]!.fenAfter);
+    expect(Object.values(after.branch!.nodes).every((node) => node.moveQuality === undefined)).toBe(true);
+    after.returnToGame();
+    expect(useReviewStore.getState()).toMatchObject({ currentPly: 2, branch: null, positionFen: before.positionFen });
+  });
+
+  it("rejects corrupt saved paths atomically and returns a FEN study to its imported root", () => {
+    const before = useReviewStore.getState();
+    expect(() => before.openNotebookPosition(2, ["f1f8"])).toThrow();
+    expect(useReviewStore.getState()).toBe(before);
+    before.loadFen("7k/8/8/8/8/8/p7/7K b - - 0 50");
+    useReviewStore.getState().openNotebookPosition(0, ["a2a1n"]);
+    expect(useReviewStore.getState().branch?.selectedIndex).toBe(1);
+    useReviewStore.getState().openNotebookPosition(0, []);
+    expect(useReviewStore.getState()).toMatchObject({ branch: null, positionFen: "7k/8/8/8/8/8/p7/7K b - - 0 50" });
+  });
+
   it("creates a legal branch from a historical ply without mutating the canonical game", () => {
     const before = useReviewStore.getState();
     const canonicalPgn = before.game?.pgn;

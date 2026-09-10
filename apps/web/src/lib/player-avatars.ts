@@ -1,3 +1,4 @@
+import { writeLocalData, notifyLocalDataChanged } from "./browser-storage";
 import type { ExternalPlatform, PlayerColor } from "@chess-review/shared";
 import { allowedAvatarUrl } from "./player-avatar-url";
 import { openReviewDatabase, PLAYER_AVATAR_STORE } from "./browser-storage";
@@ -45,12 +46,10 @@ async function writeCachedAvatar(entry: CachedPlayerAvatar): Promise<void> {
   const database = await openReviewDatabase();
   try {
     if (!database.objectStoreNames.contains(PLAYER_AVATAR_STORE)) return;
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(PLAYER_AVATAR_STORE, "readwrite");
+    await writeLocalData(database, PLAYER_AVATAR_STORE, (transaction) => {
       transaction.objectStore(PLAYER_AVATAR_STORE).put(entry, entry.key);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to store player avatar."));
     });
+    notifyLocalDataChanged();
   } finally {
     database.close();
   }

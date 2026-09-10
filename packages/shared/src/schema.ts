@@ -718,3 +718,18 @@ export interface TrainingQueueItemV2 extends Omit<TrainingQueueItemV1, "version"
   sourceReportVersion: "advanced-study-v2";
   progress: TrainingQueueProgressV2;
 }
+
+export interface TrainingPositionReview {
+  gameId: string;
+  ply: number;
+  reviewedAt: string;
+}
+
+/** Explicit acknowledgements of source positions, never puzzle answers or mastery. */
+export interface TrainingQueueItemV3 extends Omit<TrainingQueueItemV2, "version" | "progress"> {
+  version: 3;
+  progress: TrainingQueueProgressV2 & { positions: TrainingPositionReview[] };
+  completionKind?: "manual" | "reviewed";
+}
+
+export type TrainingQueueItem = TrainingQueueItemV1 | TrainingQueueItemV2 | TrainingQueueItemV3;

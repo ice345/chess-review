@@ -1,3 +1,4 @@
+import { withReviewRun } from "./review-runs";
 import { CLASSIFICATION_MULTI_PV, divideGame } from "@chess-review/analysis";
 import { parsePgn } from "@chess-review/chess-core";
 import { recognizeOpening } from "@chess-review/openings";
@@ -40,32 +41,35 @@ export async function analyzeSyncedGame(
   // PGN should remain a visible sync/job error, not leave an orphan review
   // record that can later be paired with another game's shared cache.
   const record = await saveReviewRecord(await buildReviewRecordFromSyncedGame(syncedGame));
-  const cacheOptions = { depth: options.depth, multiPv: CLASSIFICATION_MULTI_PV };
-  let analysis = await getCachedAnalysis(game, cacheOptions).catch(() => null);
-  const cached = analysis !== null;
-  if (!analysis) {
-    const pool = new BrowserStockfishPool(1);
-    try {
-      const division = divideGame(game);
-      const opening = recognizeOpening(game) ?? null;
-      analysis = await analysisScheduler.run(
-        "background-game",
-        () => analyzeObjectiveGame(game, pool, {
-          depth: options.depth,
-          division,
-          opening,
-          ...(options.signal === undefined ? {} : { signal: options.signal }),
-        }),
-        options.signal,
-      );
-      await putCachedAnalysis(game, cacheOptions, analysis);
-    } finally {
-      pool.terminate();
+  return withReviewRun(record.id, options.depth, async (signal, report) => {
+    const cacheOptions = { depth: options.depth, multiPv: CLASSIFICATION_MULTI_PV };
+    let analysis = await getCachedAnalysis(game, cacheOptions);
+    const cached = analysis !== null;
+    if (!analysis) {
+      const pool = new BrowserStockfishPool(1);
+      try {
+        const division = divideGame(game);
+        const opening = recognizeOpening(game) ?? null;
+        analysis = await analysisScheduler.run(
+          "background-game",
+          () => analyzeObjectiveGame(game, pool, {
+            depth: options.depth,
+            division,
+            opening,
+            signal, onProgress: report,
+          }),
+          signal,
+        );
+        await putCachedAnalysis(game, cacheOptions, analysis);
+      } finally {
+        pool.terminate();
+      }
     }
-  }
-  await markSyncedGameAnalyzed(syncedGame.id, record.id, {
-    algorithmVersion: analysis.algorithmVersion,
-    depth: options.depth,
-  });
-  return { analysis, analysisId: record.id, cached };
+    await markSyncedGameAnalyzed(syncedGame.id, record.id, {
+      algorithmVersion: analysis.algorithmVersion,
+      depth: options.depth,
+    });
+    signal.throwIfAborted();
+    return { analysis, analysisId: record.id, cached };
+  }, options.signal);
 }
