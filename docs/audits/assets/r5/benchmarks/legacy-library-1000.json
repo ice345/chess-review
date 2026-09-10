@@ -1,0 +1,17 @@
+{
+  "count": 1000,
+  "mode": "legacy-upgrade",
+  "gamePlies": 21,
+  "browser": "chromium",
+  "coldMs": 1912.353792,
+  "longTasksMs": [],
+  "revisitMs": 104.6332910000001,
+  "searchMs": 6.483374999999796,
+  "storage": {
+    "quota": 3221555995,
+    "usage": 330523,
+    "usageDetails": {
+      "indexedDB": 330523
+    }
+  }
+}
