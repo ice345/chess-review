@@ -13,10 +13,17 @@
 
 Each line contains rank, White-POV score, depth, optional nodes and UCI PV. Browser engine-cache keys contain FEN, Stockfish version, depth, MultiPV and any `searchmoves` restriction. The persistent review-cache key additionally contains the algorithm version and normalized game identity.
 
-Full-game browser review evaluates every position with a one-worker pool under the
-lowest scheduler priority. The shared scheduler permits at most two engine
-tasks at once, with at most one background game, reserving capacity for
-interactive position/variation work without an unbounded worker fan-out. The baseline
+Full-game browser review evaluates every position with a pool sized from the
+device: half its logical cores, at least one and at most four
+(`reviewWorkerBudget`), under the lowest scheduler priority. Pool workers are
+created on demand, so a short game never compiles engines it cannot use. The
+shared scheduler independently permits at most two engine tasks at once, with at
+most one background game, reserving capacity for interactive position/variation
+work. Parallelism changes only how positions are distributed: each position is
+still an independent root search whose restricted played-move search is issued to
+the same worker, and scheduling order does not change any score, so a serial and
+a four-worker run of the same game produce identical classifications and
+Accuracy. The baseline
 classification configuration is always MultiPV=3. If the played move is absent,
 a second root search restricted with UCI `searchmoves` obtains that move's score.
 The independently searched resulting-position score is never substituted for the

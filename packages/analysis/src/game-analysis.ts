@@ -23,7 +23,16 @@ import { divideGame, phaseForPly } from "./divider";
 import { detectSacrifice } from "./sacrifice";
 import { winPercentFromScore } from "./win-percent";
 
-export const OBJECTIVE_ALGORITHM_VERSION = "objective-v2.0";
+/**
+ * v2.1 changes classification output: a move that preserves the top evaluation
+ * now counts as the engine's best choice even when MultiPV ordered it below
+ * rank 1 (rank alone labelled tied moves "excellent"), and Static Exchange
+ * Evaluation no longer counts an absolutely pinned piece as an attacker or
+ * defender (which inflated exchanges and could fabricate sacrifice evidence).
+ * Bumping this identity is what makes stored v2.0 analyses recompute instead of
+ * being reused with labels the current rules would not produce.
+ */
+export const OBJECTIVE_ALGORITHM_VERSION = "objective-v2.1";
 export const CLASSIFICATION_MULTI_PV = 3;
 export const VERIFICATION_POLICY_VERSION = "selective-verification-v1";
 export const ENGINE_CONSISTENCY_TOLERANCE_WIN_PERCENT = 5;

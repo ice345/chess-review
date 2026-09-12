@@ -61,6 +61,36 @@ describe("explainable move classification", () => {
     expect(result.reason.centipawnLoss).toBeUndefined();
   });
 
+  it("calls an exactly tied move best even when MultiPV ranked it second", () => {
+    // Two moves share the top evaluation; only one of them can be rank 1.
+    // The player's choice preserved the evaluation, so it is the engine's best.
+    const result = classifyMove({
+      ...base,
+      scoreBefore: { kind: "cp", cp: 120 },
+      scoreAfter: { kind: "cp", cp: 120 },
+      playedMoveRank: 2,
+    });
+    expect(result.reason).toMatchObject({ centipawnLoss: 0, winPercentLoss: 0 });
+    expect(result.quality).toBe("best");
+    expect(result.classification).toBe("best");
+    expect(result.reason.isEngineBest).toBe(true);
+  });
+
+  it("does not promote a saturated-evaluation blunder to best", () => {
+    // WinPercent saturates in a decided position, so this move shows zero
+    // win-percent loss while being 100 centipawns worse. Only the centipawn
+    // guard keeps it out of "best".
+    const result = classifyMove({
+      ...base,
+      scoreBefore: { kind: "cp", cp: 1_200 },
+      scoreAfter: { kind: "cp", cp: 1_100 },
+      playedMoveRank: 2,
+    });
+    expect(result.reason).toMatchObject({ centipawnLoss: 100, winPercentLoss: 0 });
+    expect(result.quality).toBe("excellent");
+    expect(result.classification).not.toBe("best");
+  });
+
   it("does not call an ordinary near-equal rank-three move Interesting", () => {
     const result = classifyMove({
       ...base,

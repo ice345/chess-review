@@ -13,6 +13,16 @@ function fenAfter(fen: string, uci: string): string {
 }
 
 describe("sacrifice evidence", () => {
+  it("does not count an absolutely pinned piece as a legal attacker or defender", () => {
+    // White Ke1 and Be2; black Re4 pins the bishop against the king along the
+    // e-file. Bxd3 is illegal because it opens the file onto the king, so white
+    // has no legal attacker on d3 at all.
+    expect(staticExchangeGain("4r1k1/8/8/8/4r3/3p4/4B3/4K3 w - - 0 1", "d3", "w")).toBe(0);
+    // The same capture without the pinning rook is a plain pawn win, which
+    // proves the zero above comes from the pin and not from the geometry.
+    expect(staticExchangeGain("6k1/8/8/8/8/3p4/4B3/4K3 w - - 0 1", "d3", "w")).toBe(100);
+  });
+
   it("uses x-ray-aware exchanges and treats a defended equal trade as non-sacrificial", () => {
     const before = "7k/8/4p3/3n4/2B5/8/8/7K w - - 0 1";
     const after = fenAfter(before, "c4d5");

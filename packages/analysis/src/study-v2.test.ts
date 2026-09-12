@@ -7,6 +7,7 @@ import {
   STUDY_ALGORITHM_V2,
   type StudyGameInputV2,
 } from "./study-v2";
+import { OBJECTIVE_ALGORITHM_VERSION } from "./game-analysis";
 
 function move(
   ply: number,
@@ -64,7 +65,7 @@ function game(
   const moves = overrides.moves ?? Array.from({ length: 12 }, (_, index) => move(index + 1, index % 2 === 0 ? "white" : "black"));
   const analysis: GameAnalysisV2 = {
     version: 2,
-    algorithmVersion: overrides.algorithmVersion ?? "objective-v2.0",
+    algorithmVersion: overrides.algorithmVersion ?? OBJECTIVE_ALGORITHM_VERSION,
     game: { headers: { White: "Ada", Black: "Mikhail", Result: result === "win" ? "1-0" : result === "loss" ? "0-1" : "1/2-1/2" }, initialFen: "fixture", pgn: id },
     engine: { stockfishVersion: "18", depth: 15, multiPv: 3, classificationMultiPv: 3, verificationPolicyVersion: "selective-verification-v1", verifiedMoveCount: 1 },
     opening: { eco: "C50", name: "Italian Game", matchedPly: 6, theoryUntilPly: 8 },
@@ -299,7 +300,9 @@ describe("advanced-study-v2", () => {
   it("rejects mixed objective versions", () => {
     expect(() => buildAdvancedStudyReportV2([
       game("g1", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500),
-      game("g2", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "win", 1510, { algorithmVersion: "objective-v2.1" }),
+      // Deliberately NOT the current constant: this test is about refusing to
+      // mix identities, so the second game must carry a different one.
+      game("g2", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "win", 1510, { algorithmVersion: "objective-v2.0" }),
     ], FILTERS)).toThrow(/cannot mix objective algorithm versions/i);
   });
 });

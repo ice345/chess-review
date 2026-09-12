@@ -51,6 +51,18 @@ export const CLASSIFICATION_THRESHOLDS = {
   bookMaxWinPercentLoss: 3,
   missedWinChanceBefore: 92,
   missedWinDrop: 30,
+  /**
+   * A move ordered below another by MultiPV still counts as the engine's best
+   * choice when it is genuinely the same move-evaluation: both the
+   * win-percentage loss AND the centipawn loss must be negligible.
+   *
+   * The centipawn half is essential. In a decided position WinPercent saturates,
+   * so a move that is 100cp worse still reports zero win-percent loss; treating
+   * that as a tie would label a real mistake "best". Rank alone is equally
+   * wrong: two moves can share the top evaluation and only one can be rank 1.
+   */
+  engineBestTieWinPercent: 0.1,
+  engineBestTieCentipawns: 5,
 } as const;
 
 function moverWinPercent(score: EngineScore, color: PlayerColor): number {
@@ -70,7 +82,13 @@ export function classifyMove(input: ClassificationInput): ClassificationResult {
   const secondBestGapWinPercent = input.secondBestScore
     ? Math.max(0, before - moverWinPercent(input.secondBestScore, input.color))
     : undefined;
-  const isEngineBest = input.playedMoveRank === 1;
+  // "Engine best" means no better move existed, not "MultiPV listed it first".
+  // A genuine tie needs both a negligible win-percent loss and a negligible
+  // centipawn loss; see the threshold comment for why both are required.
+  const isEngineBest = input.playedMoveRank === 1
+    || (loss <= CLASSIFICATION_THRESHOLDS.engineBestTieWinPercent
+      && centipawnLoss !== undefined
+      && centipawnLoss <= CLASSIFICATION_THRESHOLDS.engineBestTieCentipawns);
   const isForced = input.legalMoveCount === 1;
   const isObviousRecapture = input.isObviousRecapture ?? false;
   const isTrivialCheckEscape = input.isTrivialCheckEscape ?? false;

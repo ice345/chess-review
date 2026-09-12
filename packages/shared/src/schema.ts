@@ -120,6 +120,14 @@ export type MoveClassification =
   | "inaccuracy"
   | "mistake"
   | "blunder"
+  /**
+   * Reserved and currently unreachable. A "miss" means a tactical resource was
+   * overlooked, which needs a detected tactic; this project has no tactical
+   * motif detector (a move's `motifs` only ever holds "sacrifice"), and the
+   * historical `hasTacticalBestLine` input was never assigned in any revision.
+   * It stays in the taxonomy because AGENTS.md lists it and Study/coach code
+   * treats it as a costly label, but no analysis can produce it today.
+   */
   | "miss"
   | "missed_win"
   | "missed_mate";

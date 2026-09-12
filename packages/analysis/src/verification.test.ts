@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameAnalysisV2, MoveAnalysisV2, ObjectiveVerificationReason } from "@chess-review/shared";
+import { OBJECTIVE_ALGORITHM_VERSION } from "./game-analysis";
 import { planObjectiveVerification } from "./verification";
 
 function move(ply: number, reasons: ObjectiveVerificationReason[] = []): MoveAnalysisV2 {
@@ -54,7 +55,7 @@ function move(ply: number, reasons: ObjectiveVerificationReason[] = []): MoveAna
 function analysis(moves: MoveAnalysisV2[]): GameAnalysisV2 {
   return {
     version: 2,
-    algorithmVersion: "objective-v2.0",
+    algorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
     game: { headers: {}, initialFen: "fixture", pgn: "fixture" },
     engine: { stockfishVersion: "18", depth: 10, multiPv: 3, classificationMultiPv: 3, verificationPolicyVersion: "selective-verification-v1", verifiedMoveCount: 0 },
     division: { totalPlies: moves.length },

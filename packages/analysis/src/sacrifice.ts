@@ -17,10 +17,43 @@ function opposite(color: Color): Color {
   return color === "w" ? "b" : "w";
 }
 
+function kingSquare(chess: Chess, color: Color): Square | null {
+  for (const rank of chess.board()) {
+    for (const piece of rank) {
+      if (piece && piece.type === "k" && piece.color === color) return piece.square as Square;
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether virtually capturing `to` from `from` would leave the mover's own king
+ * attacked. chess.js `attackers()` is purely geometric, so an absolutely pinned
+ * piece is otherwise treated as a legal attacker or defender; that inflates the
+ * exchange value and can turn an ordinary recapture into a fabricated
+ * "sacrifice". The virtual capture is undone before returning.
+ */
+function exposesOwnKing(chess: Chess, from: Square, to: Square): boolean {
+  const moving = chess.get(from);
+  if (!moving) return true;
+  const captured = chess.get(to);
+  const snapshot = chess.fen();
+  if (captured) chess.remove(to);
+  chess.remove(from);
+  chess.put(moving, to);
+  const king = kingSquare(chess, moving.color);
+  const exposed = king === null || chess.attackers(king, opposite(moving.color)).length > 0;
+  chess.load(snapshot);
+  return exposed;
+}
+
 function exchangeGain(chess: Chess, square: Square, attackingColor: Color): number {
   const target = chess.get(square);
   if (!target) return 0;
-  const attackers = chess.attackers(square, attackingColor).filter((attacker) => chess.get(attacker)?.color === attackingColor);
+  const attackers = chess.attackers(square, attackingColor)
+    .filter((attacker) => chess.get(attacker)?.color === attackingColor)
+    // A pinned piece cannot legally take part in the exchange on this square.
+    .filter((attacker) => !exposesOwnKing(chess, attacker, square));
   if (attackers.length === 0) return 0;
 
   const cheapest = attackers.reduce((best, candidate) => {

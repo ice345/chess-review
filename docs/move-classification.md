@@ -8,6 +8,13 @@ identity: `objective-v2.0` / `GameAnalysisV2`.
 Every move has one continuous objective `quality`:
 
 - Best: engine top choice with at most 0.5 mover WinPercent loss, or checkmate.
+  A move also counts as the engine's top choice when it preserves the top
+  evaluation, even if MultiPV ordered it below rank 1. Rank alone would label a
+  tied move "Excellent", because two moves can share the best score while only
+  one of them can be rank 1. The tie test requires BOTH a negligible WinPercent
+  loss (at most 0.1) AND a negligible centipawn loss (at most 5): in a decided
+  position WinPercent saturates, so a move that is 100 centipawns worse can show
+  zero WinPercent loss and must not be promoted to Best.
 - Excellent: at most 2 WinPercent loss.
 - Good: at most 5.
 - Inaccuracy: at most 10.
@@ -24,10 +31,15 @@ Brilliant, Sacrifice, Missed win and Missed mate. The legacy `classification`
 field is a compatibility projection for existing icons and exports. It does not
 replace `quality + annotations` as the V2 contract.
 
-`interesting` and generic tactical `miss` are never emitted by V2. A rank-three
-move receives its ordinary WinPercent quality. The old tactical Miss branch was
-removed because the full-game assembler had no production tactical detector;
-Missed win and Missed mate remain reachable from explicit engine outcome facts.
+`interesting` and generic tactical `miss` are never emitted by V2, and both stay
+declared on purpose. For `interesting`, a rank-three move receives its ordinary
+WinPercent quality, and locked tests assert that. For `miss`, the branch needs a
+detected tactic: this project has no tactical motif detector (a move's `motifs`
+only ever holds `"sacrifice"`), and the historical `hasTacticalBestLine` input was
+never assigned in any revision, so `miss` was unreachable from the first commit.
+It remains in the taxonomy because AGENTS.md lists it and the study and coach
+layers treat it as a costly label. Missed win and Missed mate remain reachable
+from explicit engine outcome facts.
 
 ## Evidence
 
@@ -37,6 +49,13 @@ legal-move and triviality facts, outside-MultiPV state, sacrifice evidence,
 engine-consistency evidence, verification status and exclusions. An
 outside-MultiPV move has no invented rank. Its score comes from a restricted UCI
 `searchmoves` root search.
+
+Static Exchange Evaluation is legality-aware. `chess.js` `attackers()` is purely
+geometric, so before the exchange loop every candidate attacker is tested by
+virtually playing the capture and checking whether it would leave the mover's own
+king attacked. An absolutely pinned piece is therefore counted as neither an
+attacker nor a defender. Without this the exchange value is inflated, which
+fabricates sacrifice evidence and can mislabel an ordinary recapture as Brilliant.
 
 The chosen move's root score and the independent resulting-position score remain
 separate. Their absolute White-POV WinPercent delta is recorded with a five-point
@@ -83,4 +102,6 @@ played move, so the transport supplies a fresh `searchmoves` override for it.
 The locked regression corpus is
 `packages/analysis/src/fixtures/classification-v2-golden.ts`. It covers the former
 rank-three Interesting bug, saturated evaluations, Critical outcome uniqueness,
-outside-MultiPV rank absence, missed mate and verified sacrifice semantics.
+outside-MultiPV rank absence, missed mate and verified sacrifice semantics. The
+tied-best rule and the pinned-piece SEE case are pinned by
+`classification.test.ts` and `sacrifice.test.ts`.
