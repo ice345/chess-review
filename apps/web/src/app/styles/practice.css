@@ -1,12 +1,65 @@
-.mistake-practice-dialog { width: min(1100px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 24px; color: var(--ink-primary); background: var(--paper); }
-.mistake-practice-dialog::backdrop { background: var(--surface-page); }
-.mistake-practice-dialog header, .practice-filters, .practice-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.practice-filters { margin: 16px 0 24px; justify-content: flex-start; }
-.practice-filters small { flex-basis: 100%; }
-.practice-position { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-.practice-board { min-width: 0; width: min(100%, calc(100dvh - 245px)); align-self: start; justify-self: center; }
-.practice-controls { min-width: 0; overflow-wrap: anywhere; }
-.practice-controls form, .practice-controls label { display: grid; gap: 10px; }
-.practice-controls form, .practice-actions { margin: 16px 0; }
-.mistake-practice-dialog button, .mistake-practice-dialog select, .mistake-practice-dialog input:not([type=checkbox]) { min-height: 44px; }
-@media (max-width: 700px) { .mistake-practice-dialog { padding: 12px; } .practice-position { grid-template-columns: minmax(0, 1fr); } .practice-board { width: 100%; } }
+/* Compact Lichess-style "Learn from your mistakes" strip. The board is the
+   exercise; this only styles the instruction beside it. */
+.retro-practice {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.retro-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.retro-head strong { font-size: 15px; font-weight: 650; }
+.retro-head > span { margin-left: auto; color: var(--ink-muted); font-size: 13px; }
+.retro-close { min-width: 44px; min-height: 44px; }
+
+.retro-idle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.retro-idle-who {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 13px;
+}
+.retro-idle-row > .primary { margin-left: auto; min-height: 44px; }
+
+.practice-setup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.practice-setup button { min-height: 44px; min-width: 44px; }
+.practice-setup button.active { outline: 2px solid var(--ink-secondary); }
+.practice-filters { font-size: 13px; color: var(--ink-secondary); }
+.practice-filters summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.practice-inline-check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+
+
+.retro-lead { margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.4; }
+.retro-meta { margin: 0; color: var(--ink-muted); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+
+.retro-panel { display: grid; gap: 8px; }
+.retro-instruction { margin: 0; font-size: 15px; }
+.retro-instruction strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.retro-status { margin: 0; color: var(--ink-secondary); font-size: 13px; }
+.retro-verdict { margin: 0; font-size: 16px; font-weight: 650; }
+.retro-verdict.solved { color: #2f7f73; }
+.retro-choices { display: flex; gap: 8px 14px; flex-wrap: wrap; align-items: center; }
+.retro-choices .text-button { min-height: 44px; min-width: 44px; }
+.retro-choices .primary { min-height: 44px; }
+
+.retro-human { display: grid; gap: 4px; padding: 8px 10px; border-left: 3px solid #9ab2ad; border-radius: 0 8px 8px 0; background: rgba(228, 236, 231, .55); }
+.retro-human p { margin: 0; font-size: 13px; }
+.retro-human small { color: var(--ink-muted); font-size: 12px; }
+.retro-human-note { margin: 0; color: var(--ink-muted); font-size: 12px; }
+
+.move-quality[data-practice-hidden="true"] { color: var(--ink-muted); font-style: italic; }
+
+@media (max-width: 700px) {
+  .practice-setup { gap: 10px; }
+  .retro-idle-row > .primary { margin-left: 0; flex: 1 1 100%; }
+  .retro-choices button { flex: 1 1 auto; }
+}

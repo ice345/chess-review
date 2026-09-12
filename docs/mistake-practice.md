@@ -1,56 +1,123 @@
-# Mistake practice (S2a)
+# Mistake practice
 
-Implemented 2026-09-10. Open a completed game review and select **Practice my
-mistakes**. This is a single-game, session-only exercise. It does not modify the
-original PGN, objective results, Notebook or Training V3 review ledger.
+Revised 2026-09-11 (S7) to an **in-place** exercise modelled on Lichess "Learn
+from your mistakes". The earlier modal dialog was removed; there is one practice
+flow, not two.
 
-## User flow
+## What it is
 
-Choose White or Black (imported account color is the default), optionally include
-inaccuracies, and solve each position from **before** the original error. A modal
-board hides evaluation, arrows, original move and engine continuations. Users may
-click or drag pieces, choose all four promotions, or enter UCI using a keyboard.
-Illegal moves and the original played move can be retried. A hint identifies the
-starting square of the saved best move; Show answer reveals the saved legal PV.
-Successful answers reveal their own continuation. Users can step through it,
-open the full original evidence, skip, or continue to the next position.
+Open a completed game review and choose **Find a better move**. The session takes
+over the review board: it jumps to the position *before* one of your mistakes,
+locks forward navigation, hides the engine evidence for that ply, and asks you to
+play a better move on the real board. It does not modify the original PGN,
+objective results, Notebook or Training V3 review ledger, and it stores nothing
+between sessions.
 
-The session summary separates solved without hints, solved with hints, answer
-viewed and skipped. Closing/reloading or changing filters starts a new session.
-No durable success history, Elo, mastery or spaced repetition is claimed.
-Existing Training's **Mark position reviewed** remains a distinct action.
+## Flow
+
+1. The launcher is one Review strip: player · N positions, then **Review White's
+   N positions**. Account colour is the default when the game is linked.
+   White/Black is asked when the game has no account identity, **or** when the
+   current side has nothing to practise (so “try the other side” is not a dead
+   end). Inaccuracies stay under Filters. Empty copy comes from the selector
+   (`opening-theory` vs `missing-engine-evidence` vs no faults).
+2. Starting practice switches the sidebar to the exercise. Engine arrows, eval
+   numbers, the previous-move verdict, game summary and coach answers hide. A
+   red arrow marks the original mistake only while the board is still on the
+   prompt (`solving` / `rewinding`). It is hidden while an attempt is judged,
+   because that piece has already left the prompt squares. The board still uses
+   the review pieces and colours.
+3. Play a move. The piece stays while it is judged (15s timeout). An accepted
+   answer leaves that variation so you can keep playing the line. A rejected
+   answer stays visible briefly, then the existing board animation rewinds to
+   the prompt. Replaying the original mistake is never a solution. Timeouts and
+   engine failures are **not judged wrong**.
+4. **View the solution** plays the stronger move as a variation and counts as
+   *viewed*, not solved. **Skip** counts as skipped. **Next** keeps the current
+   index until you click it. Browsing away while an answer is owed shows
+   **You browsed away**. The session tally on the complete page separates
+   solved / viewed / skipped.
+
+Navigation is locked at the chokepoint, not per button: `navigateToPly`,
+`navigateNext`, `navigateLast`, autoplay and the right-arrow key all refuse to
+move at or past the fault while an answer is owed, so neither the move list, the
+evaluation graph nor the transport can disclose the answer. Display policy lives
+in `practicePresentation()` so each panel does not guess `active`/`locked`.
+
 
 ## Canonical policy
 
-`packages/analysis/src/mistake-practice.ts` owns selection and answer acceptance.
-Selection uses existing V2 `quality` mistake/blunder, optionally inaccuracy, and
-missed-win/missed-mate annotations. It requires matching root FEN and a legal
-Stockfish best move different from the original move. It does not reclassify games.
+`packages/analysis/src/mistake-practice.ts` owns selection and acceptance; the
+session state lives in `apps/web/src/hooks/use-retrospect.ts`.
 
-An exact engine-best answer is accepted. Other candidates are accepted at no more
-than **2 mover WinPercent points** below the best root score, using existing
-White-POV score conversion and WinPercent functions. This is a practice tolerance
-matching the Excellent quality band's numeric tolerance, not a new game-quality
-classification. A known winning mate must remain a winning mate; newly allowing
-mate fails even when WinPercent saturates. Mate distance need not be identical.
+**Selection.** V2 `quality` mistake or blunder, optionally inaccuracy, plus
+missed-win/missed-mate annotations. A move still inside recognised opening theory
+is skipped, because the opening has many playable moves and punishing a normal
+developing move teaches nothing. Requires matching root FEN and a legal Stockfish
+best move different from the one played. It never reclassifies the game.
 
-Saved MultiPV is reused. An unlisted move is **unknown, not automatically wrong**:
-the browser runs a fresh unrestricted root search followed, if necessary, by a
-restricted `searchmoves` search at the same depth (12–15), with the original game
-history. The existing analysis scheduler bounds resource contention. Cancellation,
-30-second timeout, worker failure or missing evidence does not mark an answer
-wrong. Searches stop on close; no AI service or LLM is needed.
+**Acceptance.** An exact engine-best answer, or any move within **4 mover
+WinPercent points** of the best root score. A known winning mate must stay a
+winning mate; newly allowing mate fails even when WinPercent saturates. Mate
+distance need not match.
 
-These are finite-depth engine judgments, not proof of a unique solution. Original
-Accuracy, quality/annotations, Great/Brilliant, game phase, and analysis algorithm
-version are unchanged. No database or backup format migration is introduced.
+**Unknown is not wrong.** A move outside the saved MultiPV triggers a fresh
+restricted `searchmoves` search at depth 12, which is issued with the game's
+`startFen` and the UCI history before the position, so repetition and fifty-move
+judgements are evaluated in the same context as the game itself. If the
+engine cannot answer — cancellation, worker failure, missing evidence — the move
+is **not** marked wrong and the position stays open. The analysis scheduler bounds
+resource contention. No AI service or LLM is involved.
 
-## Reference and deliberate scope
+## Relationship to Lichess
 
-Interaction reference: Lichess's official [Learn from your mistakes description](https://lichess.org/@/lichess/blog/learn-from-your-mistakes/WFvLpiQA).
-We reuse the self-attempt / optional answer / continuation flow. We do not copy
-its historical winning-chances constants or its masters-opening exception, and
-do not claim exact compatibility with Lichess's answer acceptance.
+Reference: `lila` `ui/analyse/src/retrospect/` (the UI label is "Learn from your
+mistakes"), entry gated on a full computer analysis. Parity is deliberate:
+
+| Aspect | Lichess | Here |
+| --- | --- | --- |
+| Exercise form | In-place on the analysis board, forward navigation locked | Same |
+| Prompt | Position before the fault, "X was played" | Same |
+| After a good move | Piece stays; keep exploring or Next | Same |
+| View solution | Jumps to the computer's move, then Next | Plays the stronger move as a variation, then Next mistake |
+| Off track | "You browsed away" / Resume learning | Same |
+| Hiding | Engine lines hidden on unsolved candidates, including the move list | Same, plus engine panels and arrows |
+| Acceptance | Winning-chance loss within 4 points, mate preserved | Same threshold |
+| Also accepted | Masters-database move, checkmate, the game's own solution | Checkmate and the solution |
+| Candidate selection | Evaluation swing above 10 points | V2 mistake/blunder bands (also 10 points) |
+| Opening exception | Masters database frequency | Canonical theory boundary (`isBook`) |
+| Progress | Solved / total, reset, flip colour | Solved / total, practice again |
+
+Two differences are known and accepted. The opening exception uses recognised
+theory rather than game frequencies, because this project has no masters database
+— it is a position-based approximation. And the feedback wording is this
+project's own; Lichess localises its own strings.
+
+**This project's addition.** Once a position is solved the session can explain
+*why the original move felt natural*: Maia's probability for the move actually
+played at the visitor's target Elo, with the existing find-difficulty label for
+the stronger move. Lichess's retrospect shows no human-model evidence.
+
+The explanation reads the played move's probability and policy rank from the
+persisted `HumanAnalysis`, not from Maia's candidate list. Maia's move review
+returns only its top `multiPv` policy moves, so the move someone actually played —
+exactly the one this feature explains — is usually absent from that list, because
+a blunder is a move humans rarely choose. Looking it up there would disable the
+explanation in the case it exists for. When Maia did not evaluate the engine's
+move, both the percentage and the difficulty label are omitted rather than
+computed from a placeholder zero, and a sub-1% probability prints as `<1%`
+instead of a misleading `0%`. Because Maia only exists in Enhanced Local mode, the
+exercise is complete without it; the panel then says so and points at Review's
+human analysis. Nothing is generated by a language model, so the explanation can
+never contradict the engine.
+
+## Deliberate limits
+
+Finite-depth engine judgement, not proof of a unique solution. No durable attempt
+history, Elo, mastery or spaced repetition is claimed. Existing Training's **Mark
+position reviewed** remains a separate action. Original Accuracy, quality and
+annotations, Great/Brilliant, game phase and the analysis algorithm version are
+unchanged by practising.
 
 Next: durable attempt records with backup/delete compatibility, then a training
 queue that schedules real attempts separately from source-position reviews.

@@ -36,6 +36,7 @@ export function CoachPanel({ analysis, move, onSelectPly, }: {
         label: string;
         value: string;
     } => Boolean(step.value)) : [];
+    const practiceLocked = runtime.retro.locked;
     return (<div className="coach-tab">
       <div className="coach-heading">
         <span>Generation status</span>
@@ -67,19 +68,26 @@ export function CoachPanel({ analysis, move, onSelectPly, }: {
             </span>
           </div>
           <dl>
-            <div><dt>Eval</dt><dd>{formatEngineScore(move.evaluationBefore)} → {formatEngineScore(move.playedMoveScore)}</dd></div>
-            <div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div>
-            <div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div>
-            <div><dt>Quality rule</dt><dd>{(move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule).replaceAll("-", " ")}</dd></div>
+            {/* This move's own eval and rank are the answer while practising. */}
+            <div><dt>Eval</dt><dd>{practiceLocked ? "—" : `${formatEngineScore(move.evaluationBefore)} → ${formatEngineScore(move.playedMoveScore)}`}</dd></div>
+            <div><dt>Win% loss</dt><dd>{practiceLocked ? "—" : move.classificationReason.winPercentLoss.toFixed(1)}</dd></div>
+            <div><dt>Engine rank</dt><dd>{practiceLocked ? "—" : move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div>
+            <div><dt>Quality rule</dt><dd>{practiceLocked ? "—" : (move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule).replaceAll("-", " ")}</dd></div>
           </dl>
-          <small>These facts already exist. Generate a lesson only if you want them explained in words.</small>
+          <small>{practiceLocked ? "Withheld while you solve this position." : "These facts already exist. Generate a lesson only if you want them explained in words."}</small>
         </section>) : (<section className="coach-game-facts" aria-label="Game evidence before study">
           <strong>{analysis.opening?.name ?? "Starting position"}</strong>
           <p>{`White ${analysis.white.accuracy?.toFixed(0) ?? "—"} · Black ${analysis.black.accuracy?.toFixed(0) ?? "—"} accuracy. ${analysis.criticalMoments.length} critical moment${analysis.criticalMoments.length === 1 ? "" : "s"}.`}</p>
           <small>Select a move on the board to see its Stockfish evidence, or generate a whole-game study.</small>
         </section>)}
 
-      {coach && (<article className="coach-result">
+      {/* Practice hides the position's evidence. A generated lesson is exactly
+          that evidence: its validated line is anchored at this move's fenAfter,
+          which for the fault is the position the visitor must solve. The prose
+          also quotes the move in SAN, so the whole article is withheld. */}
+      {practiceLocked && <p className="utility-empty" role="status">The explanation is hidden while you solve this position.</p>}
+
+      {coach && !practiceLocked && (<article className="coach-result">
           <div className="coach-source"><span>{coach.source.provider}</span><small>{coach.source.model} · {coach.confidence} confidence</small></div>
           <h3>{coach.headline}</h3>
           <p>{coach.summary}</p>
@@ -105,7 +113,7 @@ export function CoachPanel({ analysis, move, onSelectPly, }: {
           </details>
         </article>)}
 
-      {gameCoach && (<article className="game-coach-result">
+      {gameCoach && !practiceLocked && (<article className="game-coach-result">
           <div className="coach-source"><span>{gameCoach.source.provider}</span><small>{gameCoach.source.model} · {gameCoach.confidence} confidence</small></div>
           <h3>{gameCoach.headline}</h3>
           <p>{gameCoach.summary}</p>

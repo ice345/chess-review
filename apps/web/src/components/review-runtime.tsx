@@ -23,6 +23,7 @@ import type { MaiaServiceState } from "../lib/human-lens-state";
 import type { LocalAiConnectionState } from "../lib/use-local-ai-health";
 import type { ReviewCoachTask } from "../hooks/use-review-coach";
 import type { ReviewNotebookRuntime } from "../hooks/use-review-notebook";
+import type { RetroRuntime } from "../hooks/use-retrospect";
 
 export type ReviewRunState = "idle" | "running" | "complete" | "cached" | "error";
 
@@ -78,6 +79,8 @@ export interface ReviewRuntimeValue {
   retryBranchMoveQuality: () => void;
   navigateToPly: (ply: number) => void;
   pausePlayback: () => void;
+  /** In-place mistake practice session (Lichess-style "Learn from your mistakes"). */
+  retro: RetroRuntime;
   openNotebookPosition: (rootPly: number, line: string[]) => void;
   playContinuation: (identity: StockfishCandidateIdentity, result?: StockfishMoveAnalysis | null) => void;
   playHumanCandidate: (identity: HumanCandidateIdentity) => void;
