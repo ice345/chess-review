@@ -7,6 +7,7 @@ import {
   randomBase64Url,
   requireLichessClientId,
   sealLichessValue,
+  secureCookieFor,
   type LichessPkceState,
 } from "../../../../../../lib/server/lichess-session";
 
@@ -32,7 +33,7 @@ async function start(request: Request) {
     response.cookies.set(LICHESS_PKCE_COOKIE, sealLichessValue(pkce), {
       httpOnly: true,
       sameSite: "lax",
-      secure: requestUrl.protocol === "https:",
+      secure: secureCookieFor(request),
       path: "/",
       maxAge: 10 * 60,
     });

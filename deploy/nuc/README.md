@@ -5,6 +5,31 @@
 
 拓扑：访客 HTTPS → 现有 Cloudflare Tunnel → Debian 本机 `127.0.0.1:8080` → Nginx → 一个 Next.js standalone 进程。无需公网端口转发或本机证书。
 
+## 0. 快速开始（按顺序照做即可）
+
+分两台机器：**A = 构建机**（你的 Mac 或 x86 CI，装有 Docker buildx），**B = NUC**。
+
+| # | 在哪台 | 命令 / 操作 |
+| --- | --- | --- |
+| 1 | B | 装 Docker Engine + Compose 插件（[官方 Debian 步骤](https://docs.docker.com/engine/install/debian/)），确认 `docker info`、`docker compose version`、`python3 --version` 正常 |
+| 2 | A | `pnpm install --frozen-lockfile` |
+| 3 | A | `pnpm test && pnpm typecheck && pnpm lint && pnpm build` |
+| 4 | A | `deploy/nuc/build.sh chess-review:beta-001 beta-001`（明确构建 linux/amd64；RELEASE_ID 每次发布必须唯一） |
+| 5 | A | `docker save -o chess-review-beta-001.tar chess-review:beta-001`，再把 tar 传到 B |
+| 6 | B | `docker load -i chess-review-beta-001.tar` |
+| 7 | B | 把整个 `deploy/nuc/` 目录（含 `.env.example`、`compose.yaml`、`release.py`、`smoke.py`、`nginx.conf.template`）放到例如 `/opt/chess-review/deploy/nuc/` |
+| 8 | B | `cd /opt/chess-review/deploy/nuc && python3 release.py init` |
+| 9 | B | 编辑 `.env`：填 `DOMAIN=chess.你的域名`（只填域名，不加 `https://`、端口、引号、路径）；`chmod 600 .env` |
+| 10 | B | `python3 release.py deploy chess-review:beta-001` 然后 `python3 release.py check` |
+| 11 | B | `python3 smoke.py`（代理、固定域名、HTTP→HTTPS 跳转、worker/WASM、私有 API 响应头、OAuth 起始跳转） |
+| 12 | Cloudflare | 在现有 Tunnel 加一条 Public hostname → `http://127.0.0.1:8080`（见 §4） |
+| 13 | Cloudflare | **配置 §4 的三条 Cache Rules**（不配第 3 条会在第二次发版后白屏） |
+| 14 | B | `python3 release.py status`，按 §7 清单做真机验收 |
+
+后续更新：跳回第 4 步换一个唯一 `RELEASE_ID`（如 `beta-002`）→ `docker load` → `release.py deploy` → `smoke.py`；出问题用 `python3 release.py rollback`。
+
+只需镜像和 `deploy/nuc/` 目录即可上线，NUC 上不需要 pnpm、Node、源码或模型。
+
 ## 1. 准备
 
 NUC 安装 Python 3、Docker Engine 和 Docker Compose 插件。按 [Docker 官方 Debian 安装步骤](https://docs.docker.com/engine/install/debian/)安装对应 Debian 版本的软件包；脚本不改你的系统软件源、交换空间、防火墙或现有 Tunnel。
@@ -92,7 +117,17 @@ ingress:
 
 本方案假设 cloudflared 在 **Debian 宿主机**运行。若你的 cloudflared 自己在容器中，容器的 127.0.0.1 不是宿主机；在 Linux 上需按现有 Tunnel 的部署方式接入宿主网络后再使用这个地址，不能通过开放公网监听解决。
 
-Cloudflare 缓存保持默认：不要对 HTML / React Server Components 使用 Cache Everything，不缓存 `/api/*`，不要启用修改应用脚本的 Rocket Loader。保留 Next 的 `Vary`、缓存与内容类型响应头。`/_next/static/*` 的内容哈希资产可缓存；`/engine/*` 沿用源站重新验证策略，不额外加永久缓存规则。发布验收要看实际响应，不能仅看控制台配置。
+DNS 检查（容易漏）：在 Tunnel 里加 Public hostname 时，Cloudflare 会为它自动创建**代理状态**的 DNS 记录（指向 `<tunnel-id>.cfargotunnel.com` 的 CNAME）。到 DNS 页面确认这一点，并确认该主机名**没有**遗留的 A/AAAA 记录——旧记录会遮蔽 Tunnel，表现为域名打不开或 522/523，而 `smoke.py` 在 NUC 本机却是通过的。证书由 Cloudflare 的 Universal SSL 在以代理模式接管该主机名后自动签发，不要在 NUC 上另行申请证书。
+
+分享链接无需任何代理或服务器改动：`/share#pgn=…` 的棋局内容在 URL fragment 里，浏览器发出请求前就已剥离，服务器只看到 `GET /share`。机制说明见仓库中的 `docs/web-service-boundaries.md`（不在 `deploy/nuc/` 内）。
+
+Cloudflare 缓存配置：Next.js standalone 对静态预渲染的 HTML 页面返回 `Cache-Control: s-maxage=31536000, stale-while-revalidate`（设计给 Vercel 的 CDN，非通用场景），如果 Cloudflare 缓存了这些 HTML，新版本发布后旧 HTML 引用的已变更 JS chunk 路径会 404，**所有命中旧缓存的访客看到白屏或报错**，直到缓存 TTL 过期或手动清除。必须在 Cloudflare 的 **Cache Rules** 配置以下规则，按优先级排列：
+
+1. **Cache Everything**——`/_next/static/*`：这些资产 URL 包含构建哈希，内容不可变。规则：`URI Path` starts with `/_next/static/`，Cache eligibility → Eligible for cache，Edge TTL → Override origin, 1 year。Cloudflare 缓存减轻源站带宽。
+2. **Cache Everything**——`/engine/*`、`/sounds/*`：版本固定的 WASM 和音频文件，源站已返回 `immutable`。规则：`URI Path` starts with `/engine/` OR starts with `/sounds/`，Cache eligibility → Eligible for cache，Edge TTL → Respect origin。替换这些文件需要改文件名，不能靠清缓存更新。
+3. **Bypass cache**——其余所有路径：规则：`Hostname` equals `YOUR_CHESS_DOMAIN`（放在上面两条之后），Cache eligibility → Bypass cache。这确保 HTML 页面、`/sw.js`、`/manifest.webmanifest`、`/offline.html`、`/api/*` 和 `/share` 全部回源，每次访问拿到当前版本。`/sw.js` 尤其不能被中间层缓存：过期的 service worker 会把旧版本锁定在访客浏览器。
+
+不配置第 3 条的后果：每次发布新版本后，命中 Cloudflare 边缘缓存的访客会收到引用已删除 JS chunk 的旧 HTML，页面无法加载。手动在 Cloudflare 控制台 Purge Everything 可立即修复，但下次发布仍会复发。不要启用 Rocket Loader（它修改应用脚本导致 hydration 失败）。保留 Next 的 `Vary`、缓存与内容类型响应头。发布验收要看实际响应，不能仅看控制台配置。
 
 代理信任条件：Cloudflare 正常边缘请求提供 `CF-Connecting-IP`；Nginx 将验证后的地址覆盖为 `X-Real-IP`，覆盖 Host / X-Forwarded-Host / X-Forwarded-Proto；应用通过 `TRUST_PROXY_ORIGIN=1` 使用与 `APP_ORIGIN` 完全一致的公网 origin。整个宿主机及 Docker 管理权限属于可信范围。不要在此域名前挂可任意修改 IP 头的同区域 Worker，也不要删除访问者 IP 头后还期待按访客限流。
 
@@ -154,6 +189,9 @@ python3 release.py check
 - 全新浏览器导入 PGN，完成真实分析、取消重试、查看证据和训练回顾；保存 Notebook 笔记与变例，刷新后重新打开。
 - 实际 iOS Safari / Android Chrome 测试棋盘、触摸导航、下载备份与恢复。
 - 检查 `/engine/stockfish.wasm` 内容类型为 `application/wasm`，控制台无 worker/CSP 错误；API 不被 Cloudflare 缓存。
+- 检查 `/sw.js` 的 `Cache-Control` 是 `no-cache`，Cloudflare 未缓存（`cf-cache-status` 应为 `DYNAMIC` 或无此头）。
+- 检查 `/manifest.webmanifest` 可访问，返回正确的 `application/manifest+json` 内容类型。
+- 复制一条 `/share#pgn=…` 链接在全新浏览器标签打开，确认棋局自动导入库中并跳转到复盘页。
 - 用自己的 Lichess 账号执行授权、取消、同步、断开；确认回调域名与 Cookie 正确。Chess.com 测试公开账号同步及错误恢复。
 - 在 NUC 记录内存、CPU、网络和错误率，再决定公开规模。保存两个真实发布版本并演练回滚。
 

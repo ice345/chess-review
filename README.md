@@ -15,6 +15,9 @@ Open Chess Review is a free, open-source chess game review and coaching workspac
 - Saves personal position notes, bookmarks and legal variation lines in a local Notebook, with explicit save/conflict recovery.
 - Offers [Mistake practice](docs/mistake-practice.md): hide answers, try a better move, check alternatives with Stockfish and distinguish solved, hinted, revealed and skipped positions within a session.
 - Exports original/annotated PGN, canonical JSON, position PNGs, game-review PNGs, and portable library backups (v2, with v1 restore support).
+- Reuses a cached engine and reopens already reviewed games offline; the service worker never intercepts `/api/*`.
+- Shares a reviewed game as a link that carries the PGN in the URL fragment, so the recipient imports it locally and nothing is uploaded.
+- Draws arrows on the review board and shows the comments, NAGs and variations an imported PGN already contained.
 
 ![Stockfish and Maia comparison](e2e/__screenshots__/combined-stockfish-maia-1440.png)
 
@@ -56,9 +59,14 @@ See [docs/architecture.md](docs/architecture.md) and [docs/data-model.md](docs/d
 
 For a small public Browser Core beta on a Debian NUC behind an existing
 Cloudflare Tunnel, see [the deployment guide and scripts](deploy/nuc/README.md).
-It includes an amd64 standalone image, loopback-only ingress, resource limits,
-configuration checks, release identity and rollback. Actual domain authorization
-and physical-device acceptance remain required before public launch.
+It starts with a linear quick-start checklist and covers the amd64 standalone
+image, loopback-only ingress, resource limits, configuration checks, release
+identity and rollback. Two externally-managed steps are mandatory: the Tunnel
+public hostname in §4, and the Cloudflare **Cache Rules** in the same section —
+without the bypass rule, cached prerendered HTML will reference deleted JS chunks
+after the second release and visitors will see a blank page. `/share` links need
+no proxy change because the game travels in the URL fragment. Actual domain
+authorization and physical-device acceptance remain required before public launch.
 
 ## Runtime modes
 

@@ -43,6 +43,11 @@ http {
       add_header Retry-After 60 always;
       return 429 '{"error":"Too many requests. Please retry shortly."}';
     }
+    # Cache-Control headers are set by the application (next.config.ts) and
+    # passed through unchanged: /sw.js sends no-cache, /engine/* and /sounds/*
+    # send immutable. No proxy_cache is configured, so Nginx never stores
+    # responses. The Cloudflare edge MUST be configured to bypass cache for
+    # HTML and /sw.js — see README § 4 for required Cache Rules.
     location / {
       set $app http://web:3000;
       proxy_pass $app;

@@ -73,6 +73,36 @@ describe("Lichess route flow against deterministic provider responses", () => {
     expect(new URL(response.headers.get("location")!).searchParams.get("redirect_uri")).toBe("http://localhost:3000/api/platforms/lichess/oauth/callback");
     expect(response.headers.get("set-cookie")).not.toContain("Secure");
   });
+  it("redirects a cancelled sign-in to the configured origin, not the internal address", async () => {
+    // Behind the documented Nginx/Cloudflare deployment the standalone server
+    // sees its own container address in request.url. The visible failure mode
+    // was a cancelled sign-in landing the visitor on http://web:3000.
+    vi.stubEnv("APP_ORIGIN", "https://review.example");
+    vi.stubEnv("TRUST_PROXY_ORIGIN", "1");
+    const internal = new Request("http://web:3000/api/platforms/lichess/oauth/callback?error=access_denied", {
+      headers: { host: "review.example", "x-forwarded-host": "review.example", "x-forwarded-proto": "https" },
+    });
+    const response = await callback(internal);
+    const location = response.headers.get("location")!;
+    expect(location.startsWith("https://review.example/settings")).toBe(true);
+    expect(location).not.toContain("web:3000");
+    expect(response.headers.get("set-cookie")).toContain("Secure");
+  });
+
+  it("falls back to the configured origin when the request origin is rejected", async () => {
+    // The branch that most needs a usable error page is the one where
+    // `lichessOrigin()` itself refuses the request. It must still send the
+    // visitor to the configured public site, never to the internal address.
+    vi.stubEnv("APP_ORIGIN", "https://review.example");
+    const foreign = new Request("http://web:3000/api/platforms/lichess/oauth/callback?error=access_denied", {
+      headers: { host: "other.example" },
+    });
+    const response = await callback(foreign);
+    const location = response.headers.get("location")!;
+    expect(location.startsWith("https://review.example/settings")).toBe(true);
+    expect(location).not.toContain("web:3000");
+  });
+
   it("keeps token/provider details out of failed callback URLs", async () => {
     const { pkce } = await begin(); vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("secret-provider-token")));
     const response = await callback(request(`oauth/callback?code=test&state=${pkce.state}`));

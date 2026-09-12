@@ -106,6 +106,49 @@ personal routes. These are crawler hints, not access controls. Responses use
 nosniff, same-origin framing and a strict referrer policy; API routes use the
 stricter no-referrer policy. Worker isolation headers are unchanged.
 
+## Offline assets and the service worker
+
+The public build registers `public/sw.js` after page load. Immutable build assets
+(`/engine/*`, `/sounds/*`, `/_next/static/*`) are cache-first, so a returning
+visitor never downloads the 7.3 MB Stockfish build twice; page navigations are
+network-first, so an online visitor always receives the current release and the
+cache only answers when the network fails. `/api/*` is never intercepted, which
+keeps provider sessions, origin checks and server-side rate limits intact.
+`next.config.ts` marks `/engine/*` and `/sounds/*` `immutable` for a year, which
+is why replacing either binary requires a **new filename**: changing
+`STOCKFISH_VERSION` only changes the analysis cache key and cannot invalidate
+bytes a client already stored.
+
+Measured limits, not aspirations: cached documents render offline for any review
+that was already opened, but offline *analysis* is only verified in Chromium.
+Firefox and WebKit load the engine wasm from the page context, where the service
+worker does not observe the request, so a cut network stops the engine there even
+though its bytes are cached. WebKit additionally refuses Playwright navigation
+with the network emulated off. `e2e/offline.spec.ts` therefore asserts the full
+contract in Chromium and skips other engines with that reason recorded.
+
+### Deployment-layer caching requirements
+
+The Nginx proxy passes all upstream `Cache-Control` headers unchanged; it does
+not add, rewrite or strip them. `/sw.js` therefore reaches the visitor with
+`Cache-Control: no-cache` (set by `next.config.ts`), which instructs browsers
+and intermediaries to revalidate on every fetch — required so a new release's
+service worker replaces the previous one promptly.
+
+Next.js standalone also sends `Cache-Control: s-maxage=31536000,
+stale-while-revalidate` on every statically prerendered HTML page. This header
+is designed for Vercel's own CDN infrastructure. When a third-party CDN
+(Cloudflare, CloudFront, etc.) sits in front of the deployment and respects
+`s-maxage`, it will cache HTML pages for up to a year. A subsequent release
+changes the hashed `/_next/static/*` JS chunk filenames, but the CDN continues
+serving the old HTML that references the now-deleted chunks — visitors receive a
+broken page until the edge cache expires or is manually purged.
+
+The fix is CDN-side, not proxy-side: the operator must configure Cloudflare
+Cache Rules to bypass cache for all paths except the content-addressed assets.
+See [`deploy/nuc/README.md` § 4](../deploy/nuc/README.md) for the exact rules,
+failure mode and verification steps.
+
 ## Validation and external boundaries
 
 `e2e/r4.spec.ts` checks local capability states, independent output language,
@@ -150,6 +193,14 @@ The release script verifies liveness/version and can roll back images; the
 local smoke checks verify actual proxy headers and OAuth start without following
 the external authorization redirect. Actual Cloudflare HTTPS and signed-in
 account flows remain a separate deployment acceptance step.
+
+Share links encode a game as a base64url fragment (`/share#pgn=…`). The
+fragment is stripped by the browser before any HTTP request, so the server sees
+only `GET /share` — a 19-byte request line well within Nginx's default 8 KiB
+buffer (`large_client_header_buffers 4 8k`). No proxy or server-side change is
+needed for share links. Even the worst-case payload (`MAX_SHARE_PGN_BYTES` =
+4 096 → ~5 462 base64url characters) stays entirely in the fragment and never
+reaches the wire.
 
 ## Local address validation follow-up (2026-09-10)
 

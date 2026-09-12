@@ -71,6 +71,16 @@ export async function platformRequest(request: Request, handler: (request: Reque
     if (error instanceof Error && error.name === "PayloadTooLargeError") return Response.json({ error: "Request body is too large." }, { status: 413 });
     if (timeout.signal.aborted) return Response.json({ error: "The platform request timed out. Retry from the saved checkpoint." }, { status: 504 });
     if (request.signal.aborted) return Response.json({ error: "The platform request was cancelled." }, { status: 408 });
+    // Provider and transport failures were previously invisible: the visitor saw
+    // a generic message and the operator had no record. Only the error class and
+    // message are logged — never the request body, tokens, cookies or PGN.
+    console.error(JSON.stringify({
+      level: "error",
+      scope: "platform-request",
+      provider: provider ?? null,
+      method: request.method,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : typeof error,
+    }));
     return Response.json({ error: "The platform could not be reached or returned an invalid response. Retry from the saved checkpoint." }, { status: 502 });
   } finally { release?.(); clearTimeout(timer); }
 }

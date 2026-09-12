@@ -3,21 +3,30 @@ import { NextResponse } from "next/server";
 import { platformRequest } from "../../../../../../lib/server/platform-request";
 import { providerCooldown } from "../../../../../../lib/server/platform-guard";
 import { fetchProvider, readProviderJson } from "../../../../../../lib/server/platform-response";
-import { LICHESS_PKCE_COOKIE, LICHESS_SESSION_COOKIE, lichessOrigin, openLichessValue, requireLichessClientId, sealLichessValue, type LichessPkceState, type LichessSession } from "../../../../../../lib/server/lichess-session";
+import { LICHESS_PKCE_COOKIE, LICHESS_SESSION_COOKIE, lichessOrigin, lichessRedirectOrigin, secureCookieFor, openLichessValue, requireLichessClientId, sealLichessValue, type LichessPkceState, type LichessSession } from "../../../../../../lib/server/lichess-session";
 
 export async function GET(request: Request) { return platformRequest(request, callback, "lichess"); }
 
 async function callback(request: Request, signal: AbortSignal) {
   const requestUrl = new URL(request.url);
-  const settingsUrl = new URL("/settings", requestUrl.origin);
+  // Every redirect below must target the visitor's real origin: behind the
+  // documented Nginx/Cloudflare deployment `requestUrl.origin` is the internal
+  // container address. The configured APP_ORIGIN is preferred here because the
+  // case that most needs a usable error page is precisely the one where
+  // `lichessOrigin()` refuses the request, so its own fallback must not be the
+  // internal address.
+  const fallbackOrigin = process.env.APP_ORIGIN?.trim() || lichessRedirectOrigin(request.url);
+  let origin = fallbackOrigin;
+  let settingsUrl = new URL("/settings", fallbackOrigin);
   let failure = "Lichess sign-in could not be completed. Try connecting again.";
   function finish(response: NextResponse) {
-    response.cookies.set(LICHESS_PKCE_COOKIE, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax", secure: requestUrl.protocol === "https:" });
+    response.cookies.set(LICHESS_PKCE_COOKIE, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax", secure: origin.startsWith("https://") });
     response.headers.set("Cache-Control", "no-store"); response.headers.set("Referrer-Policy", "no-referrer");
     return response;
   }
   try {
-    const origin = lichessOrigin(request);
+    origin = lichessOrigin(request);
+    settingsUrl = new URL("/settings", origin);
     if (requestUrl.searchParams.has("error")) { failure = "Lichess sign-in was cancelled. You can connect again whenever you are ready."; throw new Error(); }
     const code = requestUrl.searchParams.get("code"), returnedState = requestUrl.searchParams.get("state");
     const sealedPkce = (await cookies()).get(LICHESS_PKCE_COOKIE)?.value;
@@ -56,7 +65,7 @@ async function callback(request: Request, signal: AbortSignal) {
       account: { id: account.id, username: account.username, ...(Object.keys(ratings).length ? { ratings } : {}) },
     };
     const response = NextResponse.redirect(new URL("/settings?lichess=connected", origin));
-    response.cookies.set(LICHESS_SESSION_COOKIE, sealLichessValue(session), { httpOnly: true, sameSite: "lax", secure: requestUrl.protocol === "https:", path: "/", expires: new Date(session.expiresAt) });
+    response.cookies.set(LICHESS_SESSION_COOKIE, sealLichessValue(session), { httpOnly: true, sameSite: "lax", secure: secureCookieFor(request), path: "/", expires: new Date(session.expiresAt) });
     return finish(response);
   } catch {
     settingsUrl.searchParams.set("lichess", "error");

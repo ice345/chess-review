@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import type { PlatformAccount } from "@chess-review/shared";
 import { acquireProvider, providerCooldown } from "../../../../../lib/server/platform-guard";
 import { platformRequest } from "../../../../../lib/server/platform-request";
-import { LICHESS_PKCE_COOKIE, LICHESS_SESSION_COOKIE, readLichessSession } from "../../../../../lib/server/lichess-session";
+import { LICHESS_PKCE_COOKIE, LICHESS_SESSION_COOKIE, readLichessSession, secureCookieFor } from "../../../../../lib/server/lichess-session";
 
 export async function GET(request: Request) {
   return platformRequest(request, async () => {
@@ -42,7 +42,7 @@ export async function DELETE(request: Request) {
         } finally { release?.(); }
       }
     } catch { /* Local disconnect still clears expired/unreadable sessions. */ }
-    for (const name of [LICHESS_SESSION_COOKIE, LICHESS_PKCE_COOKIE]) cookieStore.set(name, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax", secure: new URL(request.url).protocol === "https:" });
+    for (const name of [LICHESS_SESSION_COOKIE, LICHESS_PKCE_COOKIE]) cookieStore.set(name, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax", secure: secureCookieFor(request) });
     return Response.json({ ok: true, remoteRevoked });
   });
 }

@@ -72,6 +72,13 @@ export function readLichessSession(sealed: string): LichessSession {
   return session;
 }
 
+/**
+ * The origin a visitor actually reached us on, preferring the canonical
+ * configured address. Every Lichess redirect — success and failure alike — must
+ * be built from this, because the standalone server sees its own internal
+ * address in `request.url` and would otherwise send the browser to
+ * `http://web:3000` (or to an insecure cookie) behind the reverse proxy.
+ */
 export function lichessOrigin(request: Request): string {
   const requested = new URL(requestOrigin(request));
   const configured = process.env.APP_ORIGIN?.trim();
@@ -81,4 +88,28 @@ export function lichessOrigin(request: Request): string {
   if (configured && origin.origin !== requested.origin) throw new Error("Open the configured website address to connect Lichess.");
   if (!configured && process.env.NODE_ENV === "production" && !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)) throw new Error("Lichess sign-in is not configured for this website address.");
   return origin.origin;
+}
+
+/**
+ * Whether a session cookie may carry the `Secure` attribute. Derived from the
+ * canonical origin instead of `new URL(request.url).protocol`: the standalone
+ * server builds `request.url` from its internal listen address, so behind the
+ * reverse proxy that expression depends on incidental header handling rather
+ * than on the address the visitor actually used.
+ */
+export function secureCookieFor(request: Request): boolean {
+  const configured = process.env.APP_ORIGIN?.trim();
+  const origin = configured && configured.length > 0 ? configured : requestOrigin(request);
+  return origin.startsWith("https://");
+}
+
+/**
+ * Only the origin of the callback URL, with no path, query or fragment. A
+ * redirect built from `new URL(request.url).origin` keeps `#fragment` when
+ * someone opens the callback with one, and a fragment on a redirect re-sends it
+ * back to the provider as if it were part of our own response.
+ */
+export function lichessRedirectOrigin(requestUrl: string): string {
+  const url = new URL(requestUrl);
+  return `${url.protocol}//${url.host}`;
 }
