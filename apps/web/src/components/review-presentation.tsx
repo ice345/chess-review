@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import type { GameAnalysisV2, GamePhase, MoveQuality } from "@chess-review/shared";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { formatMoveNumber, type GameAnalysisV2, type GamePhase, type MoveQuality } from "@chess-review/shared";
 import { classificationForAnnotation, QualityIcon, QUALITY_META } from "@chess-review/ui";
-import { ANNOTATION_LABEL, ANNOTATION_ORDER, displayedMoveQualityLabel } from "../lib/move-quality-label";
+import { displayPgnComment, importedAnnotations } from "../lib/imported-annotations";
+import { useReviewRuntime } from "./review-runtime";
+import { ANNOTATION_LABEL, ANNOTATION_ORDER, displayedMoveQualityLabel, extraMoveAnnotations } from "../lib/move-quality-label";
 
 const PHASES: Array<{ key: GamePhase; label: string }> = [
   { key: "opening", label: "Opening" },
@@ -12,6 +15,9 @@ const PHASES: Array<{ key: GamePhase; label: string }> = [
 ];
 
 const QUALITY_ORDER: MoveQuality[] = ["best", "excellent", "good", "inaccuracy", "mistake", "blunder"];
+
+/** Conventional PGN glyphs ($1–$6) plus the position-evaluation marks worth showing. */
+const NAG_GLYPH: Record<number, string> = { 1: "!", 2: "?", 3: "!!", 4: "??", 5: "!?", 6: "?!" };
 
 function accuracy(value: number | undefined): string {
   return value === undefined ? "—" : value.toFixed(1);
@@ -26,6 +32,9 @@ export function ReviewOverview({
   onSelectPly: (ply: number) => void;
   allMomentsHref?: string;
 }) {
+  // Practice hides the solving ply here too: the critical list names the fault
+  // and its swing, which is the answer.
+  const hiddenPly = useReviewRuntime().retro.hiddenPly;
   const counts = QUALITY_ORDER.flatMap((quality) => {
     const white = analysis.white.qualityCounts[quality];
     const black = analysis.black.qualityCounts[quality];
@@ -115,10 +124,13 @@ export function ReviewOverview({
                 event.currentTarget.closest(".context-panel")?.scrollTo({ top: 0 });
               }}
             >
-              <QualityIcon classification={iconClassification} size={25} title="Critical" />
-              <span>{Math.ceil(critical.ply / 2)}{move.color === "white" ? "." : "…"} {move.san}</span>
+              {/* The overview's critical list also names the fault and its swing. */}
+              {hiddenPly === critical.ply
+                ? <QualityIcon classification="book" size={25} decorative title="Hidden while solving" />
+                : <QualityIcon classification={iconClassification} size={25} title="Critical" />}
+              <span>{formatMoveNumber(move.fenBefore, move.color)} {move.san}</span>
               <strong className={swing > 0 ? "critical-loss" : "critical-quiet"}>
-                {swing > 0 ? `−${swing.toFixed(1)}%` : "Only reasonable move"}
+                {hiddenPly === critical.ply ? "Hidden while solving" : swing > 0 ? `−${swing.toFixed(1)}%` : "Only reasonable move"}
               </strong>
             </button>
           );
@@ -141,6 +153,8 @@ export function ReviewMoves({
   filter?: "all" | "critical" | "errors";
 }) {
   const criticalPlies = new Set(analysis.criticalMoments.map((moment) => moment.ply));
+  const hiddenPly = useReviewRuntime().retro.hiddenPly;
+  const listRef = useRef<HTMLDivElement>(null);
   const moves = analysis.moves.filter((move) => (
     filter === "all"
     || (filter === "critical" && criticalPlies.has(move.ply))
@@ -148,20 +162,49 @@ export function ReviewMoves({
       || move.annotations.includes("missed_win")
       || move.annotations.includes("missed_mate"))
   ));
+  const imported = useMemo(() => importedAnnotations(analysis), [analysis]);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const active = list?.querySelector<HTMLElement>("button.active");
+    if (!list || !active || !list.closest(".objective-route")) return;
+    const listBox = list.getBoundingClientRect();
+    const rowBox = active.getBoundingClientRect();
+    if (rowBox.top < listBox.top || rowBox.bottom > listBox.bottom) {
+      list.scrollTop += rowBox.top - listBox.top - Math.max(0, (list.clientHeight - active.offsetHeight) / 2);
+    }
+  }, [currentPly, filter, moves.length]);
   return (
-    <div className="review-move-list">
+    <div className="review-move-list" ref={listRef}>
       {moves.length === 0 && <p className="quiet-empty">No moves match this filter.</p>}
-      {moves.map((move) => (
-        <button type="button" className={move.ply === currentPly ? "active" : ""} key={move.ply} onClick={() => onSelectPly(move.ply)}>
-          <span className="move-number">{Math.ceil(move.ply / 2)}{move.color === "white" ? "." : "…"}</span>
-          <QualityIcon classification={move.classification} size={24} />
-          <strong>{move.san}</strong>
-          <span className="move-quality" title={move.annotations.length === 0 ? QUALITY_META[move.quality].label : `Annotations: ${move.annotations.map((annotation) => ANNOTATION_LABEL[annotation]).join(", ")}`}>
-            {displayedMoveQualityLabel(move)}
-          </span>
-          <small>{move.accuracy.toFixed(0)}</small>
-        </button>
-      ))}
+      {moves.map((move) => {
+        const annotation = imported?.plies[move.ply - 1];
+        const glyphs = (annotation?.nags ?? []).flatMap((nag) => NAG_GLYPH[nag] ?? []);
+        const variations = (annotation?.variations ?? []).flatMap((variation) => {
+          const visible = displayPgnComment(variation);
+          return visible === undefined ? [] : [visible];
+        });
+        const comment = displayPgnComment(annotation?.comment);
+        const extras = hiddenPly === move.ply ? [] : extraMoveAnnotations(move);
+        return (
+          <button type="button" className={move.ply === currentPly ? "active" : ""} key={move.ply} onClick={() => onSelectPly(move.ply)}>
+            <span className="move-number">{formatMoveNumber(move.fenBefore, move.color)}</span>
+            {hiddenPly === move.ply
+              ? <QualityIcon classification="book" size={24} decorative title="Hidden while solving" />
+              : <QualityIcon classification={move.classification} size={24} />}
+            <strong>{move.san}</strong>
+            <span className="move-quality" data-practice-hidden={hiddenPly === move.ply ? "true" : undefined} title={hiddenPly === move.ply ? "Hidden while solving" : move.annotations.length === 0 ? QUALITY_META[move.quality].label : `Annotations: ${move.annotations.map((item) => ANNOTATION_LABEL[item]).join(", ")}`}>
+              {glyphs.length > 0 && <span className="move-imported-glyph">{glyphs.join("")}</span>}
+              {hiddenPly === move.ply ? "Hidden while solving" : displayedMoveQualityLabel(move)}
+              {extras.map((item) => (
+                <QualityIcon classification={classificationForAnnotation(item)} size={20} key={item} title={ANNOTATION_LABEL[item]} />
+              ))}
+            </span>
+            <small>{hiddenPly === move.ply ? "—" : move.accuracy.toFixed(0)}</small>
+            {comment !== undefined && <span className="move-imported-comment">{comment}</span>}
+            {variations.length > 0 && <span className="move-imported-variation">{variations.join(" ")}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 }

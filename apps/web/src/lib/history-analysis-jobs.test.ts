@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryAnalysisJobV1, HistoryAnalysisScopeV1, SyncedGame } from "@chess-review/shared";
+import { OBJECTIVE_ALGORITHM_VERSION } from "@chess-review/analysis";
 import {
   cancelHistoryAnalysisJobRecord,
   gameMatchesHistoryScope,
@@ -64,8 +65,8 @@ describe("history analysis scope", () => {
     const stale = { ...SCOPE, freshness: "stale" as const };
     expect(gameMatchesHistoryScope(game("cc-new"), stale, 12)).toBe(false);
     expect(gameMatchesHistoryScope(game("cc-old", { analyzed: true, analysisAlgorithmVersion: "old", analysisDepth: 12 }), stale, 12)).toBe(true);
-    expect(gameMatchesHistoryScope(game("cc-shallow", { analyzed: true, analysisAlgorithmVersion: "objective-v2.0", analysisDepth: 10 }), stale, 12)).toBe(true);
-    expect(gameMatchesHistoryScope(game("cc-current", { analyzed: true, analysisAlgorithmVersion: "objective-v2.0", analysisDepth: 12 }), stale, 12)).toBe(false);
+    expect(gameMatchesHistoryScope(game("cc-shallow", { analyzed: true, analysisAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION, analysisDepth: 10 }), stale, 12)).toBe(true);
+    expect(gameMatchesHistoryScope(game("cc-current", { analyzed: true, analysisAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION, analysisDepth: 12 }), stale, 12)).toBe(false);
   });
 
   it("deduplicates provider IDs and identical PGNs in deterministic date order", () => {
@@ -101,7 +102,7 @@ describe("history analysis durable transitions", () => {
     id: "job",
     status: "running",
     scope: SCOPE,
-    objectiveAlgorithmVersion: "objective-v2.0",
+    objectiveAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
     depth: 12,
     classificationMultiPv: 3,
     items: [
@@ -213,7 +214,7 @@ describe("history job supersession", () => {
       id,
       status,
       scope: SCOPE,
-      objectiveAlgorithmVersion: "objective-v2.0",
+      objectiveAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
       depth: 10,
       classificationMultiPv: 3,
       items: gameIds.map((gameId) => ({ gameId, status: status === "paused" ? "queued" : "completed", attempts: 1, updatedAt: createdAt })),

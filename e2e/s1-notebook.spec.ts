@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { mockLocalAi, seedReview, writeStores } from "./fixtures";
+import { goToReviewMoreSection, mockLocalAi, seedReview, writeStores } from "./fixtures";
 import { buildReviewRecord } from "../apps/web/src/lib/review-library";
 import type { LibraryBackupV2 } from "../apps/web/src/lib/library-backup-format";
 
@@ -30,7 +30,7 @@ test("saves position notes, bookmarks and a legal line; preserves the deep-linke
   await page.locator('.board-wrap [data-square="g8"]').click();
   await page.locator('.board-wrap [data-square="f6"]').click();
   await expect(page.locator(".move-status")).toContainText("Analysis variation");
-  await page.getByRole("link", { name: "Engine", exact: true }).click();
+  await goToReviewMoreSection(page, "Engine");
   await page.getByRole("link", { name: "Save this position in Notebook" }).click();
   await expect(panel(page).locator(".notebook-line")).toContainText("2. Bc4 2… Nf6");
   await page.getByLabel("Entry title").fill("An alternative line");
@@ -60,7 +60,7 @@ test("retains drafts across position and route navigation and handles same-entry
     await other.getByLabel("Your note").fill("My unsaved second-tab draft");
     await page.getByLabel("Your note").fill("Keep this draft across sections");
     await page.getByRole("link", { name: "Moves", exact: true }).click();
-    await page.getByRole("link", { name: "Notebook", exact: true }).click();
+    await goToReviewMoreSection(page, "Notebook");
     await expect(page.getByLabel("Your note")).toHaveValue("Keep this draft across sections");
     await saveNote(page, "The first saved edit");
     await panel(other).getByRole("button", { name: "Save note and bookmark" }).click();

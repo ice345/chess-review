@@ -12,7 +12,8 @@ import { buildReviewRecordFromSyncedGame, saveReviewRecord } from "./review-libr
 
 /**
  * Optional conservative account-sync policy. Games are analyzed strictly in
- * sequence so browser Stockfish, Maia and coach workloads never fan out.
+ * sequence so browser Stockfish, Maia and coach workloads never fan out, while
+ * a single game may still use the device's worker budget like a manual review.
  */
 export async function autoAnalyzeSyncedGames(
   games: SyncedGame[],
@@ -46,7 +47,7 @@ export async function analyzeSyncedGame(
     let analysis = await getCachedAnalysis(game, cacheOptions);
     const cached = analysis !== null;
     if (!analysis) {
-      const pool = new BrowserStockfishPool(1);
+      const pool = new BrowserStockfishPool();
       try {
         const division = divideGame(game);
         const opening = recognizeOpening(game) ?? null;

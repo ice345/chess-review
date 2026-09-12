@@ -101,9 +101,9 @@ export function useReviewAnalysis({
           return;
         }
         useReviewStore.getState().setAnalysis(null);
-        // This full-game pool owns one worker. The shared scheduler caps the
-        // total engine workload at two tasks and prioritizes current-board work.
-        const pool = new BrowserStockfishPool(1);
+        // The pool sizes itself from the visitor's device; the shared scheduler
+        // still caps concurrent analysis jobs and prioritizes current-board work.
+        const pool = new BrowserStockfishPool();
         reviewPool.current = pool;
         const analysis = await analysisScheduler.run(
           "background-game",

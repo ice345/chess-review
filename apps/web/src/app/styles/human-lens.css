@@ -18,15 +18,6 @@
   gap: 14px;
 }
 
-.lens-toolbar > div:first-child {
-  display: grid;
-  gap: 3px;
-}
-
-.lens-toolbar strong {
-  color: #38545c;
-  font: 500 13px Georgia, "Songti SC", serif;
-}
 
 .lens-switch {
   padding: 2px;

@@ -47,10 +47,6 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
   return (
     <div className="analysis-lens-panel">
       <div className="lens-toolbar">
-        <div>
-          <span className="kicker">Analysis source</span>
-          <strong>Objective truth and human prediction stay separate</strong>
-        </div>
         <div className="lens-switch" role="group" aria-label="Analysis source">
           {MODES.map((value) => (
             <button
@@ -109,10 +105,6 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
         )}
       </div>
 
-      <div className="lens-legend" aria-label="Analysis source legend">
-        {runtime.analysisMode !== "maia" && <span><i className="objective" />Stockfish MultiPV · objective</span>}
-        {showHuman && <span><i className="human" />Maia policy + human-game WDL · prediction</span>}
-      </div>
 
       {showHuman && (
         <div className="human-lens-content">
@@ -122,7 +114,12 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
           </p>
           {runtime.humanPositionError && <p className="error">{runtime.humanPositionError}</p>}
 
-          {result && (
+          {/* Practice hides the position's evidence, and Maia's ranked candidates
+              are evidence about the position the visitor is being asked to solve.
+              They also play on click, so they must not be reachable mid-answer. */}
+          {runtime.retro.locked && <p className="utility-empty" role="status">Human-model candidates are hidden while you solve this position.</p>}
+
+          {result && !runtime.retro.locked && (
             <>
               <div className="human-root-wdl">
                 <div><span>Maia human-game WDL</span><strong>{result.sideToMove === "white" ? "White" : "Black"} to move</strong></div>

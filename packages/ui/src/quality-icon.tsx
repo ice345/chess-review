@@ -97,6 +97,10 @@ function Motif({ motif, ink, wash }: { motif: QualityMotif; ink: string; wash: s
       return <><Diamond ink={ink} wash={wash} inset /><path {...stroke} d="M9 9.5c4.2 1.8 7.4 5.2 12.2 11.8m-5.8-1.1 5.8 1.1-1.2-5.8" /></>;
     case "octagon-missed-mate":
       return <><Octagon ink={ink} wash={wash} /><text {...textStyle} x="16" y="19.2" fontSize="7.5" fill={ink}>#?</text></>;
+    default:
+      // Every motif is listed above; this keeps the exhaustive union honest if
+      // a new motif is added without a renderer.
+      return null;
   }
 }
 

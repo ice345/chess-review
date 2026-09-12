@@ -28,6 +28,7 @@ describe("application settings", () => {
     expect(DEFAULT_APP_SETTINGS.soundEnabled).toBe(true);
     expect(DEFAULT_APP_SETTINGS.soundVolume).toBe(0.35);
     expect(DEFAULT_APP_SETTINGS.soundTheme).toBe("wintrchess");
+    expect(DEFAULT_APP_SETTINGS.pieceSet).toBe("liz-blue");
   });
 
   it("persists the selected Maia model independently from Elo", () => {
@@ -61,9 +62,14 @@ describe("application settings", () => {
     });
 
     saveAppSettings({ ...DEFAULT_APP_SETTINGS, soundEnabled: false, soundVolume: 0.72 });
-    expect(loadAppSettings()).toMatchObject({ soundEnabled: false, soundVolume: 0.72, soundTheme: "wintrchess" });
+    expect(loadAppSettings()).toMatchObject({ soundEnabled: false, soundVolume: 0.72, soundTheme: "wintrchess", pieceSet: "liz-blue" });
+
+    saveAppSettings({ ...DEFAULT_APP_SETTINGS, pieceSet: "classic" });
+    expect(loadAppSettings().pieceSet).toBe("classic");
+    values.set("open-chess-review-settings-v1", JSON.stringify({ pieceSet: "unknown" }));
+    expect(loadAppSettings().pieceSet).toBe("liz-blue");
 
     values.set("open-chess-review-settings-v1", JSON.stringify({ soundVolume: 7, soundTheme: "unknown" }));
-    expect(loadAppSettings()).toMatchObject({ soundEnabled: true, soundVolume: 1, soundTheme: "wintrchess" });
+    expect(loadAppSettings()).toMatchObject({ soundEnabled: true, soundVolume: 1, soundTheme: "wintrchess", pieceSet: "liz-blue" });
   });
 });

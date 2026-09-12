@@ -29,8 +29,8 @@ within the viewport at the R2 acceptance sizes. Board size responds to both
 width and available height: measured 424px at 1280×720, 472px at 1366×768,
 540px at 1440×900 and 600px at 1920×1080. Sound/flip share the upper player row;
 the titlebar is compact. The contextual column scrolls within the board column's
-height. On Review, Game Summary and its 220px evaluation plot remain together
-inside that column. No timeline is added below the board.
+height. On Review, Game Summary stays in that column; the evaluation plot is
+collapsed until opened. No timeline is added below the board.
 
 Below the tablet breakpoint, the route panel stacks under the board and normal document scrolling resumes. Move navigation remains adjacent to the board. There must be no horizontal document overflow.
 
@@ -42,7 +42,7 @@ The visual language distinguishes three sources:
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
 - Study: generated teaching from canonical facts, with concise provenance and grounding details on demand.
 
-The primary review navigation contains Review, Moves, Study and Engine. Settings stays in the titlebar. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with the current move, then the analysis source and compact candidates; whole-game Accuracy, phases, Move Quality and the embedded timeline sit in Game Summary below that desk. Before full-game analysis, its Analyze action precedes position candidates. After analysis at ply zero, a next-step section links to the first canonical critical moment and its Study facts; with no flagged moment, it offers ordinary exploration without claiming one exists. Engine Lab remains the advanced depth/MultiPV/raw UCI surface and is not copied into Review. The evaluation timeline is open by default on Review and is not mounted on Moves, Study or Engine. Study shows the current move’s Stockfish evidence before any generated lesson. Exports are grouped in one menu: Original PGN (PGN records), Canonical JSON, Annotated PGN, Position PNG and Game Review PNG. Menu copy distinguishes original source preservation from analysis annotations on the mainline.
+The primary review navigation contains Review, Moves and Study. Notebook and Engine sit under More; Settings stays in the titlebar. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with a one-line key-moment entry when one exists (or a walk-through line when none does), the practice launcher and a compact move list, then the current-move line and analysis source. Whole-game Accuracy, phases and Move Quality stay visible in Game Summary; the evaluation timeline in that same card is collapsed until opened. Before full-game analysis, its Analyze action precedes position candidates. Engine Lab remains a separate advanced route.
 
 Quality icons come from `packages/ui` and use Move Quality Annotation System V3 across the move list, destination-square overlay, charts, summary and PNG exports. Diamonds identify elite/special moves, circles positive and ring states, rounded squares informational/warning states, and octagons severe errors. The schema classification `great` is presented to users as **Critical**, matching its only-good-move meaning without changing the persisted classification key or algorithm. Silhouette and glyph remain readable at 20–28px without relying on color. The destination-square badge always remains the canonical Stockfish Move Quality icon in Stockfish, Maia and Compare modes; changing analysis source never relabels the played move. Human Find Difficulty keeps its quieter, separate mark family in the evidence panel. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board uses warm cream and mist-blue squares; the flip control sits outside the board.
 
@@ -95,6 +95,14 @@ and a Stockfish bar plus Maia marker in Compare. Recommendation comparison shows
 both top moves, Maia probability and Stockfish rank as separate evidence. Text
 continuations remain compact supporting evidence. Maia target Elo and model are
 persisted in Settings.
+
+Both arrow sources are hints the user can inspect, and the visitor may also draw
+their own: a right-click drag on the review board adds an arrow, right-click
+clears it, and moving to another position clears drawings because an arrow
+describes one position. Drawn arrows are merged with the engine arrows rather
+than replacing them, and they are session state — never written to the record,
+the analysis or the export. This is a pointer gesture: touch devices have no
+equivalent gesture implemented yet, so arrow drawing is desktop-only for now.
 
 Clicking a side-to-move piece highlights legal destinations with dots for quiet
 moves and rings for captures; clicking a destination moves it. Dragging remains

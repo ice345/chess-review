@@ -2,6 +2,7 @@ import { isLocalSessionInvalid, LocalDataChangedError } from "./browser-storage"
 import type { CoachLanguage } from "@chess-review/shared";
 import type { CoachRequestProvider, MaiaModel } from "./local-ai";
 import type { ChessSoundTheme } from "./chess-sound";
+import type { PieceSetId } from "./board-pieces";
 
 export interface AppSettings {
   coachProvider: CoachRequestProvider;
@@ -17,6 +18,7 @@ export interface AppSettings {
   soundEnabled: boolean;
   soundVolume: number;
   soundTheme: ChessSoundTheme;
+  pieceSet: PieceSetId;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -33,6 +35,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundEnabled: true,
   soundVolume: 0.35,
   soundTheme: "wintrchess",
+  pieceSet: "liz-blue",
 };
 
 export const APP_SETTINGS_STORAGE_KEY = "open-chess-review-settings-v1";
@@ -56,6 +59,7 @@ export function loadAppSettings(): AppSettings {
       soundEnabled: stored.soundEnabled !== false,
       soundVolume,
       soundTheme: "wintrchess",
+      pieceSet: stored.pieceSet === "classic" ? "classic" : "liz-blue",
     };
   } catch {
     return DEFAULT_APP_SETTINGS;

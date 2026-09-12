@@ -95,6 +95,7 @@ export function backupSettings(value: unknown): AppSettings {
     humanTargetElo: integer(v.humanTargetElo, "target Elo", 400, 3000), humanModel: choice(v.humanModel, ["maia3-5m", "maia3-23m", "maia3-79m"], "Maia model"),
     autoAnalyzeImported: choice(v.autoAnalyzeImported, [0, 1, 3, 5], "sync preference"), soundEnabled: boolean(v.soundEnabled, "sound preference"),
     soundVolume: number(v.soundVolume, "volume", 0, 1), soundTheme: choice(v.soundTheme, ["wintrchess"], "sound theme"),
+    pieceSet: optional(v.pieceSet, (value) => choice(value, ["liz-blue", "classic"] as const, "piece set")) ?? "liz-blue",
   };
 }
 

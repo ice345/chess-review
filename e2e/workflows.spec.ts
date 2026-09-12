@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { SAMPLE_PGN, mockLocalAi, seedAdvancedStudy, seedConnectedLibrary, seedHistoricalReviewWithPgnDrift, seedPartialHistoryJob, seedPausedHistoryJob, seedReview, seedUnanalyzedReview } from "./fixtures";
+import { SAMPLE_PGN, mockLocalAi, openReviewMore, openReviewTimeline, seedAdvancedStudy, seedConnectedLibrary, seedHistoricalReviewWithPgnDrift, seedPartialHistoryJob, seedPausedHistoryJob, seedReview, seedUnanalyzedReview } from "./fixtures";
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -193,14 +193,18 @@ test("keeps Review desk priorities and fits Moves to the board workspace", async
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
 
+  await expect(page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Review", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Engine", exact: true })).toHaveCount(0);
+  await openReviewMore(page);
   await expect(page.getByRole("link", { name: "Engine", exact: true })).toBeVisible();
-  await expect(page.locator(".game-summary-section .timeline-panel")).toHaveAttribute("open", "");
+  await expect(page.locator(".game-summary-section")).toBeVisible();
+  await expect(page.locator(".game-summary-section .timeline-panel")).not.toHaveAttribute("open");
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator(".objective-route > .dual-verdict")).toBeVisible();
   await expect(page.locator(".objective-route > .position-analysis")).toBeVisible();
 
   await page.goto(`/review/${record.id}/moves`);
-  await expect(page.locator(".game-summary-section .timeline-panel")).toHaveCount(0);
+  await expect(page.locator(".game-summary-section")).toHaveCount(0);
   const heights = await page.evaluate(() => ({
     position: document.querySelector(".position-workspace")?.getBoundingClientRect().height ?? 0,
     moves: document.querySelector(".moves-route")?.getBoundingClientRect().height ?? 0,
@@ -211,6 +215,22 @@ test("keeps Review desk priorities and fits Moves to the board workspace", async
   const panel = await page.locator(".moves-context").boundingBox();
   expect(evidence!.y + evidence!.height).toBeLessThanOrEqual(panel!.y + panel!.height + 1);
 });
+
+test("the Review move list keeps the current ply in view", async ({ page }) => {
+  const { record } = await seedReview(page);
+  await page.goto(`/review/${record.id}`);
+  await page.getByRole("button", { name: "Last position" }).click();
+  const visible = await page.evaluate(() => {
+    const list = document.querySelector(".objective-route .review-move-list");
+    const active = list?.querySelector("button.active");
+    if (!list || !active) return false;
+    const box = list.getBoundingClientRect();
+    const row = active.getBoundingClientRect();
+    return row.top >= box.top - 1 && row.bottom <= box.bottom + 1;
+  });
+  expect(visible).toBe(true);
+});
+
 
 test("navigates, flips, explores a branch, and returns to canonical play", async ({ page }) => {
   await page.setViewportSize({ width: 1728, height: 1117 });
@@ -246,7 +266,7 @@ test("navigates, flips, explores a branch, and returns to canonical play", async
   await expect(page.getByText(/Analysis variation · c5/)).toBeVisible();
   await page.locator(".position-workspace .return-to-game").click();
   await expect(page.getByText(/Analysis branch · root ply/)).toHaveCount(0);
-
+  await openReviewTimeline(page);
   await page.getByRole("button", { name: "Go to ply 2, Best" }).click();
   await expect(page.locator(".move-status").getByText("1… e5", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Last position" }).click();
@@ -282,7 +302,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
   await expect(page.locator(".human-verdict")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Maia · 1400/ }).click();
-  await expect(page.getByText(/2\. e5 · .* to find/)).toBeVisible();
+  await expect(page.locator(".human-verdict")).toContainText(/e5 · .*to find/);
   await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /Maia predicted human-game WDL/);
   await expect(page.locator(".objective-verdict")).toHaveCount(0);
   await expect(page.locator(".human-verdict")).toContainText("MAIA · HUMAN FIND DIFFICULTY");
@@ -338,7 +358,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
 
   await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Explain this move: e5" }).click();
-  await expect(page).toHaveURL(`/review/${record.id}/coach`);
+  await expect(page).toHaveURL(new RegExp(`/review/${record.id}/coach(?:\\?ply=\\d+)?$`));
   await expect(page.locator(".move-status")).toContainText("1… e5");
   await expect(page.getByRole("link", { name: "Study" })).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".coach-provenance")).toContainText("MAIA-3 23M @ 1600");
@@ -612,6 +632,7 @@ test("ANNOTATIONS use quality icons and the played-move label follows Brilliant"
   await expect(page.locator(".annotation-count").filter({ hasText: "Sacrifice" }).locator("svg")).toHaveCount(1);
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator(".objective-verdict strong")).toContainText("Brilliant");
+  await expect(page.locator(".objective-route .review-move-list button.active .move-quality svg[aria-label='Sacrifice']")).toBeVisible();
   await page.locator(".context-panel").evaluate((element) => { element.scrollTop = element.scrollHeight; });
   await expect(page.locator(".annotation-count").filter({ hasText: "Brilliant" })).toBeInViewport();
 });
@@ -620,6 +641,7 @@ test("Evaluation timeline stays inside the scroll-aligned Game Summary panel", a
   await page.setViewportSize({ width: 1440, height: 900 });
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
+  await page.locator(".timeline-panel > summary").click();
   await expect(page.locator(".timeline-panel")).toBeVisible();
   const layout = await page.evaluate(() => {
     const board = document.querySelector(".position-workspace")!.getBoundingClientRect();

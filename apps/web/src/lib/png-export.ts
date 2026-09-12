@@ -1,4 +1,4 @@
-import type { AnyGameAnalysis, EngineScore, MoveAnalysis } from "@chess-review/shared";
+import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis } from "@chess-review/shared";
 import { QUALITY_META } from "@chess-review/ui";
 
 const PIECES: Record<string, string> = {
@@ -258,7 +258,7 @@ export async function renderPositionCard(
   orientation: "white" | "black",
 ): Promise<Blob> {
   const [element, context] = canvas();
-  const moveNumber = `${Math.ceil(move.ply / 2)}${move.color === "white" ? "." : "…"} ${move.san}`;
+  const moveNumber = formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san });
   background(context, moveNumber, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : move.phase);
   roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
   drawBoard(context, move.fenAfter, 50, 80, 520, orientation);

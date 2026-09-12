@@ -245,6 +245,13 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+.objective-route > .review-move-list {
+  max-height: min(280px, 42vh);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
 
 .review-move-list button {
   padding: 7px 8px;
@@ -261,7 +268,34 @@
 
 .review-move-list button.active { border-color: #9ab2ad; background: #e4ece7; }
 .move-number, .move-quality, .review-move-list small { color: var(--muted); font-size: 12px; }
+.move-quality { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .review-move-list small { text-align: right; }
+
+/* Imported annotations sit under their own move, spanning the columns after the
+   move number so the source comment and variation stay visually attached to it
+   rather than reading as another move row. */
+.move-imported-comment, .move-imported-variation {
+  grid-column: 3 / -1;
+  font-size: 12px;
+  line-height: 1.35;
+  font-style: italic;
+  color: var(--ink-secondary);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.move-imported-comment::before { content: "“"; }
+.move-imported-comment::after { content: "”"; }
+.move-imported-variation { font-style: normal; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.move-imported-glyph { color: var(--accent-primary); font-weight: 700; margin-right: 4px; }
+.move-imported-note {
+  margin: 0 0 9px;
+  padding: 7px 9px;
+  border-left: 3px solid #9ab2ad;
+  background: rgba(255, 253, 248, .7);
+  color: var(--ink-secondary);
+  font-style: italic;
+  border-radius: 0 8px 8px 0;
+}
 
 .move-evidence {
   margin-top: 11px;
@@ -496,10 +530,20 @@
   .coach-actions, .engine-actions { grid-template-columns: 1fr; }
 }
 
-.review-next-step { padding: 12px 0 14px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
-.review-next-step h2 { margin: 4px 0; font: 500 22px/1.2 Georgia, serif; }
-.review-next-step p { margin: 6px 0 10px; color: var(--ink-secondary); font-size: 13px; line-height: 1.5; }
-.review-next-step > div { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; }
-.review-next-step .primary { min-height: 44px; }
-.review-next-step a { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink-secondary); font-size: 13px; }
+
+.review-next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 0 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-secondary);
+  font-size: 13px;
+}
+.review-next-step strong { color: var(--ink); font-size: 13px; }
+.review-next-step button,
+.review-next-step a { min-height: 44px; display: inline-flex; align-items: center; }
+
 .move-filters button, .review-move-list button, .critical-list button { min-height: 44px; }

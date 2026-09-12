@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AnyGameAnalysis, EngineScore, MoveAnalysis } from "@chess-review/shared";
+import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis } from "@chess-review/shared";
 import { QUALITY_META, QualityIcon } from "./quality-icon";
 
 export interface EvaluationGraphProps {
@@ -108,7 +108,7 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
           );
         })}
       </svg>
-      {hovered && <div className="evaluation-graph-detail"><strong>{hovered.move ? `${hovered.move.ply}. ${hovered.move.san}` : "Starting position"}</strong><span>{scoreLabel(hovered.score)}</span>{hovered.move && <><span>{QUALITY_META[hovered.move.classification].label}</span><small>Accuracy {hovered.move.accuracy.toFixed(1)}</small></>}</div>}
+      {hovered && <div className="evaluation-graph-detail"><strong>{hovered.move ? formatMoveNotation({ fenBefore: hovered.move.fenBefore, color: hovered.move.color, san: hovered.move.san }) : "Starting position"}</strong><span>{scoreLabel(hovered.score)}</span>{hovered.move && <><span>{QUALITY_META[hovered.move.classification].label}</span><small>Accuracy {hovered.move.accuracy.toFixed(1)}</small></>}</div>}
     </div>
   );
 }

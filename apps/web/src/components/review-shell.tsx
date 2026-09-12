@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
@@ -22,12 +22,15 @@ import { useReviewAnalysis } from "../hooks/use-review-analysis";
 import { useReviewCoach } from "../hooks/use-review-coach";
 import { useReviewHuman } from "../hooks/use-review-human";
 import { useReviewPlayback } from "../hooks/use-review-playback";
+import { useRetrospect } from "../hooks/use-retrospect";
 import { useReviewRecord } from "../hooks/use-review-record";
 import { useReviewNotebook } from "../hooks/use-review-notebook";
+import { useBoardPieces } from "../hooks/use-board-pieces";
 import { loadAppSettings } from "../lib/app-settings";
 import { useLocalAiHealth } from "../lib/use-local-ai-health";
 import {
   analysisModeArrows,
+  faultArrow,
   matchingHumanCandidate,
   matchingStockfishCandidate,
   type HumanCandidateIdentity,
@@ -41,6 +44,7 @@ import { BlueBishopMark } from "@chess-review/ui";
 import { saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { exportAnalysisJson, exportAnnotatedPgn } from "@chess-review/shared";
 import { useReviewStore } from "../store/review-store";
+import { buildShareUrl } from "../lib/share-link";
 
 export function ReviewShell({ children }: { children: ReactNode }) {
   const params = useParams<{ gameId: string }>();
@@ -51,6 +55,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const gameId = params.gameId;
   const state = useReviewStore();
   const settings = useMemo(() => loadAppSettings(), []);
+  const pieces = useBoardPieces();
   // Review's Maia and Coach surfaces share one capability poller. This keeps
   // route transitions and health updates from creating duplicate /health
   // requests and intervals.
@@ -107,12 +112,31 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     goToPly: state.goToPly,
   });
   const pausePlayback = playback.pause;
+  const playUciOnBoard = useCallback((uci: string) => {
+    const promo = uci[4];
+    return useReviewStore.getState().playAnalysisMove(
+      uci.slice(0, 2),
+      uci.slice(2, 4),
+      promo === "q" || promo === "r" || promo === "b" || promo === "n" ? promo : undefined,
+    );
+  }, []);
+  // In-place mistake practice. It drives navigation itself, so it is created
+  // after playback and receives the canonical ply setter.
+  const retro = useRetrospect({ analysis: state.analysis, goToPly: state.goToPly, playUci: playUciOnBoard });
   const branchPositionFen = state.branch ? state.positionFen : null;
   const canonicalPositionResult = state.branch ? null : state.analysis?.moves[state.currentPly]?.stockfish ?? null;
   const candidateResult = continuationResult ?? canonicalPositionResult;
-  const reviewedAnalysis = state.branch || state.currentPly === 0
-    ? null
-    : state.analysis?.moves[state.currentPly - 1] ?? null;
+  // While practising, the board holds the position BEFORE the fault — and after
+  // a correct answer it holds a variation rooted there. The human request, the
+  // built facts and the ply they are stored against must stay on the fault
+  // itself for the whole session, including while that variation exists.
+  // Keying off the board-derived move would file the facts under the wrong ply
+  // (or drop them the moment playAnalysisMove sets a branch).
+  const reviewedAnalysis = retro.active && retro.current !== null
+    ? state.analysis?.moves[retro.current.faultPly - 1] ?? null
+    : state.branch || state.currentPly === 0
+      ? null
+      : state.analysis?.moves[state.currentPly - 1] ?? null;
   const reviewedMoveTarget = reviewedAnalysis
     ? { ply: reviewedAnalysis.ply, fenBefore: reviewedAnalysis.fenBefore, uci: reviewedAnalysis.uci }
     : null;
@@ -151,6 +175,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const [exportBusy, setExportBusy] = useState(false);
   const exporting = useRef(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const shareCopiedTimer = useRef<number | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
   const pendingPromotionRef = useRef(pendingPromotion);
   pendingPromotionRef.current = pendingPromotion;
@@ -212,6 +239,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, select, button, a, [contenteditable='true'], [role='slider']")) return;
       const review = useReviewStore.getState();
+      const prompt = retro.current?.promptPly ?? 0;
       if (event.key === "Escape" && review.branch) {
         pausePlayback();
         review.returnToGame();
@@ -224,12 +252,14 @@ export function ReviewShell({ children }: { children: ReactNode }) {
       if (event.key === "ArrowRight") {
         pausePlayback();
         if (review.branch) review.stepBranch(1);
+        // Same chokepoint as navigateNext: the next mainline ply is the answer.
+        else if (retro.locked && review.currentPly >= prompt) return;
         else review.goToPly(review.currentPly + 1);
       }
     }
     window.addEventListener("keydown", navigate);
     return () => window.removeEventListener("keydown", navigate);
-  }, [pausePlayback]);
+  }, [pausePlayback, retro.current?.promptPly, retro.locked]);
 
   const root = `/review/${gameId}`;
 
@@ -262,9 +292,17 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     { href: root, label: "Review" },
     { href: `${root}/moves`, label: "Moves" },
     { href: `${root}/coach`, label: "Study" },
+  ];
+  const more = [
     { href: `${root}/notebook`, label: "Notebook" },
     { href: `${root}/engine`, label: "Engine" },
   ];
+  const sectionHref = (href: string) => (
+    trainingId
+      ? `${href}?${new URLSearchParams({ training: trainingId, position: query.get("position") ?? "", ply: String(state.currentPly) })}`
+      : href
+  );
+  const moreOpen = more.some((item) => pathname === item.href);
   const selectedBranchMove = selectedBranch?.move ?? null;
   const boardArrows = analysisModeArrows({
     mode: humanRuntime.mode,
@@ -298,6 +336,15 @@ export function ReviewShell({ children }: { children: ReactNode }) {
       return false;
     }
     setPendingPromotion(null);
+    if (retro.evaluating || retro.status === "rejected" || retro.status === "rewinding") return false;
+    const practice = retro.active && retro.locked && !state.branch ? retro.current : null;
+    if (practice && state.currentPly === practice.promptPly) {
+      if (!destinations.some((move) => move.to === to)) return false;
+      const played = state.playAnalysisMove(from, to, promotion);
+      if (!played) return false;
+      void retro.attempt(`${from}${to}${promotion ?? ""}`);
+      return true;
+    }
     return state.playAnalysisMove(from, to, promotion);
   }
 
@@ -339,6 +386,12 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   function navigateToPly(ply: number) {
     playback.pause();
+    // While a practice answer is owed, jumping to any ply at or past the fault
+    // would reveal its classification and engine continuation. Rewind instead.
+    if (!state.branch && retro.locked && ply > (retro.current?.promptPly ?? 0)) {
+      state.goToPly(retro.current?.promptPly ?? 0);
+      return;
+    }
     state.goToPly(ply);
   }
 
@@ -356,6 +409,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   function navigateNext() {
     playback.pause();
+    // While a practice answer is owed, the next move is the answer: refuse to walk
+    // past it, matching Lichess retrospect's preventGoingToNextMove.
+    if (!state.branch && retro.locked && state.currentPly >= (retro.current?.promptPly ?? 0)) return;
     if (state.branch) state.stepBranch(1);
     else state.goToPly(state.currentPly + 1);
   }
@@ -363,6 +419,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   function navigateLast() {
     playback.pause();
     if (state.branch) state.stepBranch(state.branch.activePath.length - 1 - state.branch.selectedIndex);
+    // Mid-practice the last move is the answer; stay on the prompt position.
+    else if (retro.locked) navigateToPly(retro.current?.promptPly ?? 0);
     else state.goToPly(totalPlies);
   }
 
@@ -418,6 +476,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     retryBranchMoveQuality: branchQualityRuntime.retry,
     navigateToPly,
     pausePlayback,
+    retro,
     openNotebookPosition: (rootPly: number, line: string[]) => {
       playback.pause();
       state.openNotebookPosition(rootPly, line);
@@ -448,12 +507,46 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         <div className="review-titlebar">
           <div><span className="kicker">{record.kind === "pgn" ? "Game review" : "Position study"}</span><strong>{record.title}</strong><small>{record.subtitle}</small></div>
           <nav className="review-nav" aria-label="Review sections">
-            {primary.map((item) => <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={trainingId ? `${item.href}?${new URLSearchParams({ training: trainingId, position: query.get("position") ?? "", ply: String(state.currentPly) })}` : item.href} key={item.href}>{item.label}{item.label === "Study" && coachRuntime.task?.status === "running" ? <small>Generating…</small> : null}</Link>)}
+            {primary.map((item) => (
+              <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={sectionHref(item.href)} key={item.href}>
+                {item.label}{item.label === "Study" && coachRuntime.task?.status === "running" ? <small>Generating…</small> : null}
+              </Link>
+            ))}
           </nav>
           <div className="review-actions">
+            <details className={moreOpen ? "review-more open" : "review-more"}>
+              <summary>More</summary>
+              <div className="action-menu">
+                {more.map((item) => (
+                  <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={sectionHref(item.href)} key={item.href}>{item.label}</Link>
+                ))}
+              </div>
+            </details>
             <details key={`export-${pathname}`}><summary>Export</summary><div className="action-menu">
               {record.kind === "pgn" && <button type="button" disabled={exportBusy} onClick={() => void runExport("Original PGN", () => downloadText(record.originalPgn ?? record.input, "application/x-chess-pgn", `review-${record.id}-original.pgn`))}>Original PGN</button>}
-              {record.kind === "pgn" && <small className="export-note">Original keeps imported comments and variations. Annotated adds analysis to the mainline.</small>}
+              {record.kind === "pgn" && <button type="button" disabled={exportBusy} onClick={() => {
+                void runExport("Copy share link", async () => {
+                  const pgn = record.originalPgn ?? record.input;
+                  const url = buildShareUrl(pgn, window.location.origin);
+                  if (!url) throw new Error("This game is too large to share by link. Use Original PGN to export instead.");
+                  // The link is always shown as well as copied: the clipboard API
+                  // is unavailable on some browsers and needs a permission on
+                  // others, and the visitor still needs a way to take the link.
+                  setShareUrl(url);
+                  try {
+                    await navigator.clipboard.writeText(url);
+                  } catch {
+                    setShareCopied(false);
+                    return;
+                  }
+                  setShareCopied(true);
+                  if (shareCopiedTimer.current !== null) window.clearTimeout(shareCopiedTimer.current);
+                  shareCopiedTimer.current = window.setTimeout(() => { shareCopiedTimer.current = null; setShareCopied(false); }, 3000);
+                });
+              }}>Copy share link</button>}
+              {shareCopied && <small role="status">Share link copied to clipboard</small>}
+              {shareUrl !== null && <input className="share-link-value" aria-label="Share link" readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} />}
+              {record.kind === "pgn" && <small className="export-note">Original keeps imported comments and variations. Annotated adds analysis to the mainline. A share link opens the game in the recipient's own browser — nothing is uploaded.</small>}
               <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Canonical JSON", () => { if (state.analysis) downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json")); })}>Canonical JSON</button>
               <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Annotated PGN", () => { if (state.analysis) downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn")); })}>Annotated PGN</button>
               <button type="button" disabled={exportBusy} onClick={() => void runExport("Position PNG", exportPositionPng)}>Position PNG</button>
@@ -496,18 +589,24 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                   stockfish={displayedScore}
                   maia={humanRuntime.positionAnalysis}
                   orientation={state.orientation}
+                  valuesHidden={!retro.presentation.showEvalValues}
                 />
                 <div className="board-wrap">
                   <Chessboard options={{
                     position: state.positionFen,
+                    pieces,
                     allowDragging: true,
-                    allowDrawingArrows: false,
-                    arrows: pendingPromotion ? [] : boardArrows,
+                    allowDrawingArrows: !retro.locked,
+                    arrows: pendingPromotion
+                      ? []
+                      : retro.presentation.showFaultArrow && retro.current
+                        ? [faultArrow(retro.current.faultUci)].flatMap((arrow) => arrow ? [arrow] : [])
+                        : retro.presentation.showEngineArrows ? boardArrows : [],
                     arrowOptions: { ...defaultArrowOptions, arrowWidthDenominator: 9, opacity: .76 },
                     boardOrientation: state.orientation,
                     animationDurationInMs: 160,
                     squareStyles: boardSquareStyles,
-                    canDragPiece: ({ piece }) => !pendingPromotion && pieceMatchesTurn(piece.pieceType, state.positionFen),
+                    canDragPiece: ({ piece }) => !pendingPromotion && !retro.evaluating && retro.status !== "rejected" && retro.status !== "rewinding" && pieceMatchesTurn(piece.pieceType, state.positionFen),
                     onPieceDrag: ({ piece, square }) => {
                       if (square && pieceMatchesTurn(piece.pieceType, state.positionFen)) setSelectedSquare(square);
                     },
@@ -519,7 +618,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       return playBoardMove(sourceSquare, targetSquare);
                     },
                     onSquareClick: ({ piece, square }) => {
-                      if (pendingPromotion) return;
+                      if (pendingPromotion || retro.evaluating || retro.status === "rejected" || retro.status === "rewinding") return;
                       if (selectedSquare) {
                         const destination = legalDestinations.find((move) => move.to === square);
                         if (destination) {
@@ -577,7 +676,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       <button type="button" className="promotion-cancel" onClick={() => setPendingPromotion(null)}>Cancel</button>
                     </div>
                   )}
-                  {!pendingPromotion && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
+                  {!pendingPromotion && retro.presentation.showMoveBadge && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
                     ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={state.orientation} classification={selectedBranchQuality.classification} />
                     : currentAnalysis && !state.branch
                       ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />
@@ -606,7 +705,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                 <MoveTransport
                   isPlaying={playback.isPlaying}
                   inVariation={state.branch !== null}
-                  playDisabled={state.branch !== null || totalPlies === 0}
+                  playDisabled={state.branch !== null || totalPlies === 0 || retro.locked}
                   atStart={state.branch ? state.branch.selectedIndex === 0 : state.currentPly === 0}
                   atEnd={state.branch ? state.branch.selectedIndex === state.branch.activePath.length - 1 : state.currentPly === totalPlies}
                   onFirst={navigateFirst}

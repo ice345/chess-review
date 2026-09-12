@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SyncedGame } from "@chess-review/shared";
+import { OBJECTIVE_ALGORITHM_VERSION } from "@chess-review/analysis";
 import { syncedGameHasAnalysis } from "./platform-library";
 
 const BASE: SyncedGame = {
@@ -30,7 +31,7 @@ describe("synced game analysis readiness", () => {
       ...BASE,
       analyzed: true,
       analysisId: "review",
-      analysisAlgorithmVersion: "objective-v2.0",
+      analysisAlgorithmVersion: OBJECTIVE_ALGORITHM_VERSION,
       analysisDepth: 10,
     })).toBe(true);
   });

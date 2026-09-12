@@ -1,4 +1,5 @@
 import { parsePgn, replayUciLine, type NormalizedGame } from "@chess-review/chess-core";
+import { formatMoveNotation } from "@chess-review/shared";
 import type { ReviewRecord } from "./review-library";
 
 export const MAX_NOTEBOOK_ENTRIES = 200;
@@ -84,11 +85,12 @@ export function notebookPositionLabel(record: ReviewRecord, position: NotebookPo
   const root = notebookRootFen(record, position.rootPly, game);
   if (position.line.length) {
     const moves = replayUciLine(root, position.line);
-    return moves.map((move) => {
-      const fields = move.fenBefore.split(" ");
-      return `${fields[5]}${fields[1] === "w" ? "." : "…"} ${move.san}`;
-    }).join(" ");
+    return moves.map((move) => formatMoveNotation({
+      fenBefore: move.fenBefore,
+      color: move.fenBefore.split(" ")[1] === "b" ? "black" : "white",
+      san: move.san,
+    })).join(" ");
   }
   const move = game?.plies[position.rootPly - 1];
-  return move ? `After ${move.moveNumber}${move.color === "white" ? "." : "…"} ${move.san}` : record.kind === "fen" ? "Imported position" : "Starting position";
+  return move ? `After ${formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san })}` : record.kind === "fen" ? "Imported position" : "Starting position";
 }

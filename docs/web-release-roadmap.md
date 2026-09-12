@@ -227,6 +227,11 @@ P2 原候选：可保存的个人变例、笔记、书签及完整编辑往返�
 
 - [x] S1：个人变例、笔记、书签与 v2 备份恢复；独立 Notebook，不改原 PGN 或客观分析。详见 [Notebook](review-notebook.md)。
 - [x] S2a：单盘错题练习，隐藏答案、主动走棋、Stockfish 判题及独立的提示/查看/跳过统计。仅本次会话，详见 [Mistake practice](mistake-practice.md)。
+- [x] S7：错题练习改为 **就地** 形态（贴合 Lichess retrospect）：在复现棋盘上出题、锁住前进导航、隐藏引擎证据，并新增用 Maia 解释「原着为何自然」的差异化证据。原弹窗已删除。详见 [Mistake practice](mistake-practice.md) 与 [错题练习就地化](audits/2026-09-11-in-place-practice.md)。
+- [x] S3：整盘复盘 worker 池按设备规模并行（上限 4），以及引擎/音效不可变缓存、离线外壳与 manifest。未改棋类算法；离线分析重跑仅在 Chromium 验证。详见 [复盘并行度与离线外壳](audits/2026-09-11-review-parallelism-and-offline-shell.md)。
+- [x] S4：fragment 内的分享链接（不上传棋局）、用户手绘棋盘箭头、导入 PGN 评论/NAG/变例的显示与再导出。修复了导出两个相邻注释导致 Annotated PGN 无法被本产品重新导入的缺陷。触摸设备暂无手绘箭头。详见 [分享链接、棋盘箭头与导入注解保真](audits/2026-09-11-share-arrows-and-annotation-fidelity.md)。
+- [x] S5：同分走法不再被误判为 Excellent；SEE 不再把被绝对牵制的子算作攻击/防守方（此前会高估交换并可能误报 Brilliant）。`interesting`/`miss` 按既有契约与测试保持声明但不可达，并在 schema 注明；`OBJECTIVE_ALGORITHM_VERSION` 已提升为 `objective-v2.1`。详见 [分类契约修复](audits/2026-09-11-classification-contract-fixes.md)。
+- [x] S6：修正 Lichess 取消授权后跳回内网地址（`http://web:3000`）的缺陷，Cookie 的 `Secure` 改由规范 origin 决定；新增 HSTS；平台请求失败写入不含凭据的服务端日志。CSP 与第三方错误上报仍未做（见审计记录的理由）。详见 [生产边界修复](audits/2026-09-11-production-boundary-fixes.md)。
 - [ ] 基于实际训练记录的复习计划；先积累数据，再验证重复训练策略。
 - [ ] 自有账号、跨设备云同步、可分享研究或教练协作，按实际用户需求选择。
 - 免费开源路线；当前没有收费、支付或套餐开发任务。

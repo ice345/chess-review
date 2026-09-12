@@ -38,7 +38,7 @@ test("import actions and board navigation fit the first screen across six sizes"
       expect(review.panel.width / review.board.width).toBeLessThan(1.3);
     }
     expect((await page.getByRole("button", { name: "Next move" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await expect(page.locator(".context-panel .timeline-panel[open]")).toHaveCount(1);
+    await expect(page.locator(".context-panel .timeline-panel[open]")).toHaveCount(0);
     measurements.push({ width, height, homeSubmit: home, ...review });
   }
   await writeFile(`${directory}/measurements.json`, JSON.stringify(measurements, null, 2));

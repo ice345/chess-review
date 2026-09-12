@@ -104,13 +104,13 @@
 }
 
 .dual-verdict {
-  margin: -4px 0 18px;
+  margin: 0 0 12px;
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .dual-verdict-compare {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
 }
 
 .explain-move-action {
@@ -126,79 +126,74 @@
 
 .move-verdict {
   min-width: 0;
-  padding: 11px 4px;
+  padding: 6px 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   border-top: 1px solid #dce3e0;
-  border-bottom: 1px solid #dce3e0;
 }
 
 .human-verdict {
   border-color: #d6e1d8;
   background: linear-gradient(90deg, rgba(226, 238, 228, .34), transparent);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.move-verdict > div {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-}
-
-.move-verdict > div > span {
-  color: #829096;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .08em;
-}
-
-.move-verdict strong {
+.move-verdict > strong {
   overflow: hidden;
   color: #304d59;
   font-size: 13px;
   text-overflow: ellipsis;
 }
 
-.move-verdict small {
-  color: #72868e;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.move-verdict details {
+.objective-verdict details {
   position: relative;
 }
 
-.move-verdict summary {
+.objective-verdict summary {
   color: #527b8d;
   font-size: 12px;
   cursor: pointer;
 }
 
-.move-verdict details p {
+.objective-verdict details p {
   position: absolute;
   z-index: 7;
   right: 0;
   width: 220px;
-  padding: 10px;
-  border: 1px solid #ccd7d5;
-  border-radius: 9px;
+  padding: 8px 10px;
+  border: 1px solid #d5e0dc;
+  border-radius: 8px;
   background: #fffdf8;
-  box-shadow: 0 10px 30px rgba(58, 77, 83, .12);
-  color: #71828a;
+  color: #5b727a;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(48, 77, 84, .12);
 }
 
-.human-mark-placeholder {
-  width: 40px;
-  height: 40px;
+.human-verdict > summary {
   display: grid;
-  place-items: center;
-  color: #7a8799;
-  font-size: 20px;
+  gap: 2px;
+  color: #3f5d55;
+  font-size: 13px;
+  cursor: pointer;
 }
+
+.human-verdict > summary > span {
+  color: #829096;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+.human-verdict p {
+  margin: 4px 0 0;
+  color: #72868e;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 
 .game-summary-section {
   margin: 22px 0 0;
@@ -207,6 +202,7 @@
   border-radius: 16px 13px 18px 14px;
   background: rgba(255, 253, 248, .48);
 }
+
 
 .section-heading {
   margin-bottom: 12px;

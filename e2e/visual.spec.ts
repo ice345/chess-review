@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockLocalAi, seedConnectedLibrary, seedReview } from "./fixtures";
+import { mockLocalAi, openReviewTimeline, seedConnectedLibrary, seedReview } from "./fixtures";
 
 async function dragChessPiece(page: import("@playwright/test").Page, fromSquare: string, toSquare: string) {
   const source = page.locator(`[data-square="${fromSquare}"]`).getByRole("button");
@@ -24,6 +24,7 @@ test("representative Phase 5.3 workspace states", async ({ page }) => {
 
   await page.setViewportSize({ width: 1728, height: 1117 });
   await page.goto(`/review/${record.id}`);
+  await openReviewTimeline(page);
   await page.getByRole("button", { name: "Go to ply 1, Brilliant" }).click();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page).toHaveScreenshot("review-white-brilliant-stockfish-1728.png");

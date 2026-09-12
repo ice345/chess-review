@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
+import { useBoardPieces } from "../hooks/use-board-pieces";
 import { normalizeFen, parsePgn } from "@chess-review/chess-core";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import { externalGameKey } from "../lib/review-status";
@@ -36,6 +37,7 @@ function previewImport(kind: ReviewRecordKind, input: string): { fen: string; pr
 
 export function HomeWorkspace() {
   const router = useRouter();
+  const pieces = useBoardPieces();
   const [kind, setKind] = useState<ReviewRecordKind>("pgn");
   const [input, setInput] = useState("");
   const { snapshot, error: libraryError, loading: libraryLoading, refresh: refreshLibrary } = useLibrarySnapshot();
@@ -198,6 +200,7 @@ export function HomeWorkspace() {
             <div className="home-board-frame" aria-hidden="true" inert>
               <Chessboard options={{
                 position: fen,
+                pieces,
                 allowDragging: false,
                 canDragPiece: () => false,
                 allowDrawingArrows: false,

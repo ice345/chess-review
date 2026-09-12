@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { parsePgn } from "@chess-review/chess-core";
 import type { GameAnalysisV2, PlatformAccount } from "@chess-review/shared";
+import { OBJECTIVE_ALGORITHM_VERSION } from "@chess-review/analysis";
 import type { ReviewRecord } from "./review-library";
 import { buildStudyPlayerLibraries, compactAnalysisForStudy, studyPlayerKey } from "./advanced-study-library";
 
-function analysis(pgn: string, createdAt: string, algorithmVersion = "objective-v2.0"): GameAnalysisV2 {
+function analysis(pgn: string, createdAt: string, algorithmVersion = OBJECTIVE_ALGORITHM_VERSION): GameAnalysisV2 {
   return {
     version: 2,
     algorithmVersion,

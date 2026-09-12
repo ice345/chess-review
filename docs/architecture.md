@@ -45,7 +45,7 @@ The web product uses Next.js App Router nested layouts:
 /settings
 ```
 
-`/review/[gameId]/layout.tsx` owns the persistent review shell. Client-side transitions replace only the contextual panel, preserving game, current ply, orientation, board position and engine runtime state. The shell places the board beside a scrollable contextual panel; on the Review route, Game Summary contains the evaluation timeline so summary metrics and the graph stay aligned while the panel scrolls. The import surface is not mounted inside review routes.
+`/review/[gameId]/layout.tsx` owns the persistent review shell. Client-side transitions replace only the contextual panel, preserving game, current ply, orientation, board position and engine runtime state. The shell places the board beside a scrollable contextual panel. On Review the column leads with a compact key-moment line when one exists, the practice launcher, a compact move list, the current-move verdict and analysis source. Game Summary still owns Accuracy, phases, Move Quality and the evaluation timeline in that same column; the timeline starts collapsed. The import surface is not mounted inside review routes.
 
 Imported review records receive a deterministic browser-side ID and are stored in
 IndexedDB. A record points back to PGN or normalized FEN input; it does not
@@ -126,7 +126,9 @@ and Training progress stores traceable game/ply evidence rather than prose. See
 
 Phase 5.1 uses one shared browser scheduler with two logical slots and three
 priorities: current interactive board, interactive branch, then background
-full-game review. Full-game pools use one worker and the scheduler allows at
+full-game review. A full-game pool sizes itself from the device (half the logical
+cores, bounded to four) and starts workers on demand; the scheduler still allows
+at
 most two engine tasks at once. R5 limits background games to one, leaving a
 slot available for foreground work even while History has a backlog. Queued jobs are priority ordered and stale
 current/continuation work is cancelled with `AbortSignal`. Maia remains

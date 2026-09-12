@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { mockLocalAi, seedReview } from "./fixtures";
+import { mockLocalAi, openReviewMore, openReviewTimeline, seedReview } from "./fixtures";
 
 test("capture review second cut", async ({ page }) => {
   await mockLocalAi(page, "available");
   const { record } = await seedReview(page, { visualLabels: true });
   await page.setViewportSize({ width: 1728, height: 1117 });
   await page.goto(`/review/${record.id}`);
+  await openReviewMore(page);
   await expect(page.getByRole("link", { name: "Engine", exact: true })).toBeVisible();
   await page.screenshot({ path: "/tmp/review-cut2-overview.png" });
+  await openReviewTimeline(page);
   await page.getByRole("button", { name: "Go to ply 2, Blunder" }).click();
   await page.screenshot({ path: "/tmp/review-cut2-overview-move.png" });
   await page.waitForTimeout(1200);

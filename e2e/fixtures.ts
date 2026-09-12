@@ -59,7 +59,7 @@ async function digest(value: string): Promise<string> {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function reviewFixture({ visualLabels = false } = {}): Promise<{
+export async function reviewFixture({ visualLabels = false, preferredOrientation = "white" as "white" | "black" | null } = {}): Promise<{
   record: ReviewRecord;
   analysis: GameAnalysisV2;
   cacheKey: string;
@@ -107,7 +107,7 @@ export async function reviewFixture({ visualLabels = false } = {}): Promise<{
     ...await buildReviewRecord("pgn", SAMPLE_PGN),
     createdAt: "2026-08-23T01:00:00.000Z",
     updatedAt: "2026-08-23T01:00:00.000Z",
-    preferredOrientation: "white" as const,
+    ...(preferredOrientation === null ? {} : { preferredOrientation }),
   };
   const cacheKey = await digest([
     OBJECTIVE_ALGORITHM_VERSION,
@@ -144,7 +144,7 @@ export async function writeStores(page: Page, values: Record<string, Array<[IDBV
   }, { values, name: DATABASE_NAME, version: DATABASE_VERSION, stores: [...DATA_STORES, LOCAL_META_STORE] });
 }
 
-export async function seedReview(page: Page, options: { visualLabels?: boolean } = {}) {
+export async function seedReview(page: Page, options: { visualLabels?: boolean; preferredOrientation?: "white" | "black" | null } = {}) {
   const fixture = await reviewFixture(options);
   await writeStores(page, {
     "review-records": [[fixture.record.id, fixture.record]],
@@ -152,6 +152,26 @@ export async function seedReview(page: Page, options: { visualLabels?: boolean }
   });
   return fixture;
 }
+
+export async function openReviewMore(page: Page): Promise<void> {
+  const details = page.locator("details.review-more");
+  if ((await details.getAttribute("open")) === null) {
+    await details.locator("summary").click();
+  }
+}
+
+export async function goToReviewMoreSection(page: Page, name: "Engine" | "Notebook"): Promise<void> {
+  await openReviewMore(page);
+  await page.locator("details.review-more .action-menu").getByRole("link", { name, exact: true }).click();
+}
+
+export async function openReviewTimeline(page: Page): Promise<void> {
+  const panel = page.locator(".timeline-panel");
+  if ((await panel.getAttribute("open")) === null) {
+    await panel.locator("summary").click();
+  }
+}
+
 
 /**
  * History analysis writes the cache from the provider PGN. Review later loads
