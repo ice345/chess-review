@@ -42,9 +42,21 @@ export interface GameVerificationResult {
 
 type SearcherFactory = () => StockfishSearcher;
 
-function defaultPoolSize(): number {
-  const concurrency = typeof navigator === "undefined" ? 2 : navigator.hardwareConcurrency;
-  return Math.max(1, Math.min(2, Math.floor((concurrency || 2) / 2)));
+/** Upper bound for a whole-game review, independent of how many cores exist. */
+export const MAX_REVIEW_WORKERS = 4;
+
+/**
+ * How many Stockfish workers one whole-game review may use: half the logical
+ * cores, at least one and at most four. Not all cores, because the browser UI,
+ * the interactive board search and any optional local service still need
+ * capacity while a game is under analysis, and a wide pool thrashes on a small
+ * device. Each worker compiles its own multi-megabyte WASM engine, so an extra
+ * worker costs real memory and startup time even when the machine can afford it.
+ */
+export function reviewWorkerBudget(concurrency?: number): number {
+  const reported = concurrency ?? (typeof navigator === "undefined" ? undefined : navigator.hardwareConcurrency);
+  const cores = typeof reported === "number" && Number.isFinite(reported) && reported >= 1 ? reported : 2;
+  return Math.max(1, Math.min(MAX_REVIEW_WORKERS, Math.floor(cores / 2)));
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -55,15 +67,18 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 /**
- * A deliberately small worker pool. Full-game review is CPU-heavy, so browser
- * analysis is bounded to two Stockfish workers even on high-core machines.
+ * A bounded worker pool for whole-game review. Parallelism comes from
+ * `reviewWorkerBudget()` instead of a fixed constant, and workers are created
+ * on demand so a short game never compiles engines it cannot use.
  */
 export class BrowserStockfishPool {
-  private readonly workers: StockfishSearcher[];
+  private readonly workers: StockfishSearcher[] = [];
 
-  constructor(size = defaultPoolSize(), factory: SearcherFactory = () => new BrowserStockfish()) {
+  constructor(
+    private readonly size = reviewWorkerBudget(),
+    private readonly factory: SearcherFactory = () => new BrowserStockfish(),
+  ) {
     if (!Number.isInteger(size) || size < 1) throw new Error("Stockfish pool size must be positive.");
-    this.workers = Array.from({ length: Math.min(2, size) }, factory);
   }
 
   async analyzeGame(game: NormalizedGame, options: GameReviewOptions): Promise<GameReviewResult> {
@@ -230,6 +245,12 @@ export class BrowserStockfishPool {
     for (const worker of this.workers) worker.terminate();
   }
 
+  /** Workers are created on demand: a three-ply game never compiles four engines. */
+  private workerAt(index: number): StockfishSearcher {
+    while (this.workers.length <= index) this.workers.push(this.factory());
+    return this.workers[index]!;
+  }
+
   private async runJobs<T, R>(
     items: readonly T[],
     job: (worker: StockfishSearcher, item: T, index: number) => Promise<R>,
@@ -241,9 +262,13 @@ export class BrowserStockfishPool {
       return [];
     }
     const results = new Array<R>(items.length);
+    const workerCount = Math.min(this.size, items.length);
     let cursor = 0;
     let completed = 0;
-    const run = async (worker: StockfishSearcher): Promise<void> => {
+    // Each runner claims the next unclaimed item, so a slow position cannot
+    // leave another engine idle while work remains.
+    const run = async (workerIndex: number): Promise<void> => {
+      const worker = this.workerAt(workerIndex);
       while (cursor < items.length) {
         throwIfAborted(signal);
         const index = cursor++;
@@ -252,7 +277,7 @@ export class BrowserStockfishPool {
         onProgress(completed);
       }
     };
-    await Promise.all(this.workers.slice(0, items.length).map(run));
+    await Promise.all(Array.from({ length: workerCount }, (_, index) => run(index)));
     return results;
   }
 }

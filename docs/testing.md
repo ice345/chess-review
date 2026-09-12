@@ -33,7 +33,7 @@ pnpm --filter @chess-review/desktop sidecar:build
 
 Screenshot baselines live in `e2e/__screenshots__`. After visually reviewing an intentional UI change, regenerate them with `pnpm test:e2e:update`; do not accept a changed image only to make CI green. `style-ownership.test.ts` prevents the canonical review-shell, workspace, panel and semantic selectors from regaining multiple stylesheet owners; `button-type.test.ts` parses every TSX button and rejects an implicit HTML submit type.
 
-The E2E web server uses `pnpm dev:web`, so browser workflows validate Browser Core's offline boundary. The CI E2E job runs the semantic workflow suite on Linux. The committed visual suite remains available for reviewed local regression runs; platform-specific baselines can be added when the release matrix is introduced.
+The E2E web server uses `pnpm dev:web`, so browser workflows validate Browser Core's offline boundary. Development builds unregister the offline service worker, and `e2e/mistake-practice.spec.ts` blocks service workers outright because two of its workflows force an engine load failure that the worker's engine cache would otherwise mask. `e2e/offline.spec.ts` runs against the production artifact in `playwright.release.config.ts`: it verifies the cached engine and reviewed routes, offline rendering, the uncached-route fallback and `/api/*` staying unintercepted, and it is scoped to Chromium for the measured reasons in [service boundaries](web-service-boundaries.md). The CI E2E job runs the semantic workflow suite on Linux. The committed visual suite remains available for reviewed local regression runs; platform-specific baselines can be added when the release matrix is introduced.
 
 ## CI
 

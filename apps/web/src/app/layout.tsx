@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SITE_DESCRIPTION, SITE_NAME } from "../lib/site-info";
 import type { ReactNode } from "react";
+import { ServiceWorkerRegistrar } from "../components/service-worker-registrar";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/surfaces.css";
@@ -32,7 +33,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegistrar />
+      </body>
     </html>
   );
 }

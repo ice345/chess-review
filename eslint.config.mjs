@@ -12,6 +12,8 @@ export default tseslint.config(
       "**/src-tauri/gen/**",
       "**/.venv/**",
       "**/public/engine/**",
+      "playwright-report/**",
+      "test-results/**",
       "references/**",
     ],
   },
@@ -21,6 +23,14 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "ignoreRestSiblings": true }],
+    },
+  },
+  {
+    // The offline worker is served verbatim, so it is plain JavaScript with the
+    // service worker globals rather than browser document globals.
+    files: ["apps/web/public/sw.js"],
+    languageOptions: {
+      globals: { self: "readonly", caches: "readonly", clients: "readonly", fetch: "readonly", Response: "readonly", Request: "readonly", URL: "readonly" },
     },
   },
 );

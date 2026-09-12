@@ -2,7 +2,7 @@ import { parsePgn } from "@chess-review/chess-core";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
 import { describe, expect, it } from "vitest";
 import type { SearchOptions } from "./browser-engine";
-import { BrowserStockfishPool, type StockfishSearcher } from "./game-review";
+import { BrowserStockfishPool, MAX_REVIEW_WORKERS, reviewWorkerBudget, type StockfishSearcher } from "./game-review";
 
 const game = parsePgn("1. e4 e5 2. Nf3 Nc6");
 const checkmateGame = parsePgn("1. f3 e5 2. g4 Qh4# 0-1");
@@ -171,5 +171,37 @@ describe("BrowserStockfishPool", () => {
     // the unplanned ply 3; its played move must regain restricted evidence.
     expect(result.playedMoveAnalyses.get(3)?.searchMoves).toEqual([game.plies[2]!.uci]);
     expect(UnstableVerificationSearcher.restrictedPlies).toEqual([3]);
+  });
+
+  it("derives the worker budget from the device and never exceeds four", () => {
+    // Single and dual cores must still produce a usable pool.
+    expect(reviewWorkerBudget(0)).toBe(1);
+    expect(reviewWorkerBudget(1)).toBe(1);
+    expect(reviewWorkerBudget(2)).toBe(1);
+    expect(reviewWorkerBudget(3)).toBe(1);
+    // Mid-range machines gain parallelism instead of staying at one worker.
+    expect(reviewWorkerBudget(4)).toBe(2);
+    expect(reviewWorkerBudget(6)).toBe(3);
+    expect(reviewWorkerBudget(8)).toBe(4);
+    // Workers are capped even on many-core machines: the page needs capacity too.
+    expect(reviewWorkerBudget(16)).toBe(MAX_REVIEW_WORKERS);
+    expect(reviewWorkerBudget(Number.NaN)).toBe(1);
+  });
+
+  it("creates only the workers a game can actually use", async () => {
+    FakeSearcher.searches = [];
+    let created = 0;
+    const pool = new BrowserStockfishPool(4, () => {
+      created += 1;
+      return new FakeSearcher();
+    });
+
+    // Two positions do not justify compiling four engines.
+    await pool.analyzeGame(parsePgn("1. e4"), { depth: 10, multiPv: 3 });
+    expect(created).toBe(2);
+
+    // A wider job grows the existing pool to its limit instead of replacing it.
+    await pool.verifyMoves(game, { depth: 18, multiPv: 5, plies: [1, 2, 3, 4] });
+    expect(created).toBe(4);
   });
 });
