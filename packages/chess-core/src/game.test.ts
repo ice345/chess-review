@@ -22,6 +22,27 @@ describe("parsePgn", () => {
     expect(() => parsePgn(`[Variant "Chess960"]\n\n1. e4 *`)).toThrow(/standard chess/);
     expect(() => parsePgn("this is not a chess game 1. e4 e5 2. Ke2 illegal")).toThrow(/could not be parsed/);
   });
+
+  it("keeps imported comments, NAGs and variations on the move they annotate", () => {
+    const game = parsePgn(`[Event "Annotated"]
+
+{ Notes before the game }
+1. e4 $1 { Best by test } (1. d4 d5) e5 2. Nf3 Nc6 *`);
+
+    expect(game.comment).toBe("Notes before the game");
+    expect(game.plies).toHaveLength(4);
+    expect(game.plies[0]).toMatchObject({ san: "e4", comment: "Best by test", nags: [1], variations: ["(1. d4 d5)"] });
+    expect(game.plies[1]?.comment).toBeUndefined();
+    expect(game.plies[3]?.san).toBe("Nc6");
+  });
+
+  it("leaves annotation fields absent for a plain PGN", () => {
+    const game = parsePgn("1. e4 e5 2. Nf3 Nc6");
+    expect(game.comment).toBeUndefined();
+    expect(game.plies[0]?.comment).toBeUndefined();
+    expect(game.plies[0]?.nags).toBeUndefined();
+    expect(game.plies[0]?.variations).toBeUndefined();
+  });
 });
 
 describe("drawStatus", () => {
@@ -110,3 +131,4 @@ describe("legalBoardDestinations", () => {
     expect(legalBoardDestinations(initial, "e7")).toEqual([]);
   });
 });
+

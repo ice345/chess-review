@@ -26,9 +26,10 @@ second chess parser or change analysis semantics.
 
 Framing follows the [PGN specification, sections 7 and 8](https://www.saremba.de/chessgml/standards/pgn/pgn-complete.htm).
 The application requires at least one legal mainline move for a game review;
-use FEN for a position without moves. Variations and comments are preserved as
-source text, but interactive review and analysis still operate on the canonical
-mainline, not on every imported variation.
+use FEN for a position without moves. Comments, NAGs and variations are read as
+source text and shown on the move they annotate (see below). Interactive review
+and analysis still operate on the canonical mainline, not on every imported
+variation.
 
 ## Source versus analysis exports
 
@@ -44,11 +45,47 @@ reconstructed. A selected game from a collection exports only its own framed
 text. This is source-text preservation, not a promise to preserve the source
 file's byte encoding or byte-order mark.
 
-**Annotated PGN** remains the existing mainline export with objective analysis
-annotations. It is not a round-trip editor for original comments or recursive
-variations. The menu explains the difference. Canonical JSON, Position PNG and
-Game Review PNG remain available under their existing prerequisites. FEN
-records do not offer Original PGN.
+**Annotated PGN** is the mainline export with objective analysis annotations. As
+of S4 it is a superset of the imported source rather than a replacement for it:
+the author's comments, NAGs and recursive variations are re-emitted alongside
+the generated evidence. They stay display-and-export only — no imported text
+enters classification, Accuracy or the coach facts, so "why this label" remains
+answerable from canonical evidence alone.
+
+The exporter must hold one hard constraint: the PGN grammar in `chess.js` 1.4.0
+accepts **at most one comment per move**, in the order `SAN NAG* comment?
+variation*`. A second comment after the same move makes the whole file
+unparseable. The author's note is therefore merged into the single generated
+comment as an `Imported note:` entry rather than emitted as a second comment.
+`packages/analysis/src/export-roundtrip.test.ts` re-imports the annotated export
+through this product's own parser to keep that guarantee.
+
+Reading the annotations is `packages/shared/src/pgn-annotations.ts`, the
+counterpart to the PGN writer. It maps comments, NAGs and variations onto ply
+indexes and drops the mapping when its move count disagrees with the replayed
+mainline, so a mis-read annotation can never be attached to the wrong move. The
+review's Moves view shows the imported comment, the conventional `$1`–`$6`
+glyphs and the variation text next to the move they annotate.
+
+This is still not a variation *tree*: imported variations are shown and
+re-exported verbatim, not replayed as playable branches. Editing a variation and
+exporting it back is not implemented. FEN-only records carry no annotations.
+
+## Sharing a reviewed game by link
+
+**Copy share link** in the Export menu builds `/share#pgn=<base64url>`. The
+payload travels in the URL **fragment**, which browsers never send to the
+server, so the host sees only `GET /share` and no game content is uploaded. The
+recipient's browser decodes the fragment, imports the game into its own local
+library and opens the review.
+
+- Budget: `MAX_SHARE_PGN_BYTES = 4096` of raw UTF-8 PGN. A larger game returns
+  no link and the menu says to use **Original PGN** instead.
+- The link is always shown as a selectable field as well as copied, because the
+  clipboard API is unavailable or permission-gated on some browsers.
+- `/share` is `noindex`, and an unreadable payload explains itself instead of
+  failing silently. Changing only the fragment does not reload the document, so
+  the page also re-reads on `hashchange`.
 
 The optional source field does not change deterministic record IDs, database
 version, cache identity, canonical analysis schemas or algorithm versions.

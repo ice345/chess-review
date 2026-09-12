@@ -1,3 +1,4 @@
+import { alignPgnAnnotations, readPgnAnnotations } from "./pgn-annotations";
 import type { AnyGameAnalysis, EngineScore, MoveAnalysis } from "./schema";
 
 const STANDARD_INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -16,7 +17,15 @@ function safeComment(value: string): string {
   return value.replaceAll("{", "(").replaceAll("}", ")");
 }
 
-function moveComment(move: MoveAnalysis): string {
+/**
+ * One comment per move, always. The PGN parser accepts at most a single
+ * comment after a move's NAGs and before its variations, so the imported
+ * author note is merged into the generated evidence block instead of being
+ * emitted as a second comment (which would make the file unreadable by this
+ * very product's importer). Evidence stays first so `[%eval …]` remains at the
+ * start of the comment for other tools.
+ */
+function moveComment(move: MoveAnalysis, importedComment?: string): string {
   const objectiveV2 = "quality" in move
     ? move as MoveAnalysis & { quality: string; annotations: string[] }
     : null;
@@ -30,6 +39,7 @@ function moveComment(move: MoveAnalysis): string {
     ...(move.classificationReason.sacrifice?.genuine === true
       ? [`Sacrifice ${move.classificationReason.sacrifice.sacrificedMaterial}cp; SEE ${move.classificationReason.sacrifice.see}cp`]
       : []),
+    ...(importedComment === undefined ? [] : [`Imported note: ${importedComment}`]),
   ];
   return `{ ${safeComment(evidence.join("; "))} }`;
 }
@@ -54,16 +64,31 @@ function annotatedMovetext(analysis: AnyGameAnalysis): string {
   const fenFields = analysis.game.initialFen.split(" ");
   let moveNumber = Number(fenFields[5] ?? "1");
   if (!Number.isFinite(moveNumber) || moveNumber < 1) moveNumber = 1;
+  // The analysis carries the imported PGN, so annotations the author wrote are
+  // restored here instead of being flattened away. Annotated export is meant to
+  // be a superset of the original, not a replacement for it.
+  const imported = analysis.game.pgn === undefined
+    ? null
+    : alignPgnAnnotations(readPgnAnnotations(analysis.game.pgn), analysis.moves.length);
   const tokens: string[] = [];
   let previousColor: "white" | "black" | undefined;
 
-  for (const move of analysis.moves) {
+  if (imported?.gameComment !== undefined) tokens.push(`{ ${safeComment(imported.gameComment)} }`);
+  analysis.moves.forEach((move, index) => {
     if (move.color === "white") tokens.push(`${moveNumber}.`);
     else if (previousColor !== "white") tokens.push(`${moveNumber}...`);
-    tokens.push(move.san, moveComment(move));
+    tokens.push(move.san);
+    // Order matters: the parser accepts only `SAN NAG* comment? variation*`.
+    const annotation = imported?.plies[index];
+    for (const nag of annotation?.nags ?? []) tokens.push(`$${nag}`);
+    tokens.push(moveComment(move, annotation?.comment));
+    // Variations are re-emitted verbatim: reading them back as a tree is a
+    // separate feature, and rewriting them would silently corrupt the author's
+    // line. They keep their position immediately after the move they annotate.
+    for (const variation of annotation?.variations ?? []) tokens.push(variation);
     if (move.color === "black") moveNumber += 1;
     previousColor = move.color;
-  }
+  });
   tokens.push(analysis.game.headers.Result ?? "*");
 
   const lines: string[] = [];

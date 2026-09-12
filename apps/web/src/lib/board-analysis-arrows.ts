@@ -25,6 +25,14 @@ function arrowMove(uci: string | undefined): { startSquare: string; endSquare: s
   return { startSquare: uci.slice(0, 2), endSquare: uci.slice(2, 4) };
 }
 
+/** The original mistake, shown while an answer is owed. Not an engine suggestion. */
+export function faultArrow(uci: string): Arrow | null {
+  const move = arrowMove(uci);
+  if (!move) return null;
+  return { ...move, color: "rgba(163, 78, 91, 0.92)" };
+}
+
+
 export interface StockfishCandidateIdentity {
   fen: string;
   rank: number;

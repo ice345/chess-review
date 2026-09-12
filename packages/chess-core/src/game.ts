@@ -1,5 +1,5 @@
 import { Chess, type PieceSymbol, type Square } from "chess.js";
-import type { PlayerColor } from "@chess-review/shared";
+import { alignPgnAnnotations, readPgnAnnotations, type PlayerColor } from "@chess-review/shared";
 
 export interface NormalizedPly {
   ply: number;
@@ -13,6 +13,12 @@ export interface NormalizedPly {
   isCapture: boolean;
   isCheck: boolean;
   isPromotion: boolean;
+  /** Comment the imported PGN attached after this move. */
+  comment?: string;
+  /** NAGs the imported PGN attached after this move. */
+  nags?: number[];
+  /** Recursive annotation variations the imported PGN attached after this move, verbatim. */
+  variations?: string[];
 }
 
 export interface NormalizedGame {
@@ -21,6 +27,8 @@ export interface NormalizedGame {
   finalFen: string;
   pgn: string;
   plies: NormalizedPly[];
+  /** Comment the imported PGN placed before the first move. */
+  comment?: string;
 }
 
 export interface ReplayedUciMove {
@@ -106,12 +114,30 @@ export function parsePgn(pgn: string): NormalizedGame {
     });
   }
 
+  // Comments, NAGs and variations live outside the mainline that chess.js
+  // replays. They are recovered here and attached to the move they follow, so
+  // an imported annotated game stays readable and can be exported again
+  // without losing what the author wrote. `alignPgnAnnotations` drops the
+  // mapping when the two readings disagree on the move count.
+  const aligned = alignPgnAnnotations(readPgnAnnotations(pgn), plies.length);
+  const annotated = plies.map((ply, index) => {
+    const annotation = aligned.plies[index];
+    if (!annotation) return ply;
+    return {
+      ...ply,
+      ...(annotation.comment === undefined ? {} : { comment: annotation.comment }),
+      ...(annotation.nags === undefined ? {} : { nags: annotation.nags }),
+      ...(annotation.variations === undefined ? {} : { variations: annotation.variations }),
+    };
+  });
+
   return {
     headers,
     initialFen,
     finalFen: replay.fen(),
     pgn,
-    plies,
+    plies: annotated,
+    ...(aligned.gameComment === undefined ? {} : { comment: aligned.gameComment }),
   };
 }
 
@@ -247,3 +273,4 @@ export function legalBoardDestinations(fen: string, from: string): LegalBoardDes
     ...(move.promotion === undefined ? {} : { promotion: move.promotion }),
   }));
 }
+
