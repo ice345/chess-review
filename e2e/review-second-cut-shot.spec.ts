@@ -26,6 +26,7 @@ test("capture review second cut", async ({ page }) => {
   await page.screenshot({ path: "/tmp/review-cut2-study-move.png" });
 
   await page.goto(`/review/${record.id}/engine`);
+  await openReviewMore(page);
   await expect(page.getByRole("link", { name: "Engine", exact: true })).toHaveAttribute("aria-current", "page");
   await page.screenshot({ path: "/tmp/review-cut2-engine.png" });
 
