@@ -356,7 +356,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}`
         : "Starting position";
     if (state.analysis && currentAnalysis && !state.branch) {
-      downloadBlob(await renderPositionCard(state.analysis, currentAnalysis, state.orientation), reviewFilename(state.analysis, `move-${currentAnalysis.ply}.png`));
+      downloadBlob(await renderPositionCard(state.analysis, currentAnalysis, state.orientation, settings.pieceSet), reviewFilename(state.analysis, `move-${currentAnalysis.ply}.png`));
       return;
     }
     downloadBlob(
@@ -365,6 +365,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         orientation: state.orientation,
         title,
         subtitle: state.analysis?.opening ? `${state.analysis.opening.eco} · ${state.analysis.opening.name}` : "Displayed position",
+        pieceSet: settings.pieceSet,
       }),
       `${title.replaceAll(" ", "-").toLowerCase()}.png`,
     );
@@ -652,11 +653,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                           ["b", "Bishop"],
                           ["n", "Knight"],
                         ] as const).map(([piece, label]) => {
-                          const black = state.positionFen.split(" ")[1] === "b";
-                          const glyph = piece === "q" ? (black ? "♛" : "♕")
-                            : piece === "r" ? (black ? "♜" : "♖")
-                              : piece === "b" ? (black ? "♝" : "♗")
-                                : (black ? "♞" : "♘");
+                          const PromotionPiece = pieces[`${state.positionFen.split(" ")[1] === "b" ? "b" : "w"}${piece.toUpperCase()}`];
                           return (
                             <button
                               type="button"
@@ -667,7 +664,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                                 playBoardMove(pendingPromotion.from, pendingPromotion.to, piece);
                               }}
                             >
-                              <span aria-hidden="true">{glyph}</span>
+                              <span className="promotion-piece" aria-hidden="true">{PromotionPiece && <PromotionPiece />}</span>
                               {label}
                             </button>
                           );

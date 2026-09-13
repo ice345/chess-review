@@ -169,6 +169,14 @@ test("promotion chooser offers four pieces and cancel", async ({ page }) => {
   await expect(chooser.getByRole("button", { name: "Rook" })).toBeVisible();
   await expect(chooser.getByRole("button", { name: "Bishop" })).toBeVisible();
   await expect(chooser.getByRole("button", { name: "Knight" })).toBeVisible();
+  // The accessible names come from the label text, so assert the piece artwork
+  // actually decoded rather than leaving four blank buttons unverified.
+  await expect(chooser.locator(".promotion-piece img")).toHaveCount(4);
+  await expect.poll(
+    () => chooser.locator(".promotion-piece img").evaluateAll(
+      (images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0),
+    ),
+  ).toBe(true);
   await chooser.getByRole("button", { name: "Cancel" }).click();
   await expect(chooser).toHaveCount(0);
   await expect(page.getByText("Starting position")).toBeVisible();

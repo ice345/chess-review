@@ -1,10 +1,54 @@
 import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis } from "@chess-review/shared";
 import { QUALITY_META } from "@chess-review/ui";
+import { PIECE_ASSET_DIR, PIECE_ASSET_KEYS, boardPieceImageKey, type PieceAssetKey, type PieceSetId } from "./board-piece-assets";
 
 const PIECES: Record<string, string> = {
   P: "♙", N: "♘", B: "♗", R: "♖", Q: "♕", K: "♔",
   p: "♟", n: "♞", b: "♝", r: "♜", q: "♛", k: "♚",
 };
+
+/** Canvas fallbacks mirror the `--board-square-*` tokens in `styles/tokens.css`.
+    The rendered board reads the live tokens when a document is available, so the
+    export follows the theme while the canvas keeps a usable offline default. */
+export const BOARD_SQUARE_FALLBACK = { light: "#eee8d9", dark: "#b1c6c2" } as const;
+
+export type BoardPieceImages = Partial<Record<PieceAssetKey, HTMLImageElement>>;
+
+function cssToken(name: string, fallback: string): string {
+  if (typeof document === "undefined" || typeof getComputedStyle !== "function") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function loadImage(source: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = source;
+  });
+}
+
+const pieceImageRequests = new Map<PieceSetId, Promise<BoardPieceImages>>();
+
+/** Preloads the twelve authored PNGs once per piece set. An asset the browser
+    cannot decode keeps the Unicode glyph fallback, so an offline or partial
+    cache degrades the export instead of failing it. */
+export function loadBoardPieceImages(set: PieceSetId): Promise<BoardPieceImages> {
+  if (set !== "liz-blue" || typeof Image === "undefined") return Promise.resolve({});
+  const cached = pieceImageRequests.get(set);
+  if (cached) return cached;
+  const request = Promise.all(PIECE_ASSET_KEYS.map(async (key) => {
+    const image = await loadImage(`${PIECE_ASSET_DIR}/${key}.png`);
+    return image ? ([key, image] as const) : null;
+  })).then((entries) => Object.fromEntries(entries.filter((entry) => entry !== null)) as BoardPieceImages);
+  pieceImageRequests.set(set, request);
+  // A fully failed load stays retryable: a later export in the same page session
+  // can succeed once the browser has cached `/pieces/`.
+  void request.then((images) => {
+    if (Object.keys(images).length === 0) pieceImageRequests.delete(set);
+  });
+  return request;
+}
 
 function canvas(width = 1200, height = 675): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const element = document.createElement("canvas");
@@ -179,20 +223,28 @@ function drawBoard(
   y: number,
   size: number,
   orientation: "white" | "black",
+  images: BoardPieceImages,
 ) {
   context.save();
   const board = boardPieces(fen);
   const square = size / 8;
+  const light = cssToken("--board-square-light", BOARD_SQUARE_FALLBACK.light);
+  const dark = cssToken("--board-square-dark", BOARD_SQUARE_FALLBACK.dark);
   for (let displayRank = 0; displayRank < 8; displayRank += 1) {
     for (let displayFile = 0; displayFile < 8; displayFile += 1) {
       const sourceRank = orientation === "white" ? displayRank : 7 - displayRank;
       const sourceFile = orientation === "white" ? displayFile : 7 - displayFile;
       const px = x + displayFile * square;
       const py = y + displayRank * square;
-      context.fillStyle = (displayFile + displayRank) % 2 === 0 ? "#f2e5cf" : "#91aeb6";
+      context.fillStyle = (displayFile + displayRank) % 2 === 0 ? light : dark;
       context.fillRect(px, py, square, square);
       const piece = board[sourceRank]?.[sourceFile];
       if (!piece) continue;
+      const image = images[boardPieceImageKey(piece)];
+      if (image) {
+        context.drawImage(image, px, py, square, square);
+        continue;
+      }
       context.font = `${Math.round(square * 0.78)}px "Arial Unicode MS", "Noto Sans Symbols 2", serif`;
       context.textAlign = "center";
       context.textBaseline = "middle";
@@ -238,11 +290,13 @@ export async function renderDisplayedPositionCard(options: {
   orientation: "white" | "black";
   title: string;
   subtitle: string;
+  pieceSet?: PieceSetId;
 }): Promise<Blob> {
   const [element, context] = canvas();
+  const pieces = await loadBoardPieceImages(options.pieceSet ?? "liz-blue");
   background(context, options.title, options.subtitle);
   roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
-  drawBoard(context, options.fen, 50, 80, 520, options.orientation);
+  drawBoard(context, options.fen, 50, 80, 520, options.orientation, pieces);
   context.fillStyle = "#294653";
   context.font = "800 28px system-ui";
   context.fillText("Displayed position", 620, 174);
@@ -256,12 +310,14 @@ export async function renderPositionCard(
   analysis: AnyGameAnalysis,
   move: MoveAnalysis,
   orientation: "white" | "black",
+  pieceSet: PieceSetId = "liz-blue",
 ): Promise<Blob> {
   const [element, context] = canvas();
+  const pieces = await loadBoardPieceImages(pieceSet);
   const moveNumber = formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san });
   background(context, moveNumber, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : move.phase);
   roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
-  drawBoard(context, move.fenAfter, 50, 80, 520, orientation);
+  drawBoard(context, move.fenAfter, 50, 80, 520, orientation, pieces);
 
   drawBadge(context, move, 620, 128, 76);
   context.fillStyle = QUALITY_META[move.classification].ink;
