@@ -9,7 +9,7 @@ import {
   type MobileEndpointManifestV1,
   type MobileExecutionLane,
 } from "@chess-review/shared";
-import { BlueBishopMark } from "@chess-review/ui";
+import { BlueBishopMark, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { isTauri } from "@tauri-apps/api/core";
 import { Chessboard } from "react-chessboard";
 
@@ -305,11 +305,7 @@ export function App() {
             allowDragging: false,
             allowDrawingArrows: false,
             animationDurationInMs: 140,
-            lightSquareStyle: { backgroundColor: "#f2e5cf" },
-            darkSquareStyle: { backgroundColor: "#91aeb6" },
-            lightSquareNotationStyle: { color: "#6d8290" },
-            darkSquareNotationStyle: { color: "#f4eadb" },
-            boardStyle: { borderRadius: "5px", boxShadow: "0 16px 42px rgba(60, 74, 84, .15)" },
+            ...WINDOWLIGHT_BOARD_APPEARANCE,
           }} />
           {study?.kind === "game" && <div className="board-controls" aria-label={text.navigation}>
             <button type="button" onClick={() => setCurrentPly(0)} disabled={currentPly === 0}>{text.first}</button>
