@@ -7,7 +7,7 @@ import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
-import { BoardQualityBadge, QUALITY_META } from "@chess-review/ui";
+import { BoardQualityBadge, QUALITY_META, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
 import { TrainingSession } from "./training-session";
 import { ReviewRuntimeProvider } from "./review-runtime";
@@ -637,11 +637,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       // not a move identity (for example f2f3 and g1f3), so exact
                       // Stockfish/Maia branches are entered from candidate rows.
                     },
-                    lightSquareStyle: { backgroundColor: "#f2e5cf" },
-                    darkSquareStyle: { backgroundColor: "#91aeb6" },
-                    lightSquareNotationStyle: { color: "#6d8290" },
-                    darkSquareNotationStyle: { color: "#f4eadb" },
-                    boardStyle: { borderRadius: "5px", boxShadow: "0 20px 54px rgba(60, 74, 84, .16)" },
+                    lightSquareStyle: WINDOWLIGHT_BOARD_APPEARANCE.lightSquareStyle,
+                    darkSquareStyle: WINDOWLIGHT_BOARD_APPEARANCE.darkSquareStyle,
+                    lightSquareNotationStyle: WINDOWLIGHT_BOARD_APPEARANCE.lightSquareNotationStyle,
+                    darkSquareNotationStyle: WINDOWLIGHT_BOARD_APPEARANCE.darkSquareNotationStyle,
+                    boardStyle: WINDOWLIGHT_BOARD_APPEARANCE.boardStyle,
                   }} />
                   {pendingPromotion && (
                     <div className="promotion-chooser" role="dialog" aria-label="Choose promotion piece">

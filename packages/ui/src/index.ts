@@ -1,3 +1,4 @@
+export * from "./board-appearance";
 export * from "./board-quality-badge";
 export * from "./board-human-difficulty-badge";
 export * from "./blue-bishop-mark";

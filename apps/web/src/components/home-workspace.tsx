@@ -9,6 +9,7 @@ import { normalizeFen, parsePgn } from "@chess-review/chess-core";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import { externalGameKey } from "../lib/review-status";
 import type { SyncedGame } from "@chess-review/shared";
+import { WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
 import { EXAMPLE_PGN } from "../lib/example-game";
 import { inspectPgnImport, readPgnFile, type PgnChoice } from "../lib/pgn-import";
@@ -205,11 +206,7 @@ export function HomeWorkspace() {
                 canDragPiece: () => false,
                 allowDrawingArrows: false,
                 boardOrientation: "white",
-                lightSquareStyle: { backgroundColor: "#f2e5cf" },
-                darkSquareStyle: { backgroundColor: "#91aeb6" },
-                lightSquareNotationStyle: { color: "#6d8290" },
-                darkSquareNotationStyle: { color: "#f4eadb" },
-                boardStyle: { borderRadius: "5px", boxShadow: "0 20px 54px rgba(60, 74, 84, .16)" },
+                ...WINDOWLIGHT_BOARD_APPEARANCE,
               }} />
             </div>
             <figcaption>{

@@ -2,7 +2,7 @@ import { isLocalSessionInvalid, LocalDataChangedError } from "./browser-storage"
 import type { CoachLanguage } from "@chess-review/shared";
 import type { CoachRequestProvider, MaiaModel } from "./local-ai";
 import type { ChessSoundTheme } from "./chess-sound";
-import type { PieceSetId } from "./board-pieces";
+import type { PieceSetId } from "./board-piece-assets";
 
 export interface AppSettings {
   coachProvider: CoachRequestProvider;

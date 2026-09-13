@@ -1,4 +1,5 @@
-/* Phase 5.2 source-aware evaluation and dual move verdicts. */
+/* Phase 5.2 source-aware evaluation and dual move verdicts, plus the internal
+   visual QA fixtures (/design/quality-icons, /design/pieces). */
 
 .eval-stack {
   display: grid;
@@ -11,11 +12,11 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  border: 1px solid rgba(73, 92, 100, .22);
+  border: 1px solid color-mix(in srgb, var(--ink-secondary) 22%, transparent);
   border-radius: 10px;
-  background: #f8f3e9;
-  color: #294653;
-  box-shadow: 0 5px 16px rgba(53, 74, 81, .07);
+  background: var(--surface-raised);
+  color: var(--ink-primary);
+  box-shadow: 0 4px 14px rgba(53, 74, 81, .055);
 }
 
 .eval-top {
@@ -26,23 +27,23 @@
 
 .eval-top.eval-black,
 .eval-bottom-black {
-  background: #667e88;
+  background: #647b85;
 }
 
 .eval-top.eval-white,
 .eval-bottom-white {
-  background: #f8f3e9;
+  background: var(--surface-raised);
 }
 
 .eval-readout {
-  color: #294653;
+  color: var(--ink-primary);
   font: 700 13px/1.15 Inter, ui-sans-serif, sans-serif;
   letter-spacing: -.03em;
   text-align: center;
   word-break: break-word;
 }
 .eval-source-label {
-  color: #6d8590;
+  color: var(--ink-muted);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: .04em;
@@ -64,7 +65,7 @@
   transform: translateY(-50%);
   border-radius: 999px;
   background: #6d9874;
-  box-shadow: 0 0 0 1px rgba(255, 253, 248, .9);
+  box-shadow: 0 0 0 1px var(--surface-paper);
   transition: top .25s ease;
 }
 
@@ -117,12 +118,12 @@
   grid-column: 1 / -1;
   justify-self: end;
   padding: 3px 1px;
-  color: #4f7889;
+  color: var(--accent-primary);
   font-size: 12px;
   font-weight: 750;
 }
 
-.explain-move-action:hover { color: #294f60; }
+.explain-move-action:hover { color: var(--accent-hover); }
 
 .move-verdict {
   min-width: 0;
@@ -131,18 +132,18 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid #dce3e0;
+  border-top: 1px solid var(--line-soft);
 }
 
 .human-verdict {
-  border-color: #d6e1d8;
-  background: linear-gradient(90deg, rgba(226, 238, 228, .34), transparent);
+  border-color: var(--line-soft);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--wash-sage) 34%, transparent), transparent);
   grid-template-columns: minmax(0, 1fr);
 }
 
 .move-verdict > strong {
   overflow: hidden;
-  color: #304d59;
+  color: var(--ink-primary);
   font-size: 13px;
   text-overflow: ellipsis;
 }
@@ -152,7 +153,7 @@
 }
 
 .objective-verdict summary {
-  color: #527b8d;
+  color: var(--accent-primary);
   font-size: 12px;
   cursor: pointer;
 }
@@ -163,10 +164,10 @@
   right: 0;
   width: 220px;
   padding: 8px 10px;
-  border: 1px solid #d5e0dc;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
-  color: #5b727a;
+  background: var(--surface-paper);
+  color: var(--ink-secondary);
   font-size: 12px;
   line-height: 1.4;
   box-shadow: 0 8px 24px rgba(48, 77, 84, .12);
@@ -175,13 +176,13 @@
 .human-verdict > summary {
   display: grid;
   gap: 2px;
-  color: #3f5d55;
+  color: var(--ink-secondary);
   font-size: 13px;
   cursor: pointer;
 }
 
 .human-verdict > summary > span {
-  color: #829096;
+  color: var(--ink-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .06em;
@@ -189,7 +190,7 @@
 
 .human-verdict p {
   margin: 4px 0 0;
-  color: #72868e;
+  color: var(--ink-muted);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -198,9 +199,10 @@
 .game-summary-section {
   margin: 22px 0 0;
   padding: 16px;
-  border: 1px solid rgba(117, 145, 146, .24);
-  border-radius: 16px 13px 18px 14px;
-  background: rgba(255, 253, 248, .48);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface-paper);
+  box-shadow: var(--shadow-paper);
 }
 
 
@@ -210,7 +212,7 @@
 
 .section-heading h2 {
   margin: 4px 0 0;
-  color: #304d59;
+  color: var(--ink-primary);
   font: 500 18px Georgia, "Songti SC", serif;
 }
 
@@ -223,8 +225,8 @@
 .quality-fixture-page {
   min-height: 100vh;
   padding: 48px;
-  color: #334f5b;
-  background: #f8f3e9;
+  color: var(--ink-primary);
+  background: var(--surface-raised);
 }
 
 .quality-fixture-page header {
@@ -234,7 +236,7 @@
 
 .quality-fixture-page header > span,
 .quality-fixture-page header p {
-  color: #71858d;
+  color: var(--ink-muted);
   font-size: 12px;
 }
 
@@ -253,9 +255,9 @@
 
 .quality-fixture-grid > section {
   padding: 14px;
-  border: 1px solid #d3deda;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 253, 248, .72);
+  background: var(--surface-paper);
 }
 
 .quality-fixture-grid > section > div {
@@ -266,7 +268,7 @@
 
 .quality-fixture-grid > section > div small {
   margin-left: auto;
-  color: #849296;
+  color: var(--ink-muted);
   font-size: 12px;
 }
 
@@ -284,7 +286,71 @@
   font-size: 12px;
 }
 
-.quality-fixture-grid .paper { background: #fffaf0; }
-.quality-fixture-grid .mist { background: #dfeae8; }
-.quality-fixture-grid .light-square { background: #f2e5cf; }
-.quality-fixture-grid .dark-square { background: #91aeb6; color: #fffaf0; }
+.quality-fixture-grid .paper { background: var(--surface-paper); }
+.quality-fixture-grid .mist { background: var(--wash-blue); }
+.quality-fixture-grid .light-square { background: var(--board-square-light); }
+.quality-fixture-grid .dark-square { background: var(--board-square-dark); color: var(--board-notation-dark); }
+
+/* Piece and board acceptance fixture (/design/pieces). Shares the quality
+   fixture shell so both internal QA routes measure the production environment. */
+.piece-fixture-matrix,
+.piece-fixture-boards {
+  grid-column: 1 / -1;
+}
+
+.piece-fixture-matrix { display: grid; gap: 8px; }
+
+.piece-fixture-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.piece-fixture-row > strong {
+  color: var(--ink-secondary);
+  font: 700 12px var(--font-mono);
+}
+
+.piece-fixture-cells { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.piece-fixture-cell {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--board-outline);
+  border-radius: 4px;
+}
+
+.piece-fixture-cell.light { background: var(--board-square-light); }
+.piece-fixture-cell.dark { background: var(--board-square-dark); }
+
+.piece-fixture-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.piece-fixture-board { min-width: 0; display: grid; align-content: start; gap: 6px; }
+.piece-fixture-board h2 { margin: 0; color: var(--ink-primary); font: 500 18px var(--font-serif); }
+.piece-fixture-board p { margin: 0; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+.piece-fixture-board-wrap {
+  position: relative;
+  width: min(340px, 100%);
+  aspect-ratio: 1;
+  margin-top: 4px;
+}
+
+/* The fixtures are internal QA pages, but they must still obey the phone
+   overflow contract: one column, tighter padding and narrower icon cells. */
+@media (max-width: 900px) {
+  .quality-fixture-page { padding: 24px; }
+  .quality-fixture-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .quality-fixture-page { padding: 16px; }
+  .quality-fixture-grid article { grid-template-columns: minmax(0, 1fr) repeat(4, 28px); }
+  .piece-fixture-row { grid-template-columns: 26px minmax(0, 1fr); }
+  .piece-fixture-board-wrap { width: 100%; }
+}

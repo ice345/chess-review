@@ -10,7 +10,7 @@ describe("board move hints", () => {
 
     expect(styles.e4?.boxShadow).toContain("inset");
     expect(styles.e5?.backgroundImage).toContain("0 12%");
-    expect(styles.d5?.backgroundImage).toContain("65% 78%");
+    expect(styles.d5?.backgroundImage).toContain("64% 78%");
     expect(styles.e5).not.toEqual(styles.d5);
   });
 

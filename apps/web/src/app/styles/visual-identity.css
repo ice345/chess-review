@@ -6,9 +6,9 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(236, 228, 212, .88);
-  color: #6478a0;
-  box-shadow: inset 0 0 0 1px rgba(100, 120, 160, .18);
+  background: var(--wash-cream);
+  color: var(--accent-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 18%, transparent);
   transform: none;
 }
 
@@ -21,7 +21,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  color: #7a8aa3;
+  color: var(--ink-secondary);
 }
 
 .home-chess-identity > svg {
@@ -29,8 +29,8 @@
 }
 
 .home-chess-identity > span { display: grid; gap: 4px; }
-.home-chess-identity b { color: #3d4f66; font: 500 15px Georgia, "Songti SC", serif; }
-.home-chess-identity small { color: #8a919c; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.home-chess-identity b { color: var(--ink-primary); font: 500 15px var(--font-serif); }
+.home-chess-identity small { color: var(--ink-faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 
 @media (max-width: 760px) {
   .home-chess-identity { margin-bottom: 20px; }

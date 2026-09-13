@@ -115,13 +115,13 @@ export function SettingsPage() {
         <section className="settings-card">
           <div><span className="kicker">Board feedback</span><h2>Chess sounds</h2></div>
           <label>Piece set<select value={settings.pieceSet} onChange={(event) => update({ ...settings, pieceSet: event.target.value as AppSettings["pieceSet"] })}>
-            <option value="liz-blue">Liz Blue</option>
+            <option value="liz-blue">Feather Porcelain</option>
             <option value="classic">Classic SVG</option>
           </select></label>
           <label className="sound-enabled-setting"><span>Sound effects</span><input type="checkbox" checked={settings.soundEnabled} onChange={(event) => update({ ...settings, soundEnabled: event.target.checked })} /></label>
           <label>Volume · {Math.round(settings.soundVolume * 100)}<input type="range" min={0} max={100} step={1} value={Math.round(settings.soundVolume * 100)} onChange={(event) => update({ ...settings, soundVolume: Number(event.target.value) / 100 })} /></label>
           <label>Sound theme<select value={settings.soundTheme} onChange={() => update({ ...settings, soundTheme: "wintrchess" })}><option value="wintrchess">WintrChess</option></select></label>
-          <small>Liz Blue is the default board set. Classic SVG is the previous react-chessboard pieces. Sounds follow legal board transitions.</small>
+          <small>Feather Porcelain is the default board set. Classic SVG is the previous react-chessboard pieces. Sounds follow legal board transitions.</small>
         </section>
         <section className="settings-card runtime-card">
           <div><span className="kicker">Available capabilities</span><h2>{enhanced ? "Local enhancements" : "Browser Core"}</h2></div>

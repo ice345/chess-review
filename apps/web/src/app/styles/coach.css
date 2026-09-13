@@ -5,7 +5,7 @@
   margin-top: 16px;
   display: grid;
   gap: 0;
-  border-top: 1px solid #d8e2de;
+  border-top: 1px solid var(--line-soft);
 }
 
 .coach-teaching-sequence > section {
@@ -14,13 +14,13 @@
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
   gap: 8px;
-  border-bottom: 1px solid #dfe6e3;
+  border-bottom: 1px solid var(--line-soft);
   background: transparent;
 }
 
 .coach-teaching-sequence > section > span {
-  color: #9aacaa;
-  font: italic 400 9px Georgia, "Songti SC", serif;
+  color: var(--ink-faint);
+  font: italic 400 11px Georgia, "Songti SC", serif;
 }
 
 .coach-teaching-sequence > section > div {
@@ -29,13 +29,13 @@
 }
 
 .coach-teaching-sequence strong {
-  color: #426675;
+  color: var(--ink-secondary);
   font-size: 12px;
 }
 
 .coach-teaching-sequence p {
   margin: 0;
-  color: #61767c;
+  color: var(--ink-secondary);
   font-size: 12px;
   line-height: 1.65;
 }
@@ -46,7 +46,7 @@
 }
 
 .coach-teaching-sequence .teaching-consequence {
-  background: rgba(226, 236, 233, .38);
+  background: color-mix(in srgb, var(--wash-blue) 38%, transparent);
 }
 
 .coach-teaching-sequence .teaching-alternative {

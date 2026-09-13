@@ -5,7 +5,7 @@
   width: min(1220px, calc(100% - 44px));
   margin: 0 auto;
   padding: 54px 0;
-  border-top: 1px solid #dbe2df;
+  border-top: 1px solid var(--line);
 }
 
 .settings-grid + .connected-accounts {
@@ -24,14 +24,14 @@
 .connected-accounts h2,
 .synced-games-section h2 {
   margin: 5px 0 0;
-  color: #2d4a56;
+  color: var(--ink-primary);
   font: 500 29px Georgia, "Songti SC", serif;
 }
 
 .connected-accounts header p,
 .synced-games-section > div:first-child p {
   margin: 0;
-  color: #74868e;
+  color: var(--ink-muted);
   font-size: 11px;
   line-height: 1.6;
 }
@@ -51,37 +51,37 @@
   align-items: center;
   gap: 20px;
   scroll-margin-top: 84px;
-  border: 1px solid #d4dedb;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(255, 253, 248, .62);
+  background: var(--surface-paper);
 }
 
-.account-link-card:target { border-color: #769caf; box-shadow: 0 0 0 3px rgba(118, 156, 175, .12); }
+.account-link-card:target { border-color: var(--focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 12%, transparent); }
 .account-link-card > div:first-child { display: grid; gap: 5px; }
-.account-link-card strong { color: #344f5b; }
-.account-link-card small { color: #829096; font-size: 9px; }
+.account-link-card strong { color: var(--ink-primary); }
+.account-link-card small { color: var(--ink-muted); font-size: 11px; }
 .account-link-card > div:last-child { display: flex; gap: 7px; }
-.account-link-card input { width: 145px; min-width: 0; padding: 0 10px; border: 1px solid #c6d2d0; border-radius: 9px; background: #fffdf8; color: #354e59; }
+.account-link-card input { width: 145px; min-width: 0; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-paper); color: var(--ink-primary); }
 .account-link-card .secondary { min-height: 38px; }
-.account-link-card a { color: #527b8d; font-size: 10px; font-weight: 750; white-space: nowrap; }
+.account-link-card a { color: var(--accent-primary); font-size: 11px; font-weight: 750; white-space: nowrap; }
 
 .account-list { margin-top: 12px; display: grid; gap: 7px; }
 .account-list article > div { display: grid; gap: 3px; }
-.account-list article strong { color: #344f5b; font-size: 12px; }
-.account-list article small { color: #829096; font-size: 9px; }
-.account-list article em { color: #a6535f; font-size: 9px; font-style: normal; }
-.account-list .disconnect { color: #98707a; }
-.account-notice { margin: 13px 0 0; color: #607984; font-size: 10px; }
+.account-list article strong { color: var(--ink-primary); font-size: 12px; }
+.account-list article small { color: var(--ink-muted); font-size: 11px; }
+.account-list article em { color: var(--danger); font-size: 11px; font-style: normal; }
+.account-list .disconnect { color: var(--danger); }
+.account-notice { margin: 13px 0 0; color: var(--ink-secondary); font-size: 11px; }
 
 .oauth-notice {
   width: min(1060px, calc(100% - 40px));
   margin: 32px auto -26px;
   padding: 10px 12px;
-  border: 1px solid #c9d7d5;
+  border: 1px solid var(--line);
   border-radius: 9px;
-  background: #e8f0ee;
-  color: #4f6e7b;
-  font-size: 10px;
+  background: var(--wash-blue);
+  color: var(--ink-secondary);
+  font-size: 11px;
 }
 
 .synced-games-section { padding-top: 47px; }
@@ -114,7 +114,7 @@
   background: transparent;
 }
 
-.history-filters label { display: grid; gap: 5px; color: #7c8d93; font-size: 8px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.history-filters label { display: grid; gap: 5px; color: var(--ink-muted); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .history-filters input, .history-filters select { width: 100%; min-width: 0; height: 37px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-paper); color: var(--ink-primary); }
 
 .history-game {
@@ -133,8 +133,8 @@
 
 .history-game > span:nth-child(2) { min-width: 0; display: grid; gap: 3px; }
 .history-game strong, .history-game small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-game strong { color: #334f5a; font-size: 13px; }
-.history-game small, .history-game time { color: #819096; font-size: 10px; }
+.history-game strong { color: var(--ink-primary); font-size: 13px; }
+.history-game small, .history-game time { color: var(--ink-muted); font-size: 11px; }
 
 .platform-avatar {
   position: relative;
@@ -145,8 +145,8 @@
   overflow: hidden;
   border-radius: 50% 44% 52% 46%;
   background: #6f8f78;
-  color: #fffdf8;
-  font: 700 10px Georgia, "Songti SC", serif;
+  color: var(--surface-paper);
+  font: 700 11px Georgia, "Songti SC", serif;
 }
 
 .platform-avatar.lichess {
@@ -167,7 +167,7 @@
   grid-template-columns: 40px minmax(220px, 1fr) auto auto;
   align-items: center;
   gap: 13px;
-  border-bottom: 1px solid #dce3e0;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .account-identity {
@@ -187,8 +187,8 @@
 }
 
 .sync-summary {
-  color: #668076;
-  font-size: 8px;
+  color: var(--ink-muted);
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: .03em;
   text-transform: capitalize;
@@ -197,7 +197,7 @@
 .sync-summary.paused,
 .sync-summary.rate-limited,
 .sync-summary.error {
-  color: #9a7273;
+  color: var(--danger);
 }
 
 .connected-accounts.compact {
@@ -215,17 +215,17 @@
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  border: 1px solid #d5dfdc;
+  border: 1px solid var(--line);
   border-radius: 13px;
-  background: rgba(255, 253, 248, .56);
-  color: #74868d;
-  font-size: 10px;
+  background: var(--surface-paper);
+  color: var(--ink-muted);
+  font-size: 11px;
 }
 
 .compact-account-empty a,
 .manage-accounts {
-  color: #527b8d;
-  font-size: 10px;
+  color: var(--accent-primary);
+  font-size: 11px;
   font-weight: 750;
 }
 

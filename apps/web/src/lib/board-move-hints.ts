@@ -1,17 +1,24 @@
 import type { CSSProperties } from "react";
 import type { LegalBoardDestination } from "@chess-review/chess-core";
 
+/* Board interaction must stay more visible than the theme. The origin uses the
+   dusty-rose selection token with a restrained brass wash; destinations keep
+   their own rose+paper rings. Colors are token-owned (tokens.css) so board
+   feedback follows the Windowlight palette instead of drifting. */
+
 const SELECTED_SQUARE: CSSProperties = {
-  boxShadow: "inset 0 0 0 4px rgba(157, 48, 90, .96)",
-  backgroundImage: "linear-gradient(rgba(255, 239, 126, .44), rgba(255, 239, 126, .44))",
+  boxShadow: "inset 0 0 0 4px var(--board-selection)",
+  backgroundImage: "linear-gradient(var(--board-selection-wash), var(--board-selection-wash))",
 };
 
 const QUIET_DESTINATION: CSSProperties = {
-  backgroundImage: "radial-gradient(circle, rgba(157, 48, 90, .96) 0 12%, rgba(255, 253, 248, .92) 13% 19%, transparent 20%)",
+  backgroundImage:
+    "radial-gradient(circle, color-mix(in srgb, var(--accent-rose) 94%, transparent) 0 12%, color-mix(in srgb, var(--surface-paper) 90%, transparent) 13% 19%, transparent 20%)",
 };
 
 const CAPTURE_DESTINATION: CSSProperties = {
-  backgroundImage: "radial-gradient(circle, transparent 0 57%, rgba(255, 253, 248, .9) 58% 64%, rgba(157, 48, 90, .94) 65% 78%, transparent 79%)",
+  backgroundImage:
+    "radial-gradient(circle, transparent 0 56%, color-mix(in srgb, var(--surface-paper) 90%, transparent) 57% 63%, color-mix(in srgb, var(--accent-rose) 92%, transparent) 64% 78%, transparent 79%)",
 };
 
 export function boardMoveHintStyles(

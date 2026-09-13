@@ -62,4 +62,8 @@ test("representative Phase 5.3 workspace states", async ({ page }) => {
   await page.goto("/design/quality-icons");
   await expect(page.locator(".quality-fixture-grid > section")).toHaveCount(14);
   await expect(page).toHaveScreenshot("quality-icons-v3-1440.png", { fullPage: true });
+
+  await page.goto("/design/pieces");
+  await expect(page.locator(".piece-fixture-row")).toHaveCount(12);
+  await expect(page).toHaveScreenshot("pieces-windowlight-1440.png", { fullPage: true });
 });
