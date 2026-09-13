@@ -24,6 +24,8 @@
 仓库：https://github.com/ice345/chess-review
 本地 web：`apps/web`（App Router）。正式 UI spec：`docs/ui-spec.md`。色板：`apps/web/src/app/styles/tokens.css`。Training 样式：`apps/web/src/app/styles/study.css`。品牌：`apps/web/src/app/styles/visual-identity.css`。
 
+**已实施状态（2026-09-13）**：Windowlight 视觉收敛已落地，见 `docs/design/2026-09-13-windowlight-implementation.md`。要点：单一浅色主题（无主题切换、无 theme provider）；棋盘 light `#eee8d9` / dark `#b1c6c2`，棋子为 Feather Porcelain（存储 id 仍为 `liz-blue`，Settings 显示名已改为 Feather Porcelain）；棋盘外观集中在 `apps/web/src/lib/board-appearance.ts`；无 `backdrop-filter`；重复密集信息用 ink row 而非半透明卡片；Stockfish/Maia/Move Quality 语义色不变。`docs/design/2026-09-05-bluebird-design-plan.md` 已标记为历史文档。
+
 实测账号：Chess.com `ice-345`，导入 98 盘，Stockfish depth 10 分析完成 95 盘，3 盘非法 PGN 失败。
 
 ### Audit finding 状态规则
