@@ -12,6 +12,7 @@ import {
 import { BlueBishopMark, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { isTauri } from "@tauri-apps/api/core";
 import { Chessboard } from "react-chessboard";
+import { FEATHER_PORCELAIN_PIECES } from "./piece-assets";
 
 const EXAMPLE_PGN = `[Event "Mobile companion"]
 [White "Blue Bishop"]
@@ -302,6 +303,7 @@ export function App() {
         {positionFen && <div className="board-preview" aria-label={text.boardLabel}>
           <Chessboard options={{
             position: positionFen,
+            pieces: FEATHER_PORCELAIN_PIECES,
             allowDragging: false,
             allowDrawingArrows: false,
             animationDurationInMs: 140,

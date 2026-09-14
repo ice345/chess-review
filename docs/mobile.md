@@ -12,7 +12,8 @@ analysis service.
 - imports the existing Blue Bishop identity and shared packages;
 - parses pasted PGN, `.pgn` files and explicit FEN locally through
   `@chess-review/chess-core`;
-- renders the imported position and navigates PGN plies without a network;
+- renders the imported position with the same Feather Porcelain pieces as the Web
+  app and navigates PGN plies without a network;
 - presents English and Simplified Chinese copy;
 - runs the versioned capability resolver against offline, cache, device-engine
   and paired-endpoint scenarios without sending a network request;

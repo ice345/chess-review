@@ -8,7 +8,16 @@
 export const PIECE_SET_IDS = ["liz-blue", "classic"] as const;
 export type PieceSetId = (typeof PIECE_SET_IDS)[number];
 
-export const PIECE_ASSET_DIR = "/pieces/liz_blue_chess_pieces_512";
+/**
+ * Versioned directory for the authored Feather Porcelain assets.
+ *
+ * The path carries the art version on purpose: `/pieces/` is cache-first in the
+ * service worker, so overwriting a URL would leave returning visitors on the
+ * previous King/Queen/Bishop art until they cleared storage. A new version
+ * directory changes the URL itself, which needs no cache flush for the engine,
+ * sounds or hashed chunks (see `docs/ui-spec.md`).
+ */
+export const PIECE_ASSET_DIR = "/pieces/feather_porcelain_v1_1";
 
 export const PIECE_ASSET_KEYS = ["wP", "wN", "wB", "wR", "wQ", "wK", "bP", "bN", "bB", "bR", "bQ", "bK"] as const;
 export type PieceAssetKey = (typeof PIECE_ASSET_KEYS)[number];

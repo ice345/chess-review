@@ -36,6 +36,44 @@ async function review(page: Page, pgn: string): Promise<string> {
 // offline analysis is actually observable end to end.
 test.skip(({ browserName }) => browserName !== "chromium", "Offline service worker behaviour is only observable in Chromium.");
 
+// The authored pieces are cached cache-first under a versioned path; this asserts
+// the path and the payload budget on the production build the worker serves.
+test("the authored pieces load from one versioned path and are cached for offline use", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.goto("/");
+
+  const pieceResources = () => page.evaluate(() => performance
+    .getEntriesByType("resource")
+    .filter((entry) => entry.name.includes("/pieces/"))
+    .map((entry) => ({
+      path: new URL(entry.name).pathname,
+      transferSize: (entry as PerformanceResourceTiming).transferSize,
+      decodedBodySize: (entry as PerformanceResourceTiming).decodedBodySize,
+    })));
+
+  await expect(page.locator(".home-board img").first()).toBeVisible();
+  await expect.poll(async () => (await pieceResources()).length).toBeGreaterThanOrEqual(12);
+  const first = await pieceResources();
+  const paths = [...new Set(first.map((entry) => entry.path))].sort();
+  // Every piece comes from the current version directory, so a released art
+  // revision can never be answered from the previous one by the cache-first rule.
+  expect(paths.some((path) => path.startsWith("/pieces/feather_porcelain_v1_1/"))).toBe(true);
+  expect(paths.every((path) => path.startsWith("/pieces/feather_porcelain_v1_1/"))).toBe(true);
+  for (const key of ["wK", "wQ", "wB"]) expect(paths).toContain(`/pieces/feather_porcelain_v1_1/${key}.png`);
+  // The PNG board is heavier than SVG on purpose; this is the budget that buys the
+  // authored shading, and it must not silently grow.
+  const decoded = first.reduce((total, entry) => total + entry.decodedBodySize, 0);
+  console.log(JSON.stringify({ pieceFiles: paths.length, decodedBytes: decoded }));
+  expect(decoded).toBeLessThan(2 * 1024 * 1024);
+
+  // A controlled revisit takes the pieces from the cache rather than the network.
+  await page.reload();
+  await expect(page.locator(".home-board img").first()).toBeVisible();
+  const cached = await cachedPaths(page);
+  expect(cached.filter((path) => path.startsWith("/pieces/")).every((path) => path.startsWith("/pieces/feather_porcelain_v1_1/"))).toBe(true);
+});
+
 test("a returning visitor keeps the engine and can reopen reviewed games offline", async ({ page, context }) => {
   await page.goto("/");
   await page.evaluate(() => navigator.serviceWorker.ready);

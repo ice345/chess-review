@@ -56,7 +56,7 @@ Board appearance is centralized in `apps/web/src/lib/board-appearance.ts` as `WI
 
 Motion stays nearly invisible: color, border, background and opacity transitions of 120–180ms. Hover must not change geometry — no rotation, scale, card lift or negative-margin width expansion — and no ambient or looping animation is used. Transparency means reduced visual weight rather than blur: no `backdrop-filter` on the app header or review titlebar, and repeated dense content is an ink row (transparent with a fine divider) rather than another translucent card. Rare sections such as Game Summary, real popovers and the promotion chooser may remain paper with a shadow. Functional text is at least 11px; 9–10px is reserved for decorative uppercase kickers.
 
-The default piece family is **Feather Porcelain**, the authored 512×512 RGBA PNG set served from `/pieces/liz_blue_chess_pieces_512/`; its persisted setting id remains `liz-blue` for compatibility, and Settings exposes it as “Feather Porcelain” beside the optional `classic` react-chessboard SVG set. Piece bytes are cache-first under `/pieces/`, so replacing them at the same URLs requires a `CACHE_VERSION` bump in `apps/web/public/sw.js`. PNG export and the promotion chooser use the same piece vocabulary as the board: Feather Porcelain draws the authored PNGs onto the export canvas and the promotion buttons, Classic SVG keeps the Unicode glyph export and its own SVG pieces, and any asset the browser cannot decode falls back to the Unicode glyph so an offline or partial cache never fails an export. The export canvas reads `--board-square-light`/`--board-square-dark` from the document and carries identical literal fallbacks in `png-export.ts`, which a regression test keeps equal to `tokens.css`. Two internal routes are the acceptance environments for this system: `/design/quality-icons` for the Move Quality icons and `/design/pieces` for all twelve pieces at 32/40/56/72px on both square colors plus selection, quiet, capture, arrow and badge states. `docs/design/2026-09-13-windowlight-implementation.md` records the implementation pass; the older 2026-09-05 proposal is historical.
+The default piece family is **Feather Porcelain**, the authored 512×512 RGBA PNG set served from the versioned directory `/pieces/feather_porcelain_v1_1/`; its persisted setting id remains `liz-blue` for compatibility, and Settings exposes it as “Feather Porcelain” beside the optional `classic` react-chessboard SVG set. The authored masters live once, in `packages/ui/assets/pieces/feather-porcelain-v1.1/`; `scripts/sync-piece-assets.mjs` validates them (exactly twelve files, 512×512, PNG with an alpha channel) and writes the Web copy in `apps/web/public/pieces/feather_porcelain_v1_1/`, and its `--check` mode fails on any drift, so an art revision cannot land in one place only. The mobile companion imports the canonical files through Vite and needs no copy. Piece bytes are cache-first under `/pieces/`, so an art pass publishes into a new version directory instead of overwriting the previous URLs; overwriting bytes at the same URLs instead requires a `CACHE_VERSION` bump in `apps/web/public/sw.js`. PNG export and the promotion chooser use the same piece vocabulary as the board: Feather Porcelain draws the authored PNGs onto the export canvas and the promotion buttons, Classic SVG keeps the Unicode glyph export and its own SVG pieces, and any asset the browser cannot decode falls back to the Unicode glyph so an offline or partial cache never fails an export. The export canvas reads `--board-square-light`/`--board-square-dark` from the document and carries identical literal fallbacks in `png-export.ts`, which a regression test keeps equal to `tokens.css`. Two internal routes are the acceptance environments for this system: `/design/quality-icons` for the Move Quality icons and `/design/pieces` for all twelve pieces at 32/40/48/56/72px on both square colors plus selection, quiet, capture, arrow and badge states. `/design/pieces` also owns the recognition passes — an unlabelled King/Queen/Bishop position behind a reveal, a silhouette pass, a distance blur pass and a side-by-side Classic comparison — because rendering correctly is not the same as being identifiable. `docs/design/2026-09-13-windowlight-implementation.md` records the theme pass and `docs/design/2026-09-14-feather-porcelain-v1-1-integration.md` records the v1.1 art integration and its recognition findings; the older 2026-09-05 proposal is historical.
 
 CSS follows the same component boundary. `tokens.css` owns the palette, type and
 shared measurements; `base.css` owns document defaults; `chrome.css`, `home.css`
@@ -78,11 +78,41 @@ adjacent contextual column contains current-position evidence and, on Review,
 Game Summary with the Evaluation Timeline. A modest amount of panel/document
 scrolling is expected; no persistent control may cover a piece.
 
-Board transport follows First, Previous, Play/Pause, Next and Last. Keyboard
-left/right navigation remains. Autoplay stops at the canonical game end and
-pauses before entering or while exploring a variation. Board flip is an
-icon-only, labelled control outside the squares. Flipping changes player-strip
-placement and evaluation-bar presentation, never the canonical White-POV score.
+Board transport follows First, Previous, Play/Pause, Next and Last. Autoplay
+stops at the canonical game end and pauses before entering or while exploring a
+variation. Board flip is an icon-only, labelled control outside the squares.
+Flipping changes player-strip placement and evaluation-bar presentation, never
+the canonical White-POV score.
+
+Board ergonomics are user-controlled on desktop. `lib/review-shortcuts.ts` is the
+single shortcut table: the key handler, the `?` overlay and the Help page all read
+it, so a shortcut cannot be documented without existing. The current map is
+`←`/`J` previous, `→`/`K` next, `↑` first, `↓` last, `Space` play/pause, `Esc`
+leave a variation or exit Focus board, `F` flip, `Z` Focus board, `?` the
+overlay. Shortcuts never fire from a form control, a link, a button or a slider,
+and the whole map is suspended while the promotion chooser or the overlay owns
+the keyboard. The board-size preference is stored in settings and applied as
+`--review-board-preference` on the workspace; the CSS clamp `--review-board-max`
+keeps a stored size inside what the viewport can afford and the responsive
+default applies below 901px, where the size control is hidden. The control
+displays the width the board actually rendered at, not the requested value, and
+writes only when the interaction ends. Focus board is one session-only mode:
+one column, no context panel, board bounded by the viewport, player strips, eval
+bar and transport kept, and an `Exit focus board` control that reports its state.
+Focus is never persisted.
+
+Board feedback preferences live in Settings under *Board and display* and are
+applied by `useBoardDisplaySettings()`, which subscribes to the settings event
+instead of joining the review shell's analysis snapshot — a display change must
+apply immediately, while a depth change must not churn an in-flight engine
+request. Coordinates are *inside the squares* or *off*; analysis arrows are the
+Stockfish/Maia candidates only, and the red practice arrow is never hidden by
+them; the Move Quality badge can be turned off; piece animation is *Off* (0 ms),
+*Fast* (90 ms) or *Natural* (160 ms), and no other motion is offered; move-list
+emphasis is *Key moves only* (default) or *All analyzed moves* and only changes how
+strongly a row is drawn, never whether it is listed. Emphasis and the *Key* filter
+share one definition of a key move — the canonical critical moments — so the two
+can never disagree.
 
 Player strips consume PGN headers first and enrich a synced game from its exact
 IndexedDB account/game record. Ratings come from sync metadata or `WhiteElo` /
@@ -123,6 +153,59 @@ interaction. Promotion drops currently default to a queen; the rules helper
 already accepts an explicit underpromotion for a future chooser. The branch
 model is detailed in [`analysis-variations.md`](analysis-variations.md), and the
 implementation status for each workspace part is kept in `docs/roadmap.md`.
+
+## Tablebase
+
+Engine Lab's third tab is **Tablebase**, and it is correctness rather than
+parity: a tablebase result is a provable outcome, which is a different class of
+claim from an engine evaluation. It appears only when the standard seven-piece
+Syzygy tables cover the position. Above that limit the panel says how many pieces
+are on the board and states that the engine evaluation is the only evidence
+available — an engine score is never translated into "winning". The tab is hidden
+during practice for the same reason the other analysis surfaces are.
+
+For a covered position the panel shows the position result, DTZ and DTM when the
+tables report them, the piece count and the table identity, and every legal move
+grouped by its own proven outcome. Outcome categories are kept as the tables
+report them: `cursed-win` and `blessed-loss` are not collapsed into win and loss,
+because the fifty-move rule can still save those positions. A move that reaches a
+position the tables do not carry is labelled as a conversion.
+
+`packages/tablebase` owns the contract, the piece-count rule and the
+normalization; `GET /api/tablebase` is the only code that talks to
+`tablebase.lichess.ovh`, forwards only the position identity (EPD), and rejects an
+over-limit position rather than returning a result. Answers are cached in the
+`remote-positions` IndexedDB store with the Opening Explorer, under the same
+stale-labelling rule.
+
+## Opening Explorer
+
+Engine Lab carries two tabs: **Engine** (the existing evaluation workspace) and
+**Explorer**. They share one panel because both investigate the current position;
+the Explorer is not part of guided Review and never feeds the objective analysis.
+Tabs are hidden while a practice answer is owed, because "what is usually played
+here" is a spoiler for the exercise.
+
+The Explorer answers *what is played from here*, which is a different question
+from opening recognition. It shows, for the current position: the total games, the
+White/Draw/Black split, each candidate move's SAN, game count and split ordered by
+frequency, and the recognised opening name when the database supplies one. The
+visitor can switch between *All players* (club-strength human games, 1600+) and
+*Masters*; selecting a move explores it on the board as a variation. Frequencies
+are other players' games, never an evaluation — Stockfish still decides what is
+best, and the panel says so.
+
+The data is third-party reference data from the public lichess.org opening
+explorer. The browser never calls lichess.org directly: `GET /api/explorer`
+validates the request, forwards only the position identity (EPD) and the chosen
+database, validates the upstream payload, and returns the normalized structure
+defined in `packages/openings/src/explorer.ts`. An unusable upstream payload is
+reported as an error rather than rendered as a partial table, because a partial
+table would show missing games as zero games. Answers are cached in the
+`remote-positions` IndexedDB store; an expired answer is used only when the
+refresh fails, and it is then labelled with its age. The panel and the Help page
+both state that the position is sent to lichess.org — this product does not
+introduce a network call silently.
 
 ## Service states
 
