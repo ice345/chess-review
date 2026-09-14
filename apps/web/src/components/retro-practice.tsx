@@ -61,14 +61,13 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
             Include inaccuracies
           </label>
         </details>
-        <button
-          type="button"
-          className="primary"
-          disabled={count === 0}
-          onClick={() => begin(color)}
-        >
-          Review {sideName(color)}&apos;s {count} {count === 1 ? "position" : "positions"}
-        </button>
+        {/* Nothing to practise is a state, not a disabled button: the explanation
+            takes the row's place instead of leaving a dead primary action far right. */}
+        {count > 0 && (
+          <button type="button" className="primary" onClick={() => begin(color)}>
+            Review {sideName(color)}&apos;s {count} {count === 1 ? "position" : "positions"}
+          </button>
+        )}
       </div>
       {count === 0 && <p className="utility-empty">{emptyCopy(queue, color)}</p>}
     </section>;
@@ -108,6 +107,11 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
           {" "}was played.
         </p>
         <p className="retro-lead">Find a better move on the board. The red arrow is the original mistake.</p>
+        {retro.hintSquare && (
+          <p className="retro-hint" role="status">
+            Look at the piece on <strong>{retro.hintSquare}</strong>. The best move starts there — other moves can still keep the position.
+          </p>
+        )}
         {retro.status === "rejected" && retro.lastOutcome?.reason !== "engine-unavailable" && retro.lastOutcome?.reason !== "timeout"
           ? <p className="retro-status" role="status">{`${retro.lastOutcome?.attemptedSan ?? "That move"} does not keep the position. Try again.`}</p>
           : null}
@@ -119,6 +123,7 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
           </p>
         )}
         <div className="retro-choices">
+          {retro.hintSquare === null && <button type="button" className="text-button" onClick={retro.useHint}>Hint</button>}
           <button type="button" className="text-button" onClick={() => retro.viewSolution()}>View the solution</button>
           <button type="button" className="text-button" onClick={() => retro.skip()}>Skip</button>
         </div>

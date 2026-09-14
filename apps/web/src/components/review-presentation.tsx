@@ -6,6 +6,7 @@ import { formatMoveNumber, type GameAnalysisV2, type GamePhase, type MoveQuality
 import { classificationForAnnotation, QualityIcon, QUALITY_META } from "@chess-review/ui";
 import { displayPgnComment, importedAnnotations } from "../lib/imported-annotations";
 import { useReviewRuntime } from "./review-runtime";
+import { useBoardDisplaySettings } from "../hooks/use-board-display-settings";
 import { ANNOTATION_LABEL, ANNOTATION_ORDER, displayedMoveQualityLabel, extraMoveAnnotations } from "../lib/move-quality-label";
 
 const PHASES: Array<{ key: GamePhase; label: string }> = [
@@ -154,6 +155,9 @@ export function ReviewMoves({
 }) {
   const criticalPlies = new Set(analysis.criticalMoments.map((moment) => moment.ply));
   const hiddenPly = useReviewRuntime().retro.hiddenPly;
+  // Emphasis and the "Key" filter share one definition of a key move, so the
+  // calmer view can never disagree with what the filter shows.
+  const keyOnlyEmphasis = useBoardDisplaySettings().moveEmphasis === "key";
   const listRef = useRef<HTMLDivElement>(null);
   const moves = analysis.moves.filter((move) => (
     filter === "all"
@@ -186,7 +190,13 @@ export function ReviewMoves({
         const comment = displayPgnComment(annotation?.comment);
         const extras = hiddenPly === move.ply ? [] : extraMoveAnnotations(move);
         return (
-          <button type="button" className={move.ply === currentPly ? "active" : ""} key={move.ply} onClick={() => onSelectPly(move.ply)}>
+          <button
+            type="button"
+            className={move.ply === currentPly ? "active" : ""}
+            data-emphasis={keyOnlyEmphasis && !criticalPlies.has(move.ply) ? "quiet" : undefined}
+            key={move.ply}
+            onClick={() => onSelectPly(move.ply)}
+          >
             <span className="move-number">{formatMoveNumber(move.fenBefore, move.color)}</span>
             {hiddenPly === move.ply
               ? <QualityIcon classification="book" size={24} decorative title="Hidden while solving" />

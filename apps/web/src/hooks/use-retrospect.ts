@@ -20,7 +20,7 @@ export type { PracticePresentation, RetroStatus };
  * your mistakes". Result kinds, attempt identity and visible reject/rewind are
  * documented in `docs/mistake-practice.md`.
  */
-export type ExerciseResultKind = "solved" | "revealed" | "skipped" | "unavailable";
+export type ExerciseResultKind = "solved" | "hinted" | "revealed" | "skipped" | "unavailable";
 
 export interface Retrospective {
   faultPly: number;
@@ -36,6 +36,7 @@ export interface Retrospective {
 
 export interface PracticeTally {
   solved: number;
+  hinted: number;
   revealed: number;
   skipped: number;
   unavailable: number;
@@ -85,9 +86,14 @@ export interface RetroRuntime {
   lastOutcome: AttemptOutcome | null;
   presentation: PracticePresentation;
   start: (color: PlayerColor) => void;
+  /** Start a one-position session on a single fault ply, for a guided key moment. */
+  startAt: (faultPly: number) => boolean;
   stop: () => void;
   next: () => void;
   viewSolution: () => void;
+  /** Reveal which piece to move without revealing the destination. Counts as hinted, never solved. */
+  useHint: () => void;
+  hintSquare: string | null;
   skip: () => void;
   reset: () => void;
   retryUnsolved: () => void;
@@ -114,6 +120,7 @@ export function useRetrospect({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<Record<number, ExerciseResultKind>>({});
   const [lastOutcome, setLastOutcome] = useState<AttemptOutcome | null>(null);
+  const [hintSquare, setHintSquare] = useState<string | null>(null);
   const engine = useRef<BrowserStockfish | null>(null);
   const abort = useRef<AbortController | null>(null);
   const timers = useRef<number[]>([]);
@@ -186,6 +193,7 @@ export function useRetrospect({
     currentRef.current = retrospective;
     setCurrentIndex(index);
     setStatus(nextStatus);
+    setHintSquare(null);
     goToPly(retrospective.promptPly);
   }, [goToPly]);
 
@@ -237,8 +245,46 @@ export function useRetrospect({
     setActive(false);
     currentRef.current = null;
     setLastOutcome(null);
+    setHintSquare(null);
     setStatus("solving");
   }, [clearTimers]);
+
+  /**
+   * Guided review practises one key moment at a time. The session is the same
+   * machinery as "Learn from your mistakes", with a one-position queue, so the
+   * result states and the visible reject/rewind behave identically.
+   */
+  const startAt = useCallback((faultPly: number) => {
+    const move = analysis?.moves[faultPly - 1];
+    const retrospective = move ? build(move) : null;
+    // Without canonical engine evidence there is nothing to solve against, so the
+    // guided moment must not pretend to start a session.
+    if (!move || !retrospective) return false;
+    abort.current?.abort();
+    clearTimers();
+    sessionId.current += 1;
+    attemptId.current += 1;
+    setColor(move.color);
+    setQueuePlies([faultPly]);
+    setResults({});
+    setCurrentIndex(0);
+    setLastOutcome(null);
+    setHintSquare(null);
+    setActive(true);
+    currentRef.current = null;
+    show(0, retrospective, "solving");
+    return true;
+  }, [analysis, build, clearTimers, show]);
+
+  const useHint = useCallback(() => {
+    const retrospective = currentRef.current;
+    if (!retrospective) return;
+    if (!practiceAnswerOwed(status)) return;
+    // The hint names the piece to move, never the destination, and the position
+    // is recorded as hinted so it can never be counted as solved.
+    recordResult(retrospective.faultPly, "hinted");
+    setHintSquare(retrospective.bestUci.slice(0, 2));
+  }, [recordResult, status]);
 
   const reset = useCallback(() => {
     abort.current?.abort();
@@ -392,6 +438,7 @@ export function useRetrospect({
     const count = (kind: ExerciseResultKind) => values.filter((item) => item === kind).length;
     return {
       solved: count("solved"),
+      hinted: count("hinted"),
       revealed: count("revealed"),
       skipped: count("skipped"),
       unavailable: count("unavailable"),
@@ -417,9 +464,12 @@ export function useRetrospect({
     lastOutcome,
     presentation,
     start,
+    startAt,
     stop,
     next,
     viewSolution,
+    useHint,
+    hintSquare,
     skip,
     reset,
     retryUnsolved,

@@ -32,11 +32,20 @@ between sessions.
    answer stays visible briefly, then the existing board animation rewinds to
    the prompt. Replaying the original mistake is never a solution. Timeouts and
    engine failures are **not judged wrong**.
-4. **View the solution** plays the stronger move as a variation and counts as
-   *viewed*, not solved. **Skip** counts as skipped. **Next** keeps the current
-   index until you click it. Browsing away while an answer is owed shows
-   **You browsed away**. The session tally on the complete page separates
-   solved / viewed / skipped.
+4. **Hint** reveals only the square the stronger move starts from — never the
+   destination — and marks it on the board with the brass hint ring. A hinted
+   position is recorded as *hinted* and can never later be counted as solved, even
+   if the visitor finds the move afterwards or views the solution. **View the
+   solution** plays the stronger move as a variation and counts as *viewed*, not
+   solved. **Skip** counts as skipped. **Next** keeps the current index until you
+   click it. Browsing away while an answer is owed shows **You browsed away**. The
+   session tally on the complete page separates solved / hinted / viewed / skipped.
+
+The exercise is also reachable one moment at a time from Guided Review: the
+Review panel's key-moment navigation offers **Try again** for the moment the board
+is on, which starts the same session with a one-position queue
+(`useRetrospect.startAt`). The eligibility rule is asked from the same module, so
+a guided moment can never offer a position the full practice queue would exclude.
 
 Navigation is locked at the chokepoint, not per button: `navigateToPly`,
 `navigateNext`, `navigateLast`, autoplay and the right-arrow key all refuse to
@@ -87,6 +96,7 @@ mistakes"), entry gated on a full computer analysis. Parity is deliberate:
 | Candidate selection | Evaluation swing above 10 points | V2 mistake/blunder bands (also 10 points) |
 | Opening exception | Masters database frequency | Canonical theory boundary (`isBook`) |
 | Progress | Solved / total, reset, flip colour | Solved / total, practice again |
+| Hint | None | The square the stronger move starts from, recorded as hinted |
 
 Two differences are known and accepted. The opening exception uses recognised
 theory rather than game frequencies, because this project has no masters database

@@ -325,6 +325,26 @@
 .piece-fixture-cell.light { background: var(--board-square-light); }
 .piece-fixture-cell.dark { background: var(--board-square-dark); }
 
+.piece-fixture-figure { display: block; width: 100%; height: 100%; }
+
+/* Recognition passes. The filter sits on the piece, never on the square, so a
+   silhouette still counts negative space against the real board color. */
+.piece-fixture-cell.silhouette .piece-fixture-figure { filter: brightness(0) saturate(0); }
+.piece-fixture-cell.blur .piece-fixture-figure { filter: blur(1px); }
+.piece-fixture-silhouette img { filter: brightness(0) saturate(0); }
+
+.piece-fixture-divider {
+  flex: none;
+  width: 1px;
+  height: 40px;
+  margin: 0 8px;
+  background: var(--board-outline);
+}
+
+.piece-fixture-reveal { color: var(--ink-muted); font-size: 12px; }
+.piece-fixture-reveal summary { cursor: pointer; color: var(--ink-secondary); font-weight: 600; }
+.piece-fixture-reveal ul { margin: 6px 0 0; padding-left: 18px; }
+
 .piece-fixture-boards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
