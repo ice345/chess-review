@@ -83,10 +83,39 @@ jobs:
           # artifacts of this repository's own machines: visual.spec.ts compares
           # against baselines generated on macOS, and review-second-cut-shot.spec.ts
           # is a capture tool that writes screenshots to /tmp. The release-only specs
-          # are excluded by testIgnore and run against the standalone artifact below.
+          # are excluded by testIgnore and run against the standalone artifact in the
+          # browser-release job below.
           # A hand-maintained allowlist is what let e2e/audit-cleanup.spec.ts and
           # e2e/zoom-acceptance.spec.ts fall out of CI; this filter cannot drift.
           pnpm exec playwright test "e2e/(?!visual|review-second-cut-shot).*\.spec\.ts"
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The release suite runs the production standalone artifact on five browser
+  # projects and needs its own budget: sharing the workflow job below, it was still
+  # running after 16 minutes when that job's 25-minute limit cancelled it.
+  browser-release:
+    name: Browser release E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - name: Build public Browser Core
         run: pnpm build
         env:
@@ -96,7 +125,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-release
           path: |
             playwright-report/
             test-results/
