@@ -150,6 +150,19 @@ export function fenToEpd(fen: string): string {
   return normalized.split(" ").slice(0, 4).join(" ");
 }
 
+/**
+ * Pieces on the board, by the placement field.
+ *
+ * Tablebase coverage is a piece-count rule, so the count is derived from the
+ * normalized position rather than from a caller's guess.
+ */
+export function fenPieceCount(fen: string): number {
+  const placement = normalizeFen(fen).split(" ")[0] ?? "";
+  let count = 0;
+  for (const character of placement) if (/[a-zA-Z]/.test(character)) count += 1;
+  return count;
+}
+
 /** Identify terminal positions whose side to move has no legal move.
  *
  * Stockfish correctly returns `bestmove (none)` for these positions, so full-

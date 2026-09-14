@@ -1,0 +1,19 @@
+{
+  "name": "@chess-review/tablebase",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@chess-review/chess-core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "4.1.11"
+  }
+}
