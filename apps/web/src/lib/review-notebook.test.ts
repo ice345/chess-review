@@ -95,8 +95,13 @@ describe("personal notebook persistence", () => {
       open.onupgradeneeded = () => open.result.createObjectStore("review-records").put(oldValue, "legacy");
       open.onsuccess = () => { open.result.close(); resolve(); }; open.onerror = () => reject(open.error);
     });
-    const db = await (await import("./browser-storage")).openReviewDatabase();
-    expect(db.version).toBe(8); expect(db.objectStoreNames.contains("review-notebooks")).toBe(true);
+    const storage = await import("./browser-storage");
+    const db = await storage.openReviewDatabase();
+    // The upgrade must reach the current schema, add its stores, and leave
+    // existing records exactly as they were.
+    expect(db.version).toBe(storage.DATABASE_VERSION);
+    expect(db.objectStoreNames.contains("review-notebooks")).toBe(true);
+    expect(db.objectStoreNames.contains("remote-positions")).toBe(true);
     expect(await new Promise((resolve) => { const get = db.transaction("review-records").objectStore("review-records").get("legacy"); get.onsuccess = () => resolve(get.result); })).toEqual(oldValue);
     db.close();
   });

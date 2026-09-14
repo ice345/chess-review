@@ -174,6 +174,15 @@ is reported separately after a successful database reset. Memory-only IndexedDB
 regressions use the test-only [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)
 dependency; production dependencies are unchanged.
 
+The `remote-positions` store holds third-party position answers — Opening Explorer
+frequencies and tablebase results — keyed by source and position identity (EPD),
+with the fetch time beside them. It is
+derived reference data, not part of the library: a backup never contains it, the
+cache-only cleanup clears it together with the objective caches, and a full reset
+clears it with every other store. A cached answer older than its 24-hour lifetime
+is only shown when the refresh fails, and it is then labelled with its age rather
+than presented as current.
+
 ### R5 disposable library identity
 
 PGN `ReviewRecord.identity` optionally stores `{ version: 1, input, initialFen,

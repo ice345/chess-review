@@ -1,5 +1,5 @@
 export const DATABASE_NAME = "open-chess-review";
-export const DATABASE_VERSION = 8;
+export const DATABASE_VERSION = 9;
 export const ANALYSIS_STORE = "objective-analyses";
 export const ANALYSIS_INDEX_STORE = "objective-analysis-index";
 export const REVIEW_STORE = "review-records";
@@ -12,7 +12,8 @@ export const PLAYER_AVATAR_STORE = "player-avatars";
 export const LOCAL_META_STORE = "local-data-metadata";
 export const REVIEW_RUN_STORE = "review-runs";
 export const NOTEBOOK_STORE = "review-notebooks";
-export const DATA_STORES = [ANALYSIS_STORE, ANALYSIS_INDEX_STORE, REVIEW_STORE, PLATFORM_ACCOUNT_STORE, SYNCED_GAME_STORE, PLATFORM_SYNC_STORE, TRAINING_QUEUE_STORE, HISTORY_ANALYSIS_JOB_STORE, PLAYER_AVATAR_STORE, REVIEW_RUN_STORE, NOTEBOOK_STORE];
+export const REMOTE_POSITIONS_STORE = "remote-positions";
+export const DATA_STORES = [ANALYSIS_STORE, ANALYSIS_INDEX_STORE, REVIEW_STORE, PLATFORM_ACCOUNT_STORE, SYNCED_GAME_STORE, PLATFORM_SYNC_STORE, TRAINING_QUEUE_STORE, HISTORY_ANALYSIS_JOB_STORE, PLAYER_AVATAR_STORE, REVIEW_RUN_STORE, NOTEBOOK_STORE, REMOTE_POSITIONS_STORE];
 export const DATA_EVENT = "open-chess-review-data";
 export const INVALIDATION_EVENT = "open-chess-review-invalidated";
 export const EPOCH_KEY = "epoch";

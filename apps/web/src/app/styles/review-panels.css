@@ -205,7 +205,7 @@
 .critical-list button strong { font-size: 12px; }
 .critical-list button strong.critical-loss { color: var(--danger); }
 .critical-list button strong.critical-quiet { color: var(--ink-muted); font-weight: 650; }
-.view-all-moments { padding: 5px 2px 0; color: var(--accent-primary); font-size: 12px; }
+.view-all-moments { min-height: 40px; padding: 0 2px; display: inline-flex; align-items: center; color: var(--accent-primary); font-size: 12px; }
 .quiet-empty, .phase-note { margin: 3px 1px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
 
 .move-filters {
@@ -273,6 +273,13 @@
 .move-number, .move-quality, .review-move-list small { color: var(--muted); font-size: 12px; }
 .move-quality { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .review-move-list small { text-align: right; }
+
+/* "Key moves only" emphasis: the row keeps its icon, label and Accuracy — it is
+   quieter, not hidden, so the move list stays a complete record. */
+.review-move-list button[data-emphasis="quiet"] img { opacity: .5; }
+.review-move-list button[data-emphasis="quiet"] .move-quality,
+.review-move-list button[data-emphasis="quiet"] .move-number,
+.review-move-list button[data-emphasis="quiet"] small { color: var(--ink-faint); }
 
 /* Imported annotations sit under their own move, spanning the columns after the
    move number so the source comment and variation stay visually attached to it
@@ -515,6 +522,125 @@
 
 .candidate-list { margin-top: 11px; display: grid; gap: 6px; }
 
+/* Engine Lab tabs: Evaluation and the position explorer are both "investigate
+   this position" tools, so they share one panel instead of adding another
+   permanent Review surface. */
+.engine-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-paper);
+}
+
+.engine-tabs button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.engine-tabs button.active { background: var(--wash-blue); color: var(--accent-primary); box-shadow: inset 0 -2px var(--line-accent); }
+
+.explorer-panel { display: grid; gap: 10px; }
+.explorer-sources { display: flex; gap: 6px; }
+.explorer-sources button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-paper);
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.explorer-sources button.active { border-color: var(--line-accent); background: var(--wash-blue); color: var(--accent-primary); }
+.explorer-privacy { color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+
+.explorer-summary { display: grid; gap: 2px; }
+.explorer-summary strong { color: var(--ink-primary); font: 500 21px var(--font-serif); font-variant-numeric: tabular-nums; }
+.explorer-summary span { color: var(--ink-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.explorer-summary small { color: var(--ink-muted); font-size: 12px; }
+.explorer-summary .explorer-stale { color: var(--accent-brass); }
+
+.explorer-moves { margin: 0; padding: 0; display: grid; gap: 2px; list-style: none; }
+.explorer-moves button {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.explorer-moves button:hover { background: var(--wash-blue); }
+.explorer-moves strong { color: var(--ink-primary); font-size: 13px; }
+.explorer-numbers { color: var(--ink-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.explorer-bar { display: flex; height: 8px; overflow: hidden; border-radius: 4px; background: var(--wash-cream); }
+.explorer-bar i { display: block; height: 100%; }
+.explorer-bar i:nth-child(1) { background: var(--surface-paper); outline: 1px solid var(--line); }
+.explorer-bar i:nth-child(2) { background: var(--board-square-dark); }
+.explorer-bar i:nth-child(3) { background: var(--ink-primary); }
+.explorer-note { color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+
+/* Tablebase: a proven result, so it is presented as evidence rather than as a
+   score, and it only appears when the tables actually cover the position. */
+.tablebase-panel { display: grid; gap: 10px; }
+.tablebase-privacy { color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+
+.tablebase-verdict { display: grid; gap: 2px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-paper); }
+.tablebase-verdict strong { color: var(--ink-primary); font: 500 21px var(--font-serif); }
+.tablebase-verdict.white { border-left: 3px solid var(--surface-paper); }
+.tablebase-verdict.black { border-left: 3px solid var(--ink-primary); }
+.tablebase-verdict.draw { border-left: 3px solid var(--board-square-dark); }
+.tablebase-verdict span { color: var(--ink-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tablebase-verdict small { color: var(--ink-muted); font-size: 12px; }
+.tablebase-verdict .tablebase-stale { color: var(--accent-brass); }
+
+.tablebase-moves { margin: 0; padding: 0; display: grid; gap: 2px; list-style: none; }
+.tablebase-moves button {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.tablebase-moves button:hover { background: var(--wash-blue); }
+.tablebase-moves strong { color: var(--ink-primary); font-size: 13px; }
+.tablebase-category { color: var(--ink-secondary); font-size: 12px; }
+.tablebase-category.white { color: var(--accent-primary); }
+.tablebase-category.draw { color: var(--ink-muted); }
+.tablebase-distance { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tablebase-note { color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .explorer-moves button { grid-template-columns: 48px minmax(0, 1fr); }
+  .explorer-numbers { grid-column: 2; }
+}
+
 .candidate {
   padding: 9px;
   display: grid;
@@ -558,3 +684,107 @@
 .review-next-step a { min-height: 44px; display: inline-flex; align-items: center; }
 
 .move-filters button, .review-move-list button, .critical-list button { min-height: 44px; }
+
+/* Guided review: where the visitor is among the key moments, and the one
+   learning action for the moment they are on. */
+.key-moment-nav {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.key-moment-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+
+.key-moment-step {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-paper);
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.key-moment-step:not(:disabled):hover { border-color: var(--line-accent); background: var(--wash-blue); color: var(--ink-primary); }
+.key-moment-step:disabled { opacity: .42; cursor: default; }
+.key-moment-progress { color: var(--ink-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.key-moment-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--wash-blue);
+}
+
+.key-moment-action-fact {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-primary);
+  font-size: 12px;
+}
+.key-moment-retry { min-height: 44px; padding-inline: 18px; }
+
+.key-moment-finish {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.key-moment-finish button { min-height: 44px; }
+
+/* End-of-review state. Facts and counts only — never a generated chess claim. */
+.review-completion {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-paper);
+  box-shadow: var(--shadow-paper);
+}
+
+.review-completion h2 { margin: 2px 0 0; color: var(--ink-primary); font: 500 20px var(--font-serif); }
+.review-completion header p { margin: 4px 0 0; color: var(--ink-secondary); font-size: 12px; }
+.review-completion-facts { margin: 0; display: grid; gap: 2px; }
+.review-completion-facts > div {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.review-completion-facts dt { color: var(--ink-muted); font-size: 12px; }
+.review-completion-facts dd { margin: 0; display: flex; align-items: center; gap: 8px; }
+.review-completion-facts dd span { min-width: 0; display: grid; gap: 1px; }
+.review-completion-facts strong { color: var(--ink-primary); font-size: 12px; }
+.review-completion-facts small { color: var(--ink-muted); font-size: 12px; }
+.review-completion-training { margin: 0; color: var(--ink-secondary); font-size: 12px; }
+
+.review-completion-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.review-completion-actions .primary-link,
+.review-completion-actions .secondary-link,
+.review-completion-actions .text-button { min-height: 44px; display: inline-flex; align-items: center; }
+.review-completion-actions .primary-link { padding-inline: 16px; }
+.review-completion-actions .secondary-link { padding-inline: 12px; border: 1px solid var(--line); border-radius: 9px; }

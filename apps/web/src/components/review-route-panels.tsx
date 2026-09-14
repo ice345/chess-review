@@ -8,6 +8,9 @@ import { EvaluationGraph, QUALITY_META, QualityIcon } from "@chess-review/ui";
 import { CoachPanel } from "./coach-panel";
 import { AnalysisLensPanel } from "./review/analysis-lens-panel";
 import { CurrentMoveVerdict } from "./review/current-move-verdict";
+import { KeyMomentNavigation } from "./review/key-moment-navigation";
+import { OpeningExplorerPanel } from "./review/opening-explorer-panel";
+import { TablebasePanel } from "./review/tablebase-panel";
 import { ReviewMoves, ReviewOverview } from "./review-presentation";
 import { displayPgnComment, importedAnnotations } from "../lib/imported-annotations";
 import { displayedMoveQualityLabel } from "../lib/move-quality-label";
@@ -166,6 +169,7 @@ export function ObjectiveRoutePanel() {
       )}
 
       <RetroPractice analysis={analysis} />
+      {!practice && <KeyMomentNavigation analysis={analysis} />}
       {!practice && (
         <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} />
       )}
@@ -199,7 +203,7 @@ export function MovesRoutePanel() {
   );
   return (
     <div className="route-panel moves-route">
-      <div className="move-filters" aria-label="Move filters">{(["all", "critical", "errors"] as const).map((value) => <button type="button" className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div>
+      <div className="move-filters" aria-label="Move filters">{([["all", "All"], ["critical", "Key"], ["errors", "Errors"]] as const).map(([value, label]) => <button type="button" className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{label}</button>)}</div>
       <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} filter={filter} />
       {move && <section className="move-evidence">{importedComment !== undefined && <p className="move-imported-note">{importedComment}</p>}<div><QualityIcon classification={move.classification} size={28} /><span><strong>{move.san} · {displayedMoveQualityLabel(move)}</strong><small>{move.annotations.length > 0 ? `Annotations · ${move.annotations.map((annotation) => annotation.replaceAll("_", " ")).join(", ")} · ` : ""}{move.phase} · Accuracy {move.accuracy.toFixed(1)}</small></span></div><dl><div><dt>Quality rule</dt><dd>{(move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule).replaceAll("-", " ")}</dd></div><div><dt>Engine rank</dt><dd>{move.classificationReason.engineRank === undefined ? "Outside MultiPV" : `#${move.classificationReason.engineRank}`}</dd></div><div><dt>Win% loss</dt><dd>{move.classificationReason.winPercentLoss.toFixed(1)}</dd></div><div><dt>Verification</dt><dd>{move.classificationReason.verification?.status ?? "not required"}</dd></div></dl>{move.classificationReason.exclusions.length > 0 && <small>Exclusions · {move.classificationReason.exclusions.join(", ")}</small>}</section>}
     </div>
@@ -223,10 +227,15 @@ export function EngineRoutePanel() {
   const runtime = useReviewRuntime();
   const analysis = useReviewStore((store) => store.analysis);
   const currentPly = useReviewStore((store) => store.currentPly);
+  const positionFen = useReviewStore((store) => store.positionFen);
+  const [tab, setTab] = useState<"engine" | "explorer" | "tablebase">("engine");
   const practiceHidden = runtime.retro.locked;
+  // The explorer shows what is commonly played from this position, which is a
+  // spoiler while the visitor still owes an answer, so the tabs stay away until
+  // the practice session ends.
+  const showTabs = !practiceHidden;
   const result = practiceHidden ? null : runtime.engineResult ?? analysis?.moves[currentPly]?.stockfish ?? null;
-  return (
-    <div className="route-panel engine-route">
+  const enginePanel = <>
       <section className="engine-config"><label>Depth<select value={runtime.reviewDepth} disabled={runtime.reviewState === "running"} onChange={(event) => runtime.setReviewDepth(Number(event.target.value) as 10 | 12 | 15)}><option value={10}>10</option><option value={12}>12</option><option value={15}>15</option></select></label><label>Engine Lab lines<select value={runtime.reviewMultiPv} onChange={(event) => runtime.setReviewMultiPv(Number(event.target.value) as 1 | 2 | 3 | 4 | 5)}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label></section>
       <div className="engine-actions"><button type="button" className="primary" disabled={runtime.engineState === "running"} onClick={() => void runtime.analyzePosition()}>{runtime.engineState === "running" ? "Analyzing position…" : "Analyze current position"}</button>{runtime.record.kind === "pgn" && (runtime.reviewState === "running" ? <button type="button" className="secondary" onClick={runtime.cancelFullGame}>Cancel game review</button> : <button type="button" className="secondary" onClick={() => void runtime.analyzeFullGame()}>Re-analyze full game</button>)}</div>
       {(runtime.engineError || runtime.reviewError) && <p className="error">{runtime.engineError ?? runtime.reviewError}</p>}
@@ -234,6 +243,21 @@ export function EngineRoutePanel() {
       <section className="engine-diagnostics"><div><span>Engine</span><strong>Stockfish 18 WASM</strong></div><div><span>Cache</span><strong>{runtime.reviewState === "cached" ? "Loaded from IndexedDB" : analysis ? "Analysis in memory" : "No game analysis"}</strong></div><div><span>Score</span><strong>{formatEngineScore(result)}</strong></div><div><span>Divider</span><strong>{analysis ? `middle ${analysis.division.middlePly ?? "—"} · end ${analysis.division.endPly ?? "—"}` : "—"}</strong></div></section>
       {practiceHidden && <p className="utility-empty" role="status">Engine lines are hidden while you solve this position. Answer on the board, view the solution, or skip.</p>}
       <div className="candidate-list">{practiceHidden ? null : result?.lines.map((line) => <div className="candidate" key={line.rank}><span>#{line.rank}</span><strong>{line.pv[0]}</strong><code>{formatEngineScore(line.score)}</code><small>{line.pv.slice(1, 7).join(" ")}</small></div>) ?? <p className="utility-empty">Run the current-position engine to inspect raw MultiPV.</p>}</div>
+  </>;
+  return (
+    <div className="route-panel engine-route">
+      {showTabs && (
+        <div className="engine-tabs" role="tablist" aria-label="Engine Lab">
+          <button type="button" role="tab" aria-selected={tab === "engine"} className={tab === "engine" ? "active" : ""} onClick={() => setTab("engine")}>Engine</button>
+          <button type="button" role="tab" aria-selected={tab === "explorer"} className={tab === "explorer" ? "active" : ""} onClick={() => setTab("explorer")}>Explorer</button>
+          <button type="button" role="tab" aria-selected={tab === "tablebase"} className={tab === "tablebase" ? "active" : ""} onClick={() => setTab("tablebase")}>Tablebase</button>
+        </div>
+      )}
+      {!showTabs || tab === "engine"
+        ? enginePanel
+        : tab === "explorer"
+          ? <OpeningExplorerPanel fen={positionFen} />
+          : <TablebasePanel fen={positionFen} />}
     </div>
   );
 }

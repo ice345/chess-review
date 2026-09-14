@@ -3,7 +3,7 @@ import { normalizeTrainingItem } from "./training-queue";
 import { parsePgn } from "@chess-review/chess-core";
 import {
   ANALYSIS_INDEX_STORE, ANALYSIS_STORE, DATA_STORES, EPOCH_KEY,
-  HISTORY_ANALYSIS_JOB_STORE, LOCAL_META_STORE, notifyLocalDataChanged, openReviewDatabase,
+  HISTORY_ANALYSIS_JOB_STORE, LOCAL_META_STORE, notifyLocalDataChanged, openReviewDatabase, REMOTE_POSITIONS_STORE,
   PLATFORM_ACCOUNT_STORE, PLATFORM_SYNC_STORE, REVIEW_STORE, REVIEW_RUN_STORE, NOTEBOOK_STORE,
   SYNCED_GAME_STORE, TRAINING_QUEUE_STORE, writeLocalData,
 } from "./browser-storage";
@@ -84,6 +84,8 @@ async function cleanup(scope: Cleanup): Promise<number> {
         if (scope.kind === "cache") {
           tx.objectStore(ANALYSIS_STORE).clear();
           tx.objectStore(ANALYSIS_INDEX_STORE).clear();
+          // Third-party position lookups are derived reference data as well.
+          tx.objectStore(REMOTE_POSITIONS_STORE).clear();
         } else {
           // Cached positions can be shared by manual imports and other accounts.
           const targeted = new Set([...removed.filter((r) => r.kind === "pgn").map((r) => identity(r.input)), ...sources.map((g) => identity(g.pgn))].filter((v): v is string => v !== null));
