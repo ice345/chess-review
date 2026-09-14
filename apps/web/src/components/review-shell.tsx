@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
@@ -11,10 +11,16 @@ import { BoardQualityBadge, QUALITY_META, WINDOWLIGHT_BOARD_APPEARANCE } from "@
 import { AppHeader } from "./app-header";
 import { TrainingSession } from "./training-session";
 import { ReviewRuntimeProvider } from "./review-runtime";
+import { BoardControls } from "./review/board-controls";
 import { BoardFlipButton } from "./review/board-flip-button";
+import { BoardFocusButton } from "./review/board-focus-button";
+import { ShortcutHelp } from "./review/shortcut-help";
 import { EvaluationBar } from "./review/evaluation-bar";
 import { MoveTransport } from "./review/move-transport";
 import { PlayerStrip } from "./review/player-strip";
+import { useBoardGeometryPreference } from "../hooks/use-board-geometry-preference";
+import { PIECE_ANIMATION_MS, useBoardDisplaySettings } from "../hooks/use-board-display-settings";
+import { useReviewKeyboardShortcuts } from "../hooks/use-review-keyboard-shortcuts";
 import { usePlayerIdentities } from "../hooks/use-player-identities";
 import { useBranchMoveQuality } from "../hooks/use-branch-move-quality";
 import { useChessSounds } from "../hooks/use-chess-sounds";
@@ -179,16 +185,14 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const shareCopiedTimer = useRef<number | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
-  const pendingPromotionRef = useRef(pendingPromotion);
-  pendingPromotionRef.current = pendingPromotion;
   const requestedPlyApplied = useRef<string | null>(null);
   const legalDestinations = useMemo(
     () => selectedSquare ? legalBoardDestinations(state.positionFen, selectedSquare) : [],
     [selectedSquare, state.positionFen],
   );
   const boardSquareStyles = useMemo(
-    () => boardMoveHintStyles(selectedSquare, legalDestinations),
-    [legalDestinations, selectedSquare],
+    () => boardMoveHintStyles(selectedSquare, legalDestinations, retro.hintSquare),
+    [legalDestinations, retro.hintSquare, selectedSquare],
   );
 
   useEffect(() => {
@@ -227,39 +231,47 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     void analysisRuntime.analyzeContinuations();
   }, [analysisRuntime.analyzeContinuations, analysisRuntime.continuationResult, branchPositionFen, canonicalPositionResult, humanRuntime.mode, loadState, record]);
 
+  // The promotion chooser owns Escape while it is open, and every other
+  // shortcut stays suspended until it closes.
   useEffect(() => {
-    function navigate(event: KeyboardEvent) {
-      if (pendingPromotionRef.current) {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          setPendingPromotion(null);
-        }
-        return;
-      }
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest("input, textarea, select, button, a, [contenteditable='true'], [role='slider']")) return;
-      const review = useReviewStore.getState();
-      const prompt = retro.current?.promptPly ?? 0;
-      if (event.key === "Escape" && review.branch) {
-        pausePlayback();
-        review.returnToGame();
-      }
-      if (event.key === "ArrowLeft") {
-        pausePlayback();
-        if (review.branch) review.stepBranch(-1);
-        else review.goToPly(review.currentPly - 1);
-      }
-      if (event.key === "ArrowRight") {
-        pausePlayback();
-        if (review.branch) review.stepBranch(1);
-        // Same chokepoint as navigateNext: the next mainline ply is the answer.
-        else if (retro.locked && review.currentPly >= prompt) return;
-        else review.goToPly(review.currentPly + 1);
-      }
+    if (!pendingPromotion) return;
+    function closeChooser(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setPendingPromotion(null);
     }
-    window.addEventListener("keydown", navigate);
-    return () => window.removeEventListener("keydown", navigate);
-  }, [pausePlayback, retro.current?.promptPly, retro.locked]);
+    window.addEventListener("keydown", closeChooser);
+    return () => window.removeEventListener("keydown", closeChooser);
+  }, [pendingPromotion]);
+
+  const boardGeometry = useBoardGeometryPreference();
+  const boardDisplay = useBoardDisplaySettings();
+  const [focusBoard, setFocusBoard] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const toggleFocusBoard = useCallback(() => setFocusBoard((focused) => !focused), []);
+  const openShortcutHelp = useCallback(() => setShortcutHelpOpen(true), []);
+  const leaveVariation = useCallback(() => {
+    const review = useReviewStore.getState();
+    if (review.branch) {
+      pausePlayback();
+      review.returnToGame();
+      return;
+    }
+    // Focus board is transient session state, so Escape also closes it.
+    setFocusBoard(false);
+  }, [pausePlayback]);
+
+  useReviewKeyboardShortcuts({
+    previous: navigatePrevious,
+    next: navigateNext,
+    first: navigateFirst,
+    last: navigateLast,
+    togglePlayback: playback.toggle,
+    leaveVariation,
+    flipBoard,
+    toggleFocus: toggleFocusBoard,
+    toggleHelp: openShortcutHelp,
+  }, { suspended: pendingPromotion !== null || shortcutHelpOpen });
 
   const root = `/review/${gameId}`;
 
@@ -560,7 +572,10 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
         {exportError && <div className="review-export-error" role="alert"><p className="error">{exportError} Open Export to retry.</p><button type="button" className="text-button" onClick={() => setExportError(null)}>Dismiss export error</button></div>}
 
-        <div className="review-workspace">
+        <div
+          className={`review-workspace${focusBoard ? " focus-board" : ""}`}
+          style={boardGeometry.size === null ? undefined : ({ "--review-board-preference": `${boardGeometry.size}px` } as CSSProperties)}
+        >
           <div className="analysis-column">
             <section className="position-workspace" aria-label="Persistent board workspace">
               <div className="board-player-header">
@@ -581,6 +596,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       : <><path d="m17 9 4 6" /><path d="m21 9-4 6" /></>}
                   </svg>
                 </button>
+                <BoardControls geometry={boardGeometry} onShowShortcuts={openShortcutHelp} />
+                <BoardFocusButton focused={focusBoard} onToggle={toggleFocusBoard} />
                 <BoardFlipButton onFlip={flipBoard} />
                 </div>
               </div>
@@ -592,7 +609,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                   orientation={state.orientation}
                   valuesHidden={!retro.presentation.showEvalValues}
                 />
-                <div className="board-wrap">
+                <div className="board-wrap" ref={boardGeometry.boardRef}>
                   <Chessboard options={{
                     position: state.positionFen,
                     pieces,
@@ -602,10 +619,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       ? []
                       : retro.presentation.showFaultArrow && retro.current
                         ? [faultArrow(retro.current.faultUci)].flatMap((arrow) => arrow ? [arrow] : [])
-                        : retro.presentation.showEngineArrows ? boardArrows : [],
+                        : boardDisplay.boardArrows && retro.presentation.showEngineArrows ? boardArrows : [],
                     arrowOptions: { ...defaultArrowOptions, arrowWidthDenominator: 9, opacity: .76 },
                     boardOrientation: state.orientation,
-                    animationDurationInMs: 160,
+                    showNotation: boardDisplay.boardCoordinates === "inside",
+                    animationDurationInMs: PIECE_ANIMATION_MS[boardDisplay.pieceAnimation],
                     squareStyles: boardSquareStyles,
                     canDragPiece: ({ piece }) => !pendingPromotion && !retro.evaluating && retro.status !== "rejected" && retro.status !== "rewinding" && pieceMatchesTurn(piece.pieceType, state.positionFen),
                     onPieceDrag: ({ piece, square }) => {
@@ -673,7 +691,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       <button type="button" className="promotion-cancel" onClick={() => setPendingPromotion(null)}>Cancel</button>
                     </div>
                   )}
-                  {!pendingPromotion && retro.presentation.showMoveBadge && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
+                  {!pendingPromotion && boardDisplay.boardQualityBadge && retro.presentation.showMoveBadge && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
                     ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={state.orientation} classification={selectedBranchQuality.classification} />
                     : currentAnalysis && !state.branch
                       ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />
@@ -721,6 +739,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
             {children}
           </aside>
         </div>
+        {shortcutHelpOpen && <ShortcutHelp onClose={() => setShortcutHelpOpen(false)} />}
       </main>
     </ReviewRuntimeProvider>
   );

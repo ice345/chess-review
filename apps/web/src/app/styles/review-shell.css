@@ -135,7 +135,8 @@
 
 .review-workspace {
   --eval-gutter: 40px;
-  --review-board-size: min(600px, 37.5vw, max(360px, calc(100dvh - 296px)));
+  --review-board-default: min(600px, 37.5vw, max(360px, calc(100dvh - 296px)));
+  --review-board-size: var(--review-board-default);
   width: min(1280px, calc(100% - 40px), calc(var(--review-board-size) * 2 + 164px));
   margin: 12px auto 20px;
   display: grid;
@@ -143,6 +144,32 @@
   grid-template-rows: auto;
   gap: 24px;
   align-items: stretch;
+}
+
+/* The persisted board-size preference is honoured only where the layout can
+   afford it: it is clamped against the viewport so a stored 720px can never
+   push the context panel off-screen, and narrow layouts below keep the
+   responsive default untouched. */
+@media (min-width: 901px) {
+  .review-workspace {
+    --review-board-max: clamp(320px, calc(100vw - 434px), 720px);
+    --review-board-size: clamp(320px, var(--review-board-preference, var(--review-board-default)), var(--review-board-max));
+  }
+}
+
+/* Focus board: one column, no context panel, board bounded by the viewport. */
+.review-workspace.focus-board {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+.review-workspace.focus-board .context-panel { display: none; }
+
+@media (min-width: 901px) {
+  .review-workspace.focus-board {
+    width: min(calc(100% - 40px), calc(var(--review-board-size) + 60px));
+    --review-board-size: min(calc(100dvh - 250px), calc(100vw - 140px), 960px);
+  }
 }
 
 .analysis-column {
@@ -279,3 +306,64 @@
 .context-panel.moves-context.training-context { overflow: auto; }
 
 .review-export-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 22px; }
+
+/* `?` shortcut overlay. Modal on purpose: it owns the keyboard while it is open,
+   and the workspace shortcut hook is suspended for the same period. */
+.shortcut-help-backdrop {
+  position: fixed;
+  z-index: 300;
+  inset: 0;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: rgba(45, 70, 84, .38);
+}
+
+.shortcut-help {
+  width: min(520px, 100%);
+  max-height: min(88dvh, 720px);
+  overflow: auto;
+  padding: 18px 20px 20px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-paper);
+  box-shadow: var(--shadow-floating);
+}
+
+.shortcut-help header { display: grid; gap: 3px; }
+.shortcut-help h2 { margin: 0; color: var(--ink-primary); font: 500 21px var(--font-serif); }
+.shortcut-help header p { margin: 0; color: var(--ink-muted); font-size: 12px; }
+
+.shortcut-help-group { display: grid; gap: 6px; }
+.shortcut-help-group > strong {
+  color: var(--ink-secondary);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.shortcut-help-group dl { margin: 0; display: grid; gap: 2px; }
+.shortcut-help-group dl > div {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.shortcut-help-group dt { margin: 0; }
+.shortcut-help-group dd { margin: 0; color: var(--ink-secondary); font-size: 12px; }
+
+.shortcut-help kbd {
+  padding: 2px 7px;
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--wash-blue);
+  color: var(--ink-primary);
+  font: 650 12px var(--font-mono);
+}
+
+.shortcut-help > button { min-height: 44px; justify-self: end; padding-inline: 18px; }

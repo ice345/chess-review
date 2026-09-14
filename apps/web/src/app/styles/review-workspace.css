@@ -20,11 +20,18 @@
   align-items: center;
   gap: 8px;
   transform: translateX(calc((var(--eval-gutter) + 10px) / 2));
+  /* The transform makes this row a stacking context, so its popovers (board
+     settings) would otherwise paint under the board that follows it. The row
+     carries the toolbar menus, so it sits above every board overlay. */
+  position: relative;
+  z-index: 9;
 }
 .board-player-header .player-strip { width: auto; flex: 1; margin: 0; transform: none; }
 .board-toolbar { display: flex; flex: none; gap: 6px; }
 
 .board-flip-button,
+.board-focus-button,
+.board-controls > summary,
 .sound-toggle-button {
   width: 44px;
   height: 44px;
@@ -40,6 +47,8 @@
 }
 
 .board-flip-button:hover,
+.board-focus-button:hover,
+.board-controls > summary:hover,
 .sound-toggle-button:hover {
   border-color: var(--line-accent);
   background: var(--wash-blue);
@@ -47,6 +56,8 @@
 }
 
 .board-flip-button svg,
+.board-focus-button svg,
+.board-controls > summary svg,
 .sound-toggle-button svg {
   width: 100%;
   height: 100%;
@@ -57,9 +68,44 @@
   stroke-linejoin: round;
 }
 
+.board-focus-button[aria-pressed="true"],
 .sound-toggle-button[aria-pressed="true"] {
   background: var(--wash-cream);
   color: var(--accent-brass);
+}
+
+.board-controls { position: relative; }
+.board-controls > summary { list-style: none; }
+.board-controls > summary::-webkit-details-marker { display: none; }
+
+.board-controls-menu {
+  width: min(248px, calc(100vw - 32px));
+  gap: 8px;
+  padding: 10px;
+}
+
+.board-size-row { display: grid; gap: 4px; }
+.board-size-row > span { color: var(--ink-secondary); font-size: 12px; font-weight: 650; }
+.board-size-row > small { color: var(--ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.board-size-row > input { width: 100%; accent-color: var(--accent-primary); }
+
+.board-controls-menu .text-button {
+  min-height: 40px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 7px;
+  color: var(--accent-primary);
+  font-size: 12px;
+  text-align: left;
+}
+
+.board-controls-menu .text-button:hover { background: var(--wash-blue); }
+.board-controls-note { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }
+
+/* The size control has no effect where the layout stays responsive. */
+@media (max-width: 900px) {
+  .board-controls { display: none; }
 }
 
 .player-strip {
