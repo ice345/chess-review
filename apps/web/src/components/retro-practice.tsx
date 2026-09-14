@@ -78,7 +78,7 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   const side = sideName(retro.color);
   const last = retro.currentIndex + 1 >= total;
 
-  return <section className="retro-practice" aria-label="Learn from your mistakes">
+  return <section className="retro-practice" aria-label="Learn from your mistakes" data-status={retro.status}>
     <header className="retro-head">
       <strong>Learn from your mistakes</strong>
       <span>{position} / {total}</span>

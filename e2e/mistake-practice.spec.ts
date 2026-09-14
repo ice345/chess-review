@@ -102,11 +102,16 @@ test("solves in place on the review board with the answer hidden", async ({ page
   await expect(panel(page)).toContainText("Find a better move");
   await expect(panel(page)).toContainText("was played");
 
-  // A wrong answer is rejected without leaving the prompt position.
+  // A wrong answer is rejected without leaving the prompt position. The board
+  // deliberately ignores input until the attempted move has been taken back, so
+  // wait for the session to be solving again: a loaded CI machine spends long
+  // enough in that window for the clicks below to be dropped, which is how this
+  // spec failed on every push while passing on a developer's machine.
   await play(page, "f2", "f3");
   await expect(panel(page)).toContainText("f3 does not keep the position");
   expect(await faultArrowCount(page)).toBe(0);
   await expect(page.getByLabel("Persistent board workspace").getByText("Starting position", { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(panel(page)).toHaveAttribute("data-status", "solving", { timeout: 10_000 });
 
   // The engine's move solves it and stays on the board as a variation, so the
   // visitor can keep playing that line instead of snapping back to the prompt.
