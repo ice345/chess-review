@@ -21,12 +21,21 @@ const CAPTURE_DESTINATION: CSSProperties = {
     "radial-gradient(circle, transparent 0 56%, color-mix(in srgb, var(--surface-paper) 90%, transparent) 57% 63%, color-mix(in srgb, var(--accent-rose) 92%, transparent) 64% 78%, transparent 79%)",
 };
 
+/* A practice hint marks the piece to move. Brass keeps it distinct from the
+   rose selection, because both can be on the board at the same time. */
+const HINT_SQUARE: CSSProperties = {
+  boxShadow: "inset 0 0 0 4px var(--accent-brass)",
+};
+
 export function boardMoveHintStyles(
   selectedSquare: string | null,
   destinations: readonly LegalBoardDestination[],
+  hintSquare: string | null = null,
 ): Record<string, CSSProperties> {
-  if (!selectedSquare) return {};
+  const hints: Record<string, CSSProperties> = hintSquare ? { [hintSquare]: HINT_SQUARE } : {};
+  if (!selectedSquare) return hints;
   return {
+    ...hints,
     [selectedSquare]: SELECTED_SQUARE,
     ...Object.fromEntries(destinations.map((move) => [
       move.to,

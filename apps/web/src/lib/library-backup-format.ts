@@ -1,6 +1,7 @@
 import { parsePgn } from "@chess-review/chess-core";
 import type { ExternalGameReference, SyncedGame, SyncedGamePlayer, TrainingQueueItem, TrainingQueueItemV3 } from "@chess-review/shared";
 import type { AppSettings } from "./app-settings";
+import { BOARD_SIZE_MAX, BOARD_SIZE_MIN } from "./board-geometry";
 import { buildReviewRecord, type ReviewRecord } from "./review-library";
 import { normalizeTrainingItem, trainingPositionKey } from "./training-queue";
 import { validateNotebook, type ReviewNotebookV1 } from "./review-notebook";
@@ -58,6 +59,11 @@ function array(value: unknown, name: string, max = MAX_BACKUP_RECORDS): unknown[
   return value;
 }
 function optional<T>(value: unknown, parse: (value: unknown) => T): T | undefined { return value === undefined ? undefined : parse(value); }
+/** `null` is a real board-size value (automatic), so it must survive a round trip. */
+function optionalBoardSize(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  return integer(value, "board size", BOARD_SIZE_MIN, BOARD_SIZE_MAX);
+}
 function field<K extends string, T>(key: K, value: T | undefined): Partial<Record<K, T>> { return (value === undefined ? {} : { [key]: value }) as Partial<Record<K, T>>; }
 function unique<T extends { id: string }>(values: T[], name: string): T[] {
   if (new Set(values.map(({ id }) => id)).size !== values.length) throw new Error(`The backup contains duplicate ${name} IDs.`);
@@ -96,6 +102,12 @@ export function backupSettings(value: unknown): AppSettings {
     autoAnalyzeImported: choice(v.autoAnalyzeImported, [0, 1, 3, 5], "sync preference"), soundEnabled: boolean(v.soundEnabled, "sound preference"),
     soundVolume: number(v.soundVolume, "volume", 0, 1), soundTheme: choice(v.soundTheme, ["wintrchess"], "sound theme"),
     pieceSet: optional(v.pieceSet, (value) => choice(value, ["liz-blue", "classic"] as const, "piece set")) ?? "liz-blue",
+    boardSize: optionalBoardSize(v.boardSize),
+    boardCoordinates: optional(v.boardCoordinates, (value) => choice(value, ["inside", "off"] as const, "board coordinates")) ?? "inside",
+    boardArrows: optional(v.boardArrows, (value) => boolean(value, "analysis arrows")) ?? true,
+    boardQualityBadge: optional(v.boardQualityBadge, (value) => boolean(value, "Move Quality badge")) ?? true,
+    pieceAnimation: optional(v.pieceAnimation, (value) => choice(value, ["off", "fast", "natural"] as const, "piece animation")) ?? "natural",
+    moveEmphasis: optional(v.moveEmphasis, (value) => choice(value, ["key", "all"] as const, "move emphasis")) ?? "key",
   };
 }
 

@@ -3,6 +3,17 @@ import type { CoachLanguage } from "@chess-review/shared";
 import type { CoachRequestProvider, MaiaModel } from "./local-ai";
 import type { ChessSoundTheme } from "./chess-sound";
 import type { PieceSetId } from "./board-piece-assets";
+import { normalizeBoardSizePreference } from "./board-geometry";
+
+/** Board notation placement. Only "inside" and "off" are implemented. */
+export type BoardCoordinates = "inside" | "off";
+export const BOARD_COORDINATES: readonly BoardCoordinates[] = ["inside", "off"];
+/** Windowlight motion stays almost invisible; these are the only three speeds. */
+export type PieceAnimation = "off" | "fast" | "natural";
+export const PIECE_ANIMATIONS: readonly PieceAnimation[] = ["off", "fast", "natural"];
+/** How strongly the move list colours everything that is not a key moment. */
+export type MoveEmphasis = "key" | "all";
+export const MOVE_EMPHASIS: readonly MoveEmphasis[] = ["key", "all"];
 
 export interface AppSettings {
   coachProvider: CoachRequestProvider;
@@ -19,6 +30,14 @@ export interface AppSettings {
   soundVolume: number;
   soundTheme: ChessSoundTheme;
   pieceSet: PieceSetId;
+  /** Desktop review board width in CSS pixels; null keeps the responsive default. */
+  boardSize: number | null;
+  boardCoordinates: BoardCoordinates;
+  /** Objective/Maia candidate arrows. Practice feedback arrows are never controlled by this. */
+  boardArrows: boolean;
+  boardQualityBadge: boolean;
+  pieceAnimation: PieceAnimation;
+  moveEmphasis: MoveEmphasis;
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -36,7 +55,17 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   soundVolume: 0.35,
   soundTheme: "wintrchess",
   pieceSet: "liz-blue",
+  boardSize: null,
+  boardCoordinates: "inside",
+  boardArrows: true,
+  boardQualityBadge: true,
+  pieceAnimation: "natural",
+  moveEmphasis: "key",
 };
+
+function choice<T extends string>(value: unknown, choices: readonly T[], fallback: T): T {
+  return choices.includes(value as T) ? value as T : fallback;
+}
 
 export const APP_SETTINGS_STORAGE_KEY = "open-chess-review-settings-v1";
 const STORAGE_KEY = APP_SETTINGS_STORAGE_KEY;
@@ -60,6 +89,12 @@ export function loadAppSettings(): AppSettings {
       soundVolume,
       soundTheme: "wintrchess",
       pieceSet: stored.pieceSet === "classic" ? "classic" : "liz-blue",
+      boardSize: normalizeBoardSizePreference(stored.boardSize),
+      boardCoordinates: choice(stored.boardCoordinates, BOARD_COORDINATES, "inside"),
+      boardArrows: stored.boardArrows !== false,
+      boardQualityBadge: stored.boardQualityBadge !== false,
+      pieceAnimation: choice(stored.pieceAnimation, PIECE_ANIMATIONS, "natural"),
+      moveEmphasis: choice(stored.moveEmphasis, MOVE_EMPHASIS, "key"),
     };
   } catch {
     return DEFAULT_APP_SETTINGS;
@@ -81,6 +116,12 @@ export function savePreferredHumanTargetElo(targetElo: number): AppSettings {
 
 export function savePreferredHumanModel(humanModel: MaiaModel): AppSettings {
   const settings = { ...loadAppSettings(), humanModel };
+  saveAppSettings(settings);
+  return settings;
+}
+
+export function savePreferredBoardSize(boardSize: number | null): AppSettings {
+  const settings = { ...loadAppSettings(), boardSize: normalizeBoardSizePreference(boardSize) };
   saveAppSettings(settings);
   return settings;
 }

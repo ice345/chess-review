@@ -113,12 +113,31 @@ export function SettingsPage() {
           {!enhanced && <small>Grounded summaries are built from objective analysis on this device. Generative AI is not provided by this website. Output language does not change the English interface.</small>}
         </section>
         <section className="settings-card">
-          <div><span className="kicker">Board feedback</span><h2>Chess sounds</h2></div>
+          <div><span className="kicker">Board feedback</span><h2>Board and display</h2></div>
           <label>Piece set<select value={settings.pieceSet} onChange={(event) => update({ ...settings, pieceSet: event.target.value as AppSettings["pieceSet"] })}>
             <option value="liz-blue">Feather Porcelain</option>
             <option value="classic">Classic SVG</option>
           </select></label>
-          <label className="sound-enabled-setting"><span>Sound effects</span><input type="checkbox" checked={settings.soundEnabled} onChange={(event) => update({ ...settings, soundEnabled: event.target.checked })} /></label>
+          <label>Coordinates<select value={settings.boardCoordinates} onChange={(event) => update({ ...settings, boardCoordinates: event.target.value as AppSettings["boardCoordinates"] })}>
+            <option value="inside">Inside the squares</option>
+            <option value="off">Off</option>
+          </select></label>
+          <label className="setting-row"><span>Analysis arrows</span><input type="checkbox" checked={settings.boardArrows} onChange={(event) => update({ ...settings, boardArrows: event.target.checked })} /></label>
+          <label className="setting-row"><span>Move Quality badge on the board</span><input type="checkbox" checked={settings.boardQualityBadge} onChange={(event) => update({ ...settings, boardQualityBadge: event.target.checked })} /></label>
+          <label>Piece animation<select value={settings.pieceAnimation} onChange={(event) => update({ ...settings, pieceAnimation: event.target.value as AppSettings["pieceAnimation"] })}>
+            <option value="natural">Natural · 160 ms</option>
+            <option value="fast">Fast · 90 ms</option>
+            <option value="off">Off</option>
+          </select></label>
+          <label>Move list emphasis<select value={settings.moveEmphasis} onChange={(event) => update({ ...settings, moveEmphasis: event.target.value as AppSettings["moveEmphasis"] })}>
+            <option value="key">Key moves only</option>
+            <option value="all">All analyzed moves</option>
+          </select></label>
+          <small>Arrows are the Stockfish and Maia candidates; the red practice arrow is never hidden. Emphasis changes how strongly a non-key move is drawn, never whether it is listed. Board size is set from the board toolbar inside a review.</small>
+        </section>
+        <section className="settings-card">
+          <div><span className="kicker">Board feedback</span><h2>Chess sounds</h2></div>
+          <label className="setting-row"><span>Sound effects</span><input type="checkbox" checked={settings.soundEnabled} onChange={(event) => update({ ...settings, soundEnabled: event.target.checked })} /></label>
           <label>Volume · {Math.round(settings.soundVolume * 100)}<input type="range" min={0} max={100} step={1} value={Math.round(settings.soundVolume * 100)} onChange={(event) => update({ ...settings, soundVolume: Number(event.target.value) / 100 })} /></label>
           <label>Sound theme<select value={settings.soundTheme} onChange={() => update({ ...settings, soundTheme: "wintrchess" })}><option value="wintrchess">WintrChess</option></select></label>
           <small>Feather Porcelain is the default board set. Classic SVG is the previous react-chessboard pieces. Sounds follow legal board transitions.</small>
