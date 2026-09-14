@@ -231,7 +231,9 @@
 
 .manage-accounts {
   margin-top: 13px;
-  display: inline-block;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .library-load-more {

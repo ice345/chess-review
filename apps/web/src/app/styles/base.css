@@ -25,7 +25,7 @@ button:disabled { opacity: .42; cursor: default; }
 .secondary.danger:hover { background: var(--danger-soft); }
 .text-button.danger { color: var(--danger); }
 .primary-link { display: inline-flex; align-items: center; justify-content: center; }
-.text-button, .text-action { min-height: 32px; padding: 5px 4px; border: 0; background: transparent; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; cursor: pointer; }
+.text-button, .text-action { min-height: 40px; padding: 5px 4px; display: inline-flex; align-items: center; border: 0; background: transparent; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; cursor: pointer; }
 kbd { padding: 2px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-paper); color: var(--ink-muted); font: 11px var(--font-mono); }
 
 @media (prefers-reduced-motion: reduce) {

@@ -28,8 +28,8 @@
 .settings-card label { display: grid; gap: 6px; color: var(--muted); font-size: 11px; }
 .settings-card select, .settings-card input { width: 100%; height: 39px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-paper); color: var(--ink-primary); accent-color: var(--accent-primary); }
 .settings-card input[type="range"] { padding: 0; accent-color: var(--accent-primary); }
-.settings-card .sound-enabled-setting { min-height: 39px; grid-template-columns: 1fr auto; align-items: center; }
-.settings-card .sound-enabled-setting input { width: 20px; height: 20px; accent-color: var(--accent-primary); }
+.settings-card .setting-row { min-height: 44px; grid-template-columns: 1fr auto; align-items: center; }
+.settings-card .setting-row input { width: 20px; height: 20px; accent-color: var(--accent-primary); }
 .settings-card > small, .settings-card > p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .runtime-card,
 .data-card { grid-column: 1 / -1; }
@@ -104,6 +104,26 @@
 .data-destinations > div { padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .data-destinations dt { font-weight: 750; }
 .data-destinations dd { margin: 6px 0 0; }
+
+.help-shortcut-group { margin-top: 14px; }
+.help-shortcut-group h3 {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.help-shortcut-group dl { margin: 6px 0 0; display: grid; gap: 2px; }
+.help-shortcut-group dl > div {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.help-shortcut-group dt { margin: 0; }
+.help-shortcut-group dd { margin: 0; color: var(--ink-secondary); }
 .product-help-link { width: min(1060px, calc(100% - 40px)); margin: 20px auto; font-size: 13px; }
 .product-help-link a { min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; }
 @media (min-width: 821px) {

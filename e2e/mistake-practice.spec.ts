@@ -257,7 +257,8 @@ test("the side selector and the theory exclusion decide what Start offers", asyn
   const start = startButton(page);
   const empty = page.locator(".utility-empty");
 
-  await expect(start).toBeDisabled();
+  // With nothing to practise the panel shows why, and offers no dead action.
+  await expect(start).toHaveCount(0);
   await expect(empty).toContainText("White");
   // A fault existed and was skipped as theory, so the copy must say that rather
   // than claiming nothing was recorded.
@@ -266,7 +267,7 @@ test("the side selector and the theory exclusion decide what Start offers", asyn
   await expect(empty).not.toContainText("try the other side");
 
   await page.getByRole("button", { name: "Black", exact: true }).click();
-  await expect(start).toBeDisabled();
+  await expect(start).toHaveCount(0);
   await expect(empty).toContainText("Black");
   // Black genuinely has no fault, so here the "nothing recorded" copy is correct.
   await expect(empty).toContainText("No mistakes were recorded");
@@ -301,7 +302,7 @@ test("an inaccuracy only becomes available when it is included", async ({ page }
   await page.goto(reviewUrl);
 
   const start = startButton(page);
-  await expect(start).toBeDisabled();
+  await expect(start).toHaveCount(0);
   await page.locator(".practice-filters summary").click();
   await page.getByRole("checkbox", { name: "Include inaccuracies" }).check();
   await expect(start).toBeEnabled();
