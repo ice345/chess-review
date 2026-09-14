@@ -3,7 +3,7 @@ import base from "./playwright.browser-core.config";
 
 export default defineConfig({
   ...base,
-  testMatch: ["**/r4-browser-core.spec.ts", "**/r5-release.spec.ts", "**/r3.spec.ts", "**/s1-notebook.spec.ts", "**/mistake-practice.spec.ts", "**/offline.spec.ts", "**/s4-share-and-annotations.spec.ts", "**/s4-board-arrows.spec.ts"],
+  testMatch: ["**/r4-browser-core.spec.ts", "**/r5-release.spec.ts", "**/r3.spec.ts", "**/s1-notebook.spec.ts", "**/mistake-practice.spec.ts", "**/offline.spec.ts", "**/s4-share-and-annotations.spec.ts", "**/s4-board-arrows.spec.ts", "**/audit-cleanup.spec.ts", "**/zoom-acceptance.spec.ts"],
   timeout: 90_000,
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

@@ -32,6 +32,10 @@ jobs:
       - run: pnpm test
       - run: python3 -m unittest discover -s deploy/nuc -p "test_*.py"
       - run: pnpm build
+      - name: Verify the authored pieces reached both build outputs
+        run: |
+          node scripts/sync-piece-assets.mjs --check
+          test "$(find apps/mobile/dist/assets -name '*.png' | wc -l)" -ge 12
 
   local-ai:
     name: Python local-ai tests
@@ -73,7 +77,16 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm exec playwright test e2e/workflows.spec.ts e2e/r1.spec.ts e2e/r2.spec.ts e2e/r2-layout.spec.ts e2e/r3.spec.ts e2e/r4.spec.ts e2e/s1-notebook.spec.ts e2e/mistake-practice.spec.ts e2e/mistake-practice-enhanced.spec.ts
+      - name: Browser workflow E2E
+        run: |
+          # Everything the default config covers, minus the two specs that depend on
+          # artifacts of this repository's own machines: visual.spec.ts compares
+          # against baselines generated on macOS, and review-second-cut-shot.spec.ts
+          # is a capture tool that writes screenshots to /tmp. The release-only specs
+          # are excluded by testIgnore and run against the standalone artifact below.
+          # A hand-maintained allowlist is what let e2e/audit-cleanup.spec.ts and
+          # e2e/zoom-acceptance.spec.ts fall out of CI; this filter cannot drift.
+          pnpm exec playwright test "e2e/(?!visual|review-second-cut-shot).*\.spec\.ts"
       - name: Build public Browser Core
         run: pnpm build
         env:
