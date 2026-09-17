@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-06 working tree after R1–R2 (R3)
+Superseded by: [docs/advanced-study.md](../advanced-study.md) and [docs/library-backup.md](../library-backup.md)
+Do not use as the current product contract.
+
 # R3 · 局面回顾与棋库备份
 
 2026-09-06；承接 R1、R2 的未提交工作。R3 工程实现和本地验收完成。

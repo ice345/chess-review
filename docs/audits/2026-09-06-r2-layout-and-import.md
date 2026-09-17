@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `a1f603e` · 2026-09-06 (R2)
+Superseded by: [docs/ui-spec.md](../ui-spec.md)
+Do not use as the current product contract.
+
 # R2 首页、复盘布局与 PGN 导入验收
 
 日期：2026-09-06。基线：R1 完成后的工作区，HEAD `a1f603e`。

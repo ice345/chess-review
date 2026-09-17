@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-11 (S6)
+Superseded by: [docs/web-service-boundaries.md](../web-service-boundaries.md)
+Do not use as the current product contract.
+
 # 生产边界修复（S6）
 
 日期：2026-09-11。范围：Lichess OAuth 回跳与 Cookie 属性、安全响应头、平台请求的

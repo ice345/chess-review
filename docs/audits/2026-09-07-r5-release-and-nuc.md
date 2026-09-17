@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-07 local build and deployment rehearsal (R5)
+Superseded by: [deploy/nuc/README.md](../../deploy/nuc/README.md)
+Do not use as the current product contract.
+
 # R5：生产构建验收、棋库性能与 Debian NUC 部署
 
 状态：本地工程与部署演练完成；尚未连接用户 NUC、配置真实 Cloudflare 域名或发布公开 beta。目标机器按用户提供的信息：Debian / NUC6CAYS / 8 GB / 512 GB，已有 Cloudflare Tunnel，无公网 IPv4。域名留空由用户配置。

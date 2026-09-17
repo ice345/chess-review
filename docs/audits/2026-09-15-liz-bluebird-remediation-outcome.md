@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `56d5af3` · 2026-09-15
+Superseded by: none — kept as a record of a completed pass
+Do not use as the current product contract.
+
 # Liz Bluebird audit: remediation outcome
 
 Date: 2026-09-15

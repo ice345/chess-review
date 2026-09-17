@@ -1,9 +1,14 @@
+Status: Historical
+Baseline: `56d5af3` · 2026-09-15
+Superseded by: none — kept as a record of a completed pass
+Do not use as the current product contract.
+
 # C01 — Opera Game `15. Bxd7+` (ply 29) evaluation anomaly: investigation report
 
 Date: 2026-09-15
 Baseline commit under test: `56d5af34e82f89a0652899c54dfe737331009736`
 Diagnostic: `scripts/diagnose-objective-game.mjs`
-Status: **reproduced and root-caused. Verdict — genuine depth-10 engine behaviour, amplified by the classification/verification budget; not a cache, POV, pairing or normalization defect.**
+Outcome: **reproduced and root-caused. Verdict — genuine depth-10 engine behaviour, amplified by the classification/verification budget; not a cache, POV, pairing or normalization defect.**
 
 ---
 

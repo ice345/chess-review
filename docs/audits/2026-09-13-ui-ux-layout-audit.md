@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `master` after the 2026-09-13 Windowlight pass
+Superseded by: [docs/ui-spec.md](../ui-spec.md)
+Do not use as the current product contract.
+
 # UI/UX/layout audit — post-Windowlight
 
 Date: 2026-09-13. Baseline: `master` after the

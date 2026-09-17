@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-11 (S3)
+Superseded by: [docs/analysis-scheduler.md](../analysis-scheduler.md)
+Do not use as the current product contract.
+
 # 复盘并行度与离线外壳（S3）
 
 日期：2026-09-11；范围：`packages/stockfish` 的整盘复盘 worker 池，以及公开

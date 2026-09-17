@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-11 (S4)
+Superseded by: [docs/pgn-import-export.md](../pgn-import-export.md)
+Do not use as the current product contract.
+
 # 分享链接、棋盘箭头与导入注解保真（S4）
 
 日期：2026-09-11。范围：已验证复盘的**分享链接**、**用户手绘箭头**、**导入 PGN 注解

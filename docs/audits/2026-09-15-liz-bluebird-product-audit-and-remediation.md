@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `56d5af3` · 2026-09-15
+Superseded by: [docs/audits/2026-09-15-liz-bluebird-remediation-outcome.md](2026-09-15-liz-bluebird-remediation-outcome.md), then [FIX.md](../../FIX.md)
+Do not use as the current product contract.
+
 # Open Chess Review：美学、复盘体验与产品完整性审计及修复方案
 
 日期：2026-09-15  

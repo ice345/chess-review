@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-05 proposal; never implemented as written
+Superseded by: [docs/design/windowlight-contract.md](windowlight-contract.md)
+Do not use as the current product contract.
+
 # Bluebird · 整站设计提案 V2
 
 日期：2026-09-05。状态：**待用户审阅；不是已实施的产品规范**。

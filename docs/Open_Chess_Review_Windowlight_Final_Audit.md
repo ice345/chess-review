@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `b4eb09d` · 2026-09-12
+Superseded by: [docs/design/windowlight-contract.md](design/windowlight-contract.md)
+Do not use as the current product contract.
+
 # Open Chess Review — Bluebird / Windowlight Visual Audit & Implementation Specification
 
 **Audit date:** 2026-09-12  

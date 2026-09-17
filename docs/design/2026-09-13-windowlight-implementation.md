@@ -1,6 +1,11 @@
+Status: Historical
+Baseline: `b4eb09d` · 2026-09-13
+Superseded by: [docs/design/windowlight-contract.md](windowlight-contract.md)
+Do not use as the current product contract.
+
 # Windowlight implementation note
 
-Date: 2026-09-13. Status: **implemented**.
+Date: 2026-09-13. The pass landed.
 Baseline: `master` `b4eb09dde110e0ccbc487bb45ec879a2b6b97f5a`.
 Specification: [`Open_Chess_Review_Windowlight_Final_Audit.md`](../Open_Chess_Review_Windowlight_Final_Audit.md).
 

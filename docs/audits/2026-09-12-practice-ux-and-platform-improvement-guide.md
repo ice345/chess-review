@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-12
+Superseded by: [docs/mistake-practice.md](../mistake-practice.md)
+Do not use as the current product contract.
+
 # 错误回顾 UX 审计与实施指导
 
 日期：2026-09-12。供产品审阅及后续 AI 实施使用。

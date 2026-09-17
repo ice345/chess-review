@@ -231,9 +231,10 @@ stale-labelling rule.
 
 ## Opening Explorer
 
-Engine Lab carries two tabs: **Engine** (the existing evaluation workspace) and
-**Explorer**. They share one panel because both investigate the current position;
-the Explorer is not part of guided Review and never feeds the objective analysis.
+Engine Lab carries three tabs: **Engine** (the existing evaluation workspace),
+**Explorer** and **Tablebase**. They share one panel because all three investigate
+the current position; the Explorer is not part of guided Review and never feeds the
+objective analysis.
 Tabs are hidden while a practice answer is owed, because "what is usually played
 here" is a spoiler for the exercise.
 
@@ -241,8 +242,10 @@ The Explorer answers *what is played from here*, which is a different question
 from opening recognition. It shows, for the current position: the total games, the
 White/Draw/Black split, each candidate move's SAN, game count and split ordered by
 frequency, and the recognised opening name when the database supplies one. The
-visitor can switch between *All players* (club-strength human games, 1600+) and
-*Masters*; selecting a move explores it on the board as a variation. Frequencies
+visitor can switch between *All players* (human games at a chosen rating floor and
+time-control set, 1600+ and blitz/rapid/classical by default) and *Masters* (one
+elite database with no rating floor, filtered by time control only); selecting a
+move explores it on the board as a variation. Frequencies
 are other players' games, never an evaluation — Stockfish still decides what is
 best, and the panel says so. The numbers always carry their context: which
 database, which population it covers and the exact position (the board's FEN) they

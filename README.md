@@ -11,9 +11,11 @@ Open Chess Review is a free, open-source chess game review and coaching workspac
 - Reviews with Stockfish, Maia or Compare mode while keeping objective Move Quality separate from Elo-conditioned human probability, WDL and Find Difficulty.
 - Turns structured facts and validated engine lines into contextual move lessons and a whole-game Study plan, with deterministic copy when the language provider is unavailable.
 - Builds player-specific multi-game trends, color-separated opening repertoire, evidence-bearing recurring weaknesses, and a persistent training queue from completed reviews.
+- Schedules each queued Training position on a fixed 1/3/7/21-day mastery ladder (`learning → review → mastered`), where only a review produced unaided on the day the position comes due advances it.
 - Syncs complete public Chess.com archives and authorized Lichess game history into a local IndexedDB library with resumable checkpoints.
 - Saves personal position notes, bookmarks and legal variation lines in a local Notebook, with explicit save/conflict recovery.
 - Offers [Mistake practice](docs/mistake-practice.md): hide answers, try a better move, check alternatives with Stockfish and distinguish solved, hinted, revealed and skipped positions within a session.
+- Opens Engine Lab beside the board for deeper Stockfish work, the Lichess/Masters Opening Explorer with rating and time-control population filters, and a seven-piece Syzygy tablebase lookup that stays a lookup: it never becomes classification or Accuracy evidence.
 - Exports original/annotated PGN, canonical JSON, position PNGs, game-review PNGs, and portable library backups (v2, with v1 restore support).
 - Reuses a cached engine and reopens already reviewed games offline; the service worker never intercepts `/api/*`.
 - Shares a reviewed game as a link that carries the PGN in the URL fragment, so the recipient imports it locally and nothing is uploaded.
@@ -24,7 +26,8 @@ Open Chess Review is a free, open-source chess game review and coaching workspac
 The public Browser Core release requires no subscription or Open Chess Review
 account. Games and notebooks stay in each visitor's browser; cloud sync and
 hosted AI are not provided. Optional third-party API coaching uses the provider
-you configure locally. See the [current release audit](docs/audits/2026-09-08-free-stable-release.md)
+you configure locally. See the [2026-09-08 release audit](docs/audits/2026-09-08-free-stable-release.md),
+which is a record of that pass rather than the current contract,
 and [contribution guide](CONTRIBUTING.md).
 
 ## Architecture
@@ -48,6 +51,7 @@ The pnpm workspace keeps those boundaries explicit:
 | `packages/stockfish` | Stockfish transport, UCI parsing, cache identity and worker integration |
 | `packages/openings` | Lichess opening data and position-based recognition |
 | `packages/shared` | Versioned schemas shared across browser, analysis and service boundaries |
+| `packages/tablebase` | Seven-piece Syzygy contract: coverage rule, position identity and payload normalization |
 | `packages/ui` | Original Blue Bishop identity, geometric Move Quality Annotation System V3 and quieter human-difficulty marks |
 | `services/local-ai` | Optional FastAPI Maia and provider-neutral grounded Coach adapters |
 | `apps/desktop` | Phase 6 Vite/React/Tauri 2 native shell; it imports shared packages and owns no analysis semantics |
@@ -89,7 +93,7 @@ See [Web service boundaries](docs/web-service-boundaries.md) for production mode
 Lichess `APP_ORIGIN`/private cookie key, server rate limits and ingress requirements.
 The in-app Help page explains data destinations and library backups.
 
-The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **Training** owns cross-game progress, repertoire, weaknesses and queue state; **Engine** owns advanced Stockfish tooling. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
+The review hierarchy is deliberately small: **Review** owns Stockfish, Maia and Compare; **Moves** owns decision history; **Study** owns move lessons and whole-game learning; **Training** owns cross-game progress, repertoire, weaknesses, queue state and the mastery schedule; **Analysis** owns Engine Lab — advanced Stockfish tooling, the Opening Explorer and the tablebase lookup. Candidate arrows are visual hints, while explicit candidate rows use complete UCI identity to enter an analysis branch.
 
 ## Setup
 

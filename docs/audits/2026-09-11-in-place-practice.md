@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-11 (S7)
+Superseded by: [docs/mistake-practice.md](../mistake-practice.md)
+Do not use as the current product contract.
+
 # 错题练习就地化（S7）
 
 日期：2026-09-11。范围：把 `practice` 从独立弹窗改为**就地练习**，贴合 Lichess

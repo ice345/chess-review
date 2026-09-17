@@ -75,10 +75,19 @@ The review graph consumes the canonical per-move White-POV evaluations and displ
 
 ## Tablebase boundary
 
-Syzygy is not integrated in Browser Core. Positions with seven or fewer pieces
-still use Stockfish search and must not be described as tablebase-proven wins,
-draws, losses, conversions or saves. A later correctness enhancement may add a
-versioned tablebase fact containing WDL/DTZ, exact position identity, tablebase
-source/version and availability/fallback state. It must remain distinct from cp
-and mate scores and would require fixtures before affecting classification or
+A Syzygy lookup exists as an Engine Lab tool: the **Tablebase** tab in the review
+Engine/Explorer/Tablebase panel asks `GET /api/tablebase` for the current position,
+which proxies the public seven-piece tables and returns the normalized
+`TablebasePositionV1` contract owned by `packages/tablebase`. It is a manual
+position lookup, hidden while an answer is owed, and no canonical analysis consumes
+it.
+
+It is therefore not classification proof. Endgame classification, Accuracy,
+move quality and player-intelligence/Training metrics read Stockfish search only,
+and a Stockfish score for a position with seven or fewer pieces must not be
+described as a tablebase-proven win, draw, loss, conversion or save — no matter how
+large it is. A later correctness enhancement may add a versioned tablebase fact
+(`TablebaseEvidenceV1`) containing WDL/DTZ, exact position identity, tablebase
+source/version and availability/fallback state. It must remain distinct from cp and
+mate scores and would require fixtures before affecting classification or
 player-intelligence claims.

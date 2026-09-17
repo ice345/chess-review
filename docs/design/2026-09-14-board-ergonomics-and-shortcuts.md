@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-14 (refinement audit phase 1)
+Superseded by: [docs/ui-spec.md](../ui-spec.md)
+Do not use as the current product contract.
+
 # Board ergonomics and shortcuts
 
 Date: 2026-09-14

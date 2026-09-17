@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `master @ 6c45c12` · 2026-09-14
+Superseded by: [FIX.md](../FIX.md)
+Do not use as the current product contract.
+
 # Open Chess Review — Final Product Refinement Audit & Roadmap
 
 **Date:** 2026-09-14  
@@ -1155,11 +1160,14 @@ This product is privacy-conscious; do not silently introduce a network call.
 
 # 13. P2 — Syzygy tablebase as a correctness enhancement
 
-Current docs correctly state:
+At the time of this audit the docs stated that no Syzygy lookup existed, that
+positions of seven or fewer pieces still used Stockfish search, and that they must
+not be described as tablebase-proven.
 
-> Syzygy is not integrated. <=7-piece positions still use Stockfish and must not be described as tablebase-proven.
-
-This honesty is good.
+That honesty was good. Phase 5 of this audit then shipped the Engine Lab lookup, so
+the current statement lives in
+[docs/analysis-spec.md](analysis-spec.md#tablebase-boundary): the lookup exists and it
+is still not classification proof.
 
 Chess.com automatically provides Tablebase behavior in eligible positions.
 

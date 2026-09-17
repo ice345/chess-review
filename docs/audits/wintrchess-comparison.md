@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-08-26 · snapshot `0a46eb6`
+Superseded by: [FIX.md](../../FIX.md) §3, which records this comparison as historical and unverified in the current pass
+Do not use as the current product contract.
+
 # WintrChess comparison
 
 Audit date: 2026-08-26

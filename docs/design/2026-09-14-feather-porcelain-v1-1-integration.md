@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-14
+Superseded by: [docs/design/windowlight-contract.md](windowlight-contract.md)
+Do not use as the current product contract.
+
 # Feather Porcelain v1.1 integration
 
 Date: 2026-09-14

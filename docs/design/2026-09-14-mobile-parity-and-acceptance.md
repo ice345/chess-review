@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-14 (refinement audit phase 6)
+Superseded by: [docs/mobile.md](../mobile.md)
+Do not use as the current product contract.
+
 # Mobile parity, audit cleanup, zoom and payload acceptance
 
 Date: 2026-09-14

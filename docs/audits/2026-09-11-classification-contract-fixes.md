@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-11 (S5)
+Superseded by: [docs/move-classification.md](../move-classification.md)
+Do not use as the current product contract.
+
 # 分类契约修复（S5）
 
 日期：2026-09-11。范围：`packages/analysis` 的着法分类与静态交换评估（SEE）。

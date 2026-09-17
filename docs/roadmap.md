@@ -745,7 +745,10 @@ Do not start Phase 12 until Phase 11 path B is accepted.
 
 ## Explicitly later
 
-- Syzygy ≤7-piece (already documented in Phase 9)
+- Syzygy ≤7-piece **as analysis evidence**. The Engine Lab lookup shipped on
+  2026-09-14; what remains later is a versioned `TablebaseEvidenceV1` that
+  classification, Accuracy or Training metrics may read
+  ([analysis-spec.md](analysis-spec.md#tablebase-boundary))
 - Chess960 as a supported variant (Phase 11 only rejects it)
 - 1000-game performance budget suite (OCR-024)
 - annotated PGN comment/NAG round-trip (OCR-023)

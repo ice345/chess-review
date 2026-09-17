@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-14 (refinement audit phase 4), with the 2026-09-16 token addendum
+Superseded by: [docs/ui-spec.md](../ui-spec.md)
+Do not use as the current product contract.
+
 # Opening Explorer
 
 Date: 2026-09-14
@@ -14,14 +19,15 @@ one place, with the network call declared rather than assumed.
   same validated structure is available to any surface, and the opening package
   keeps the domain boundary it already had.
 - `GET /api/explorer` is the only code that talks to lichess.org. It validates the
-  request, forwards only the position identity (EPD) and the chosen database,
-  validates the upstream payload, and reports an unusable payload as
+  request, forwards only the position identity (EPD), the chosen database and the
+  chosen population, validates the upstream payload, and reports an unusable payload as
   `502 unusable response`. It runs through the existing `platformRequest`
   wrapper, so it inherits the same-origin check, the shared rate limit, the
   bounded timeout, `Cache-Control: no-store` and error logging that never records
   request content.
 - `lib/opening-explorer.ts` caches answers in the new `opening-explorer`
-  IndexedDB store (database version 9) keyed by database plus position identity.
+  IndexedDB store (database version 9) keyed by database plus population plus
+  position identity.
 - `components/review/opening-explorer-panel.tsx` renders the panel and
   `EngineRoutePanel` gained **Engine | Explorer** tabs.
 - Help gained an *Opening Explorer* data destination and a capabilities sentence;
@@ -131,8 +137,12 @@ it covers (the chosen population, e.g. "rated 1600+ · blitz, rapid, classical",
 and the board's FEN. Database frequency is never presented as best-move advice,
 and it does not replace Maia probabilities or Stockfish evaluations.
 
-Rating and time-control filters are stage 2 and are deliberately absent; the
-request still carries only the position identity (EPD) and the database.
+Rating and time-control filters shipped in stage 2 (see *Population filters* above),
+so the request carries the position identity (EPD), the database and the chosen
+`ExplorerPopulationV1` (rating floor and speeds; masters takes speeds only). The
+deployment also needs `LICHESS_EXPLORER_TOKEN`, added server-side and never exposed
+to the browser. The population line above the numbers repeats whichever census the
+answer describes.
 
 ## Verification
 
@@ -149,9 +159,9 @@ request still carries only the position identity (EPD) and the database.
   was ever cached.
 - `e2e/opening-explorer.spec.ts` drives the real panel with a mocked endpoint:
   counts, split, opening name, fetch age, the database/population/position context,
-  the privacy note, frequency order, the exact query parameters (only `fen` and
-  `source`), playing a move into a variation, switching database, the empty-position
-  copy, a rate-limit error instead of an empty table, failure-then-retry and
+  the privacy note, frequency order, the exact query parameters (only `fen`, `source`,
+  `rating` and `speeds`), playing a move into a variation, switching database, the
+  empty-position copy, a rate-limit error instead of an empty table, failure-then-retry and
   offline-then-retry in place (the document is never reloaded and the cached
   analysis is still loaded), a previous position's answer being dropped when the
   visitor moves on, and the panel being absent during practice. The

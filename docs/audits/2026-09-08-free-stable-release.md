@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-08 working tree, final re-check 2026-09-10 (S1)
+Superseded by: [docs/roadmap.md](../roadmap.md)
+Do not use as the current product contract.
+
 # 免费开源稳定版审计与 S1
 
 日期：2026-09-08；最终复核：2026-09-10。范围：当前工作树，承接已实现的 R1–R5；不把历史审计的旧问题当成当前缺陷。

@@ -61,8 +61,9 @@ loss and missed opportunities; Endgame highlights winning-chance conversion,
 defensive holds and missed wins/mates. Advantage preservation means a move that
 started at least 70 mover WinPercent and remained at least 65. A defensive hold
 means a move starting at most 30 that lost no more than two WinPercent points.
-These are bounded decision metrics, not tablebase claims. Syzygy is not currently
-used, so the product does not claim theoretical wins/draws or perfect conversion.
+These are bounded decision metrics, not tablebase claims. The Engine Lab tablebase
+lookup is a separate surface and no report metric reads it, so the product does not
+claim theoretical wins/draws or perfect conversion here.
 
 ### Phase Accuracy is two different measures
 
@@ -98,12 +99,20 @@ deterministic and do not infer narratives from prose.
 Weaknesses require at least two incidents across two games. They expose sample
 size, game frequency, average loss, confidence, early-vs-recent trend and bounded
 evidence. The top three create a deterministic plan backed by up to five exact
-positions. `TrainingQueueItemV3` records explicit source-position review. Start
-opens the first unreviewed decision; confirmation records game ID, ply and time
-only after the source position and its objective evidence are displayed. Next
-position and Continue resume from that ledger, including across games. Reopening
-or confirming twice does not add credit. All source positions must be confirmed
-for review completion; there is no scored answer, mastery or spaced repetition.
+positions. `TrainingQueueItemV3` records explicit source-position review: a review is
+an acknowledgement that carries what it was worth (`unaided`, `hinted`, `exposed`,
+`legacy`), and confirmation records game ID, ply and time only after the source
+position and its objective evidence are displayed. Mastery is a separate, scheduled
+measure built from those outcomes: the states are `learning → review → mastered`, only
+an unaided review on a day the position had come due advances one, and the interval is
+the fixed ladder 1, 3, 7, 21 days. A task is therefore complete when every source
+position is mastered, not when every one has been looked at once. Start opens the
+position the schedule is waiting for, otherwise the first never-reviewed decision;
+Next position and Continue resume from that ledger, including across games.
+Confirming the same position twice does not add credit, and reviewing it again before
+it comes round records the attempt while leaving state, streak and due date untouched.
+[Reviewed is not mastered](#reviewed-is-not-mastered) holds the outcome table, the
+promotion rule and the schedule's own guarantees.
 
 The separate [Mistake practice](mistake-practice.md) flow now lets users solve
 errors within a single analyzed game. Its session-only results do not count as

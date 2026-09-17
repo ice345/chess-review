@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `a1f603e` · 2026-09-07 (R4)
+Superseded by: [docs/web-service-boundaries.md](../web-service-boundaries.md)
+Do not use as the current product contract.
+
 # R4 · 公开服务业务边界验收
 
 日期：2026-09-07。工作区基线 `a1f603e`，保留已有 R1–R3 未提交修改。

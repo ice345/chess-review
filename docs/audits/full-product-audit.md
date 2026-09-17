@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-08-26
+Superseded by: [FIX.md](../../FIX.md)
+Do not use as the current product contract.
+
 # Full product release-readiness audit
 
 Audit date: 2026-08-26

@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-15
+Superseded by: [docs/ui-spec.md](../ui-spec.md)
+Do not use as the current product contract.
+
 # Review desk order, withheld answers and move evidence
 
 Date: 2026-09-15

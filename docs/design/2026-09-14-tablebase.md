@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-14 (refinement audit phase 5)
+Superseded by: [docs/ui-spec.md](../ui-spec.md) and [docs/analysis-spec.md](../analysis-spec.md)
+Do not use as the current product contract.
+
 # Tablebase
 
 Date: 2026-09-14

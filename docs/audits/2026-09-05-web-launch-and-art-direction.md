@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: `a1f603e` · 2026-09-05
+Superseded by: [docs/design/windowlight-contract.md](../design/windowlight-contract.md)
+Do not use as the current product contract.
+
 # Web 上线与艺术方向审计 · 2026-09-05
 
 审计基线：`a1f603e`。范围是面向公众的棋局复盘与学习网站。本文记录当前事实、设计判断和待实现的验收条件；不代表下面的建议已经实现。

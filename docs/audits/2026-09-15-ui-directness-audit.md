@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-15 · localhost review of the Opera Game example
+Superseded by: [FIX.md](../../FIX.md)
+Do not use as the current product contract.
+
 # UI 直接性审计：为什么我们不如 Chess.com / Lichess / WintrChess 一眼可读
 
 日期：2026-09-15  

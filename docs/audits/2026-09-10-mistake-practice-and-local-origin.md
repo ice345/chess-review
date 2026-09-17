@@ -1,3 +1,8 @@
+Status: Historical
+Baseline: 2026-09-10 working tree (R1–R5 + S1)
+Superseded by: [docs/mistake-practice.md](../mistake-practice.md)
+Do not use as the current product contract.
+
 # 本地连接修复与单盘错题练习
 
 2026-09-10；在 R1–R5 + S1 工作树上追加，未改棋子或配色。
