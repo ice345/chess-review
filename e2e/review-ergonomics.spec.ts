@@ -21,6 +21,39 @@ async function boardWidth(page: Page): Promise<number> {
   return Math.round(box.width);
 }
 
+/* The start of the game is its own state: nothing has been played, so the panel has
+   one job. Everything that describes a *current* move is folded until the visitor
+   asks for it, and the number beside a move is named once instead of per row. */
+test("the start ply keeps one primary question and labels the move numbers", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openReview(page);
+
+  const column = page.locator(".objective-route");
+  await expect(page.locator(".move-status")).toContainText("Starting position");
+
+  // One primary action only: the guided step when the game has key moments, the walk
+  // through its moves when it has none. Practice and everything else stay secondary.
+  await expect(column.locator(".primary, .primary-link")).toHaveCount(1);
+
+  // The move table and the whole-game report are background until asked for.
+  const nearby = column.locator("details.review-context-moves");
+  await expect(nearby).not.toHaveAttribute("open", /.*/);
+  await expect(nearby).toContainText("Moves, quality and accuracy");
+  await expect(column.locator("details#game-summary")).not.toHaveAttribute("open", /.*/);
+
+  // Opening it shows the same window it always did, now with a legend for the numbers.
+  await nearby.locator("> summary").click();
+  await expect(nearby).toHaveAttribute("open", /.*/);
+  await expect(nearby.locator(".review-move-list button")).toHaveCount(6);
+  await expect(nearby.locator(".move-list-legend")).toHaveText("Quality · Accuracy");
+  await expect(nearby.locator(".review-move-list button").first()).toContainText("Accuracy 100");
+
+  // Away from the start the nearby moves are the current ply's context, so they stay open.
+  await page.getByRole("button", { name: "Last position" }).click();
+  await expect(column.locator("details.review-context-moves")).toHaveCount(0);
+  await expect(column.locator("section.review-context-moves .review-move-list button")).toHaveCount(6);
+});
+
 test("drives the review from the keyboard", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openReview(page);
@@ -180,7 +213,6 @@ test("floating review surfaces dismiss; the report behind them does not", async 
   for (const [name, selector] of [
     ["More", "details.review-more"],
     ["Export", ".review-actions details:not(.review-more)"],
-    ["Options", "details.practice-options"],
     ["Why?", "details.move-verdict-why"],
   ] as const) {
     await expectFloatingDismissal(page, name, selector);

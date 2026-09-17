@@ -22,7 +22,9 @@
 .eval-top {
   position: absolute;
   inset: 0 0 auto;
-  transition: height .25s ease;
+  /* Windowlight motion is a state change, not an animation: the bar settles as
+     quickly as the rest of the desk. */
+  transition: height .18s ease;
 }
 
 .eval-top.eval-black,
@@ -66,7 +68,7 @@
   border-radius: 999px;
   background: #6d9874;
   box-shadow: 0 0 0 1px var(--surface-paper);
-  transition: top .25s ease;
+  transition: top .18s ease;
 }
 
 .board-quality-badge,
@@ -237,7 +239,8 @@
   background: var(--surface-paper);
 }
 
-.game-summary-section > summary {
+.game-summary-section > summary,
+.folded-block > summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -245,10 +248,14 @@
   cursor: pointer;
   list-style: none;
 }
-.game-summary-section > summary::-webkit-details-marker { display: none; }
+.game-summary-section > summary::-webkit-details-marker,
+.folded-block > summary::-webkit-details-marker { display: none; }
 /* The same Show/Hide wording the evaluation timeline uses, so every folded block
-   in this panel says how it opens instead of reading as a static card. */
-.game-summary-section > summary::after {
+   in this panel says how it opens instead of reading as a static card. The nearby
+   moves wear it too: at the start of the game there is no current ply to be near,
+   so the table folds and the first screen keeps one job. */
+.game-summary-section > summary::after,
+.folded-block > summary::after {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: center;
@@ -256,8 +263,10 @@
   font-size: 12px;
   content: "Show";
 }
-.game-summary-section[open] > summary::after { content: "Hide"; }
-.game-summary-section > summary strong {
+.game-summary-section[open] > summary::after,
+.folded-block[open] > summary::after { content: "Hide"; }
+.game-summary-section > summary strong,
+.folded-block > summary strong {
   color: var(--ink-primary);
   font: 500 16px Georgia, "Songti SC", serif;
 }

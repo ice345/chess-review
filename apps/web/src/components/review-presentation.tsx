@@ -185,7 +185,12 @@ export function ReviewMoves({
     }
   }, [currentPly, filter, moves.length]);
   return (
-    <div className="review-move-list" ref={listRef}>
+    <div className="review-moves">
+      {/* The number beside a move is Accuracy, and a legend says so once for the list
+          instead of the word repeating on every row. The wrapper keeps the list the
+          growing child on Moves, where the route hands it the free row. */}
+      <p className="move-list-legend" aria-hidden="true">Quality · Accuracy</p>
+      <div className="review-move-list" ref={listRef}>
       {moves.length === 0 && <p className="quiet-empty">No moves match this filter.</p>}
       {moves.map((move) => {
         const annotation = imported?.plies[move.ply - 1];
@@ -216,12 +221,15 @@ export function ReviewMoves({
                 <QualityIcon classification={classificationForAnnotation(item)} size={20} key={item} title={ANNOTATION_LABEL[item]} />
               ))}
             </span>
-            <small>{hiddenPly === move.ply ? "—" : move.accuracy.toFixed(0)}</small>
+            <small title={hiddenPly === move.ply ? "Hidden while solving" : `Accuracy ${move.accuracy.toFixed(1)}`}>
+              <span className="sr-only">Accuracy </span>{hiddenPly === move.ply ? "—" : move.accuracy.toFixed(0)}
+            </small>
             {comment !== undefined && <span className="move-imported-comment">{comment}</span>}
             {variations.length > 0 && <span className="move-imported-variation">{variations.join(" ")}</span>}
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -159,13 +159,19 @@ export function ObjectiveRoutePanel() {
   const move = branch || currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   const hasKeyMoments = analysis.criticalMoments.some((moment) => analysis.moves[moment.ply - 1]);
   const practice = runtime.retro.presentation.hideReviewChrome;
+  // The start of the game is its own state: nothing has been played yet, so the panel
+  // has one job and everything that describes a *current* move is background. Both
+  // halves of the first screen read this one definition.
+  const atStart = !branch && currentPly === 0;
   return (
     <div className="route-panel objective-route">
-      {!practice && !hasKeyMoments && currentPly === 0 && !branch && (
+      {!practice && !hasKeyMoments && atStart && (
         <p className="review-next-step" role="region" aria-label="Review next step">
           Walk through your game
-          <Link href={`/review/${runtime.gameId}/moves`}>Explore moves →</Link>
-          <Link href={`/review/${runtime.gameId}/coach`}>Study this game →</Link>
+          {/* A game with no key moments still has one thing to do first: the start ply
+              keeps a single primary action either way. */}
+          <Link className="primary-link" href={`/review/${runtime.gameId}/moves`}>Explore moves →</Link>
+          <Link className="text-button" href={`/review/${runtime.gameId}/coach`}>Study this game →</Link>
         </p>
       )}
 
@@ -174,14 +180,25 @@ export function ObjectiveRoutePanel() {
       {!practice && <KeyMomentNavigation analysis={analysis} />}
       {!practice && move && !answerWithheld && <CurrentMoveVerdict move={move} />}
       <RetroPractice analysis={analysis} />
-      {!practice && (
+      {!practice && (atStart ? (
+        <details className="review-context-moves folded-block">
+          <summary>
+            <span className="eyebrow">THIS GAME</span>
+            <strong>Moves, quality and accuracy</strong>
+          </summary>
+          <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} contextWindow={5} />
+          <Link className="view-all-moments" href={`/review/${runtime.gameId}/moves`}>
+            All {analysis.moves.length} moves, filters and evidence →
+          </Link>
+        </details>
+      ) : (
         <section className="review-context-moves" aria-label="Nearby moves">
           <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} contextWindow={5} />
           <Link className="view-all-moments" href={`/review/${runtime.gameId}/moves`}>
             All {analysis.moves.length} moves, filters and evidence →
           </Link>
         </section>
-      )}
+      ))}
       {!runtime.retro.presentation.hideCoachAnswers && !answerWithheld && <PositionAnalysis compact />}
       {!practice && (
         <details className="game-summary-section" id="game-summary">

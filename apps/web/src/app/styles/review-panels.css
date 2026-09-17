@@ -254,6 +254,35 @@
   border-bottom: 1px solid var(--line);
 }
 .review-context-moves .review-move-list { max-height: min(220px, 32vh); }
+/* The nearby table folds at the start of the game and wears the same quiet surface
+   and Show/Hide wording as Game Summary. Its own class carries that surface, so it
+   never reads as another instance of the summary. */
+.folded-block {
+  margin: 16px 0 0;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--surface-paper);
+}
+.review-context-moves.folded-block { border-bottom: 1px solid var(--line-soft); padding-bottom: 12px; }
+
+/* The legend and the list travel together: the wrapper is the grid child, and the
+   list is the row that grows, so the table still owns the free height on Moves. */
+.review-moves {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* One legend for the list, so the number beside a move is never a mystery: the
+   word does not repeat on every row, and the rows keep their own names for AT. */
+.move-list-legend {
+  margin: 0 0 2px;
+  padding: 0 8px;
+  color: var(--ink-muted);
+  font-size: var(--type-caption);
+  text-align: right;
+}
 
 .review-engine-lines {
   margin: 8px 0 0;
