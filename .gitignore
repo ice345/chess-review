@@ -13,6 +13,8 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .DS_Store
+# Local agent-harness session state (model roles, locks); never product source.
+/.omp/
 .env
 .env.*
 !.env.example
@@ -25,3 +27,4 @@ references/*
 # Local browser inspection artifacts are not product source or test baselines.
 .playwright-mcp/
 page-screenshot.png
+.tmp-ui-pass/
