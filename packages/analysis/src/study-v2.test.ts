@@ -110,6 +110,12 @@ describe("advanced-study-v2", () => {
     expect(report.ratings.map((band) => band.key)).toEqual(["chesscom:rapid"]);
     expect(report.openings[0]).toMatchObject({ gameCount: 2, share: 100 });
     expect(report.phases.opening.moveCount).toBe(4);
+    expect(report.phases.opening.accuracyMetric).toEqual({
+      metricId: "mean-move-accuracy",
+      aggregation: "arithmetic-mean-per-move",
+      sampleGames: 2,
+      sampleMoves: 4,
+    });
     expect(report.gameHighlights.every((item) => item.gameId.startsWith("cc-"))).toBe(true);
     expect(report.overview.platformDistribution).toEqual([{ key: "chesscom", gameCount: 2, share: 100 }]);
   });
@@ -240,8 +246,30 @@ describe("advanced-study-v2", () => {
     });
 
     expect(report.specialMoves[0]).toMatchObject({ gameId: "g1", ply: 5, annotations: ["critical"] });
-    expect(report.coverage).toMatchObject({ coverageRate: 10, partial: true });
+    expect(report.coverage).toMatchObject({ coverageRate: 10, partial: true, state: "partial" });
     expect(report.coverage.providers?.[0]).toMatchObject({ provider: "chesscom", eligibleGames: 10, analyzedGames: 1 });
+  });
+
+  it("names an empty scope instead of claiming complete coverage of nothing", () => {
+    const empty = buildAdvancedStudyReportV2([], FILTERS, {
+      eligibleGames: 0,
+      analyzedGames: 0,
+      staleGames: 0,
+      failedGames: 0,
+      excludedGames: 0,
+    });
+    const complete = buildAdvancedStudyReportV2([
+      game("g1", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500),
+    ], FILTERS, {
+      eligibleGames: 1,
+      analyzedGames: 1,
+      staleGames: 0,
+      failedGames: 0,
+      excludedGames: 0,
+    });
+
+    expect(empty.coverage).toMatchObject({ state: "empty", coverageRate: 0, partial: false });
+    expect(complete.coverage).toMatchObject({ state: "complete", coverageRate: 100, partial: false });
   });
 
   it("does not publish unverified high-impact annotations as highlights", () => {

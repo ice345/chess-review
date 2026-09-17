@@ -86,12 +86,32 @@ export interface OpeningProfileV2 {
   problemPositions: TrainingEvidenceReference[];
 }
 
+/**
+ * How a phase profile's Accuracy number was aggregated.
+ *
+ * `PhaseProfileV2.averageAccuracy` is the arithmetic mean of the player's
+ * per-move Accuracy in the phase. Review shows the canonical single-game phase
+ * Accuracy (the Lichess-compatible figure), which is a different measure of a
+ * different thing: one game's phase score, not a cross-game mean of moves. The
+ * pair must be labelled, or the two screens look like they disagree.
+ */
+export interface PhaseAccuracyMetricV2 {
+  metricId: "mean-move-accuracy";
+  aggregation: "arithmetic-mean-per-move";
+  /** Games that contributed at least one move to this phase. */
+  sampleGames: number;
+  /** Moves averaged. */
+  sampleMoves: number;
+}
+
 export interface PhaseProfileV2 {
   phase: GamePhase;
   moveCount: number;
   errorCount: number;
   errorRate: number;
+  /** Arithmetic mean of the player's per-move Accuracy; see `accuracyMetric`. */
   averageAccuracy?: number;
+  accuracyMetric: PhaseAccuracyMetricV2;
   averageWinPercentLoss: number;
   recentAccuracy?: number;
   advantageOpportunities: number;
@@ -138,7 +158,13 @@ export interface AdvancedStudyReportV2 {
   objectiveAlgorithmVersion: string;
   generatedAt: string;
   filters: StudyReportFiltersV2;
-  coverage: StudyCoverageV2 & { coverageRate: number; partial: boolean };
+  /**
+   * Coverage describes one population: the games that survive the report's own
+   * filters. `state` names what that population can say about itself — an empty
+   * scope is neither covered nor partial, and claiming "complete coverage" of no
+   * games is the one thing the counts must not be allowed to mean.
+   */
+  coverage: StudyCoverageV2 & { coverageRate: number; partial: boolean; state: "empty" | "complete" | "partial" };
   overview: ReturnType<typeof buildAdvancedStudyReport>["trends"] & {
     scoreRate?: number;
     errorRate: number;
@@ -373,6 +399,12 @@ function phaseProfiles(games: StudyGameInputV2[]): Record<GamePhase, PhaseProfil
       moveCount: phaseMoves.length,
       errorCount: errors.length,
       errorRate: phaseMoves.length === 0 ? 0 : rounded(errors.length / phaseMoves.length * 100),
+      accuracyMetric: {
+        metricId: "mean-move-accuracy",
+        aggregation: "arithmetic-mean-per-move",
+        sampleGames: new Set(phaseMoves.map(({ game }) => game.gameId)).size,
+        sampleMoves: phaseMoves.length,
+      },
       ...(average(phaseMoves.map(({ move }) => move.accuracy)) === undefined ? {} : { averageAccuracy: average(phaseMoves.map(({ move }) => move.accuracy))! }),
       averageWinPercentLoss: average(phaseMoves.map(({ move }) => move.classificationReason.winPercentLoss)) ?? 0,
       ...(average(recentMoves.map((move) => move.accuracy)) === undefined ? {} : { recentAccuracy: average(recentMoves.map((move) => move.accuracy))! }),
@@ -491,6 +523,10 @@ export function buildAdvancedStudyReportV2(
   const coverageRate = resolvedCoverage.eligibleGames === 0
     ? 0
     : rounded(resolvedCoverage.analyzedGames / resolvedCoverage.eligibleGames * 100);
+  const coveragePartial = resolvedCoverage.analyzedGames < resolvedCoverage.eligibleGames || resolvedCoverage.staleGames > 0 || resolvedCoverage.failedGames > 0;
+  const coverageState: "empty" | "complete" | "partial" = resolvedCoverage.eligibleGames === 0
+    ? "empty"
+    : coveragePartial ? "partial" : "complete";
   const mistakes = games.flatMap((game) => playerMoves(game)
     .filter((move) => ERROR_QUALITIES.has(move.quality) || move.annotations.some((annotation) => MISSED_ANNOTATIONS.has(annotation)))
     .map((move) => evidence(game, move)))
@@ -528,7 +564,8 @@ export function buildAdvancedStudyReportV2(
     coverage: {
       ...resolvedCoverage,
       coverageRate,
-      partial: resolvedCoverage.analyzedGames < resolvedCoverage.eligibleGames || resolvedCoverage.staleGames > 0 || resolvedCoverage.failedGames > 0,
+      partial: coveragePartial,
+      state: coverageState,
     },
     overview: {
       ...legacy.trends,

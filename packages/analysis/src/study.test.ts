@@ -7,7 +7,7 @@ import type {
   MoveClassification,
   PlayerColor,
 } from "@chess-review/shared";
-import { buildAdvancedStudyReport, STUDY_ALGORITHM_VERSION, type StudyGameInput } from "./study";
+import { buildAdvancedStudyReport, gameTrainingWeaknesses, STUDY_ALGORITHM_VERSION, type StudyGameInput } from "./study";
 
 function reason(loss: number): ClassificationReason {
   return {
@@ -146,5 +146,41 @@ describe("advanced multi-game study", () => {
       { gameId: "g1", ply: 3, san: "Nf3", phase: "middlegame", classification: "missed_win", winPercentLoss: 35 },
     ]);
     expect(report.weaknesses.some(({ kind }) => kind === "endgame-decisions")).toBe(false);
+  });
+});
+
+describe("single-game training evidence", () => {
+  it("groups one game's error positions by the same rule the report uses", () => {
+    const played = game("g1", "2026-08-01T00:00:00.000Z", 70, "loss", [
+      move(1, "white", "opening", "inaccuracy", 9),
+      move(3, "white", "middlegame", "blunder", 31),
+      move(5, "white", "middlegame", "missed_win", 22),
+      move(7, "black", "endgame", "blunder", 40),
+    ]);
+    const weaknesses = gameTrainingWeaknesses(played.analysis, "g1", "white");
+
+    expect(weaknesses.map(({ kind }) => kind)).toEqual(["middlegame-decisions", "missed-opportunities", "opening-decisions"]);
+    expect(weaknesses.every(({ gameCount }) => gameCount === 1)).toBe(true);
+    // The opponent's blunder is not this player's evidence.
+    expect(weaknesses.flatMap(({ evidence }) => evidence.map(({ ply }) => ply))).toEqual([3, 5, 1]);
+    expect(weaknesses[0]?.evidence[0]).toMatchObject({ gameId: "g1", san: "Nf3", phase: "middlegame", classification: "blunder", winPercentLoss: 31 });
+  });
+
+  it("stays ordered by impact and never reports a negative priority", () => {
+    const played = game("g7", "2026-08-01T00:00:00.000Z", 70, "loss", [
+      move(1, "white", "opening", "inaccuracy", 6),
+      move(2, "white", "opening", "blunder", 25),
+      move(4, "white", "opening", "mistake", 12),
+    ]);
+    const [opening] = gameTrainingWeaknesses(played.analysis, "g7", "white");
+
+    expect(opening?.evidence.map(({ winPercentLoss }) => winPercentLoss)).toEqual([25, 12, 6]);
+    expect(opening?.priority).toBeGreaterThan(0);
+    expect(opening?.priority).toBeLessThanOrEqual(100);
+  });
+
+  it("offers nothing for a game without recorded errors", () => {
+    const clean = game("g9", "2026-08-01T00:00:00.000Z", 96, "win", [move(1, "white", "opening", "best", 0)]);
+    expect(gameTrainingWeaknesses(clean.analysis, "g9", "white")).toEqual([]);
   });
 });

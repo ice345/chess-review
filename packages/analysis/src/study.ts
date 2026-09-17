@@ -221,42 +221,66 @@ function buildRepertoire(games: StudyGameInput[]): OpeningRepertoireEntry[] {
   }).sort((left, right) => right.gameCount - left.gameCount || left.eco.localeCompare(right.eco) || left.name.localeCompare(right.name));
 }
 
+/** The evidence rule, applied to one game. Never derived anywhere else. */
+function gameWeaknessEvidence(analysis: AnyGameAnalysis, gameId: string, playerColor: PlayerColor): Map<StudyWeaknessKind, TrainingEvidenceReference[]> {
+  const groups = new Map<StudyWeaknessKind, TrainingEvidenceReference[]>();
+  for (const move of analysis.moves) {
+    if (move.color !== playerColor || !ERROR_CLASSIFICATIONS.has(move.classification)) continue;
+    const kind = weaknessKind(move.phase, move.classification);
+    const evidence: TrainingEvidenceReference = {
+      gameId,
+      ply: move.ply,
+      san: move.san,
+      phase: move.phase,
+      classification: move.classification,
+      winPercentLoss: rounded(move.classificationReason.winPercentLoss),
+    };
+    groups.set(kind, [...(groups.get(kind) ?? []), evidence]);
+  }
+  return groups;
+}
+
+/** Strongest evidence first, then the later ply, then a stable game order. */
+function orderEvidence(evidence: readonly TrainingEvidenceReference[]): TrainingEvidenceReference[] {
+  const impact = (item: TrainingEvidenceReference) => (SEVERITY[item.classification] ?? 0) * 100 + item.winPercentLoss;
+  return [...evidence].sort((left, right) => (
+    impact(right) - impact(left) || right.ply - left.ply || left.gameId.localeCompare(right.gameId)
+  ));
+}
+
+function weaknessProfile(kind: StudyWeaknessKind, evidence: TrainingEvidenceReference[]): RecurringWeakness {
+  const gameCount = new Set(evidence.map(({ gameId }) => gameId)).size;
+  const averageLoss = average(evidence.map(({ winPercentLoss }) => winPercentLoss)) ?? 0;
+  const averageSeverity = evidence.reduce((sum, item) => sum + (SEVERITY[item.classification] ?? 0), 0) / evidence.length;
+  const priority = Math.min(100, Math.round(averageSeverity * 16 + Math.min(40, averageLoss) * 1.3 + Math.min(15, Math.max(0, gameCount - 2) * 5)));
+  return { kind, gameCount, incidentCount: evidence.length, priority, averageWinPercentLoss: averageLoss, evidence: orderEvidence(evidence) };
+}
+
+/**
+ * One game's error positions, grouped by the training weakness they belong to.
+ *
+ * The recurring-weakness report requires two games before it calls something a
+ * pattern. A single reviewed game still produces exact positions worth training,
+ * and the end-of-review state offers them with this same rule, so the two paths
+ * can never disagree about which positions are evidence.
+ */
+export function gameTrainingWeaknesses(analysis: AnyGameAnalysis, gameId: string, playerColor: PlayerColor): RecurringWeakness[] {
+  return [...gameWeaknessEvidence(analysis, gameId, playerColor).entries()]
+    .map(([kind, evidence]) => weaknessProfile(kind, evidence))
+    .sort((left, right) => right.priority - left.priority || left.kind.localeCompare(right.kind));
+}
+
 function buildWeaknesses(games: StudyGameInput[]): RecurringWeakness[] {
   const groups = new Map<StudyWeaknessKind, TrainingEvidenceReference[]>();
   for (const game of games) {
-    for (const move of game.analysis.moves) {
-      if (move.color !== game.playerColor || !ERROR_CLASSIFICATIONS.has(move.classification)) continue;
-      const kind = weaknessKind(move.phase, move.classification);
-      const evidence: TrainingEvidenceReference = {
-        gameId: game.gameId,
-        ply: move.ply,
-        san: move.san,
-        phase: move.phase,
-        classification: move.classification,
-        winPercentLoss: rounded(move.classificationReason.winPercentLoss),
-      };
-      groups.set(kind, [...(groups.get(kind) ?? []), evidence]);
+    for (const [kind, evidence] of gameWeaknessEvidence(game.analysis, game.gameId, game.playerColor)) {
+      groups.set(kind, [...(groups.get(kind) ?? []), ...evidence]);
     }
   }
-
   return [...groups.entries()].flatMap(([kind, evidence]) => {
     const gameCount = new Set(evidence.map(({ gameId }) => gameId)).size;
     if (gameCount < 2 || evidence.length < 2) return [];
-    const orderedEvidence = [...evidence].sort((left, right) => {
-      const impact = (item: TrainingEvidenceReference) => (SEVERITY[item.classification] ?? 0) * 100 + item.winPercentLoss;
-      return impact(right) - impact(left) || right.ply - left.ply || left.gameId.localeCompare(right.gameId);
-    });
-    const averageLoss = average(evidence.map(({ winPercentLoss }) => winPercentLoss)) ?? 0;
-    const averageSeverity = evidence.reduce((sum, item) => sum + (SEVERITY[item.classification] ?? 0), 0) / evidence.length;
-    const priority = Math.min(100, Math.round(averageSeverity * 16 + Math.min(40, averageLoss) * 1.3 + Math.min(15, (gameCount - 2) * 5)));
-    return [{
-      kind,
-      gameCount,
-      incidentCount: evidence.length,
-      priority,
-      averageWinPercentLoss: averageLoss,
-      evidence: orderedEvidence,
-    }];
+    return [weaknessProfile(kind, evidence)];
   }).sort((left, right) => right.priority - left.priority || right.gameCount - left.gameCount || left.kind.localeCompare(right.kind));
 }
 

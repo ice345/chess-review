@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { ClassificationReason, GameAnalysisV1, MoveAnalysis } from "@chess-review/shared";
+import type {
+  ClassificationReason,
+  CriticalMoment,
+  GameAnalysisV1,
+  GameAnalysisV2,
+  MoveAnalysis,
+  MoveAnalysisV2,
+  MoveAnnotation,
+  MoveQuality,
+  PlayerColor,
+} from "@chess-review/shared";
 import {
   buildDeterministicGameCoach,
   buildDeterministicMoveCoach,
@@ -135,6 +145,54 @@ const analysis: GameAnalysisV1 = {
   createdAt: "2026-08-23T00:00:00.000Z",
 };
 
+const NO_QUALITY: Record<MoveQuality, number> = { best: 0, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
+
+/**
+ * A two-ply V2 record with the V2 layers the deterministic summary consumes.
+ * The V1 `analysis` fixture above cannot express quality/annotation counts, which
+ * is exactly what the summary used to read from the compatibility projection.
+ */
+function v2Analysis(
+  quality: { white?: Partial<Record<MoveQuality, number>>; black?: Partial<Record<MoveQuality, number>> } = {},
+  annotations: { white?: Partial<Record<MoveAnnotation, number>>; black?: Partial<Record<MoveAnnotation, number>> } = {},
+  criticalMoments: CriticalMoment[] = [],
+  options: { verifiedPlies?: number[]; moveAnnotations?: Record<number, MoveAnnotation[]> } = {},
+): GameAnalysisV2 {
+  const moves: MoveAnalysisV2[] = [moveOne, moveTwo].map((move) => ({
+    ...move,
+    quality: "best",
+    annotations: options.moveAnnotations?.[move.ply] ?? [],
+    objectiveVersion: "move-quality-v2",
+    classificationReason: {
+      ...move.classificationReason,
+      qualityRule: "centipawn-or-win-percent-loss-ladder",
+      ...(options.verifiedPlies?.includes(move.ply)
+        ? { verification: { status: "verified" as const, depth: 15, multiPv: 5, reasons: [] } }
+        : {}),
+    },
+  }));
+  const player = (color: PlayerColor, accuracy: number) => ({
+    color,
+    accuracy,
+    phaseAccuracy: { opening: accuracy },
+    classificationCounts: {},
+    qualityCounts: { ...NO_QUALITY, ...quality[color] },
+    annotationCounts: { ...annotations[color] },
+  });
+  return {
+    version: 2,
+    algorithmVersion: "fixture",
+    game: { headers: { White: "Ada", Black: "Mikhail" }, initialFen: beforeE4 },
+    engine: { stockfishVersion: "18", depth: 12, multiPv: 3, classificationMultiPv: 3, verificationPolicyVersion: "fixture", verifiedMoveCount: options.verifiedPlies?.length ?? 0 },
+    division: { totalPlies: 2 },
+    white: player("white", 99.2),
+    black: player("black", 34),
+    moves,
+    criticalMoments,
+    createdAt: "2026-08-23T00:00:00.000Z",
+  };
+}
+
 describe("canonical coach facts", () => {
   it("builds structured move facts without asking an LLM to reconstruct chess truth", () => {
     const facts = buildMoveCoachFacts(analysis, 1);
@@ -216,8 +274,84 @@ describe("canonical coach facts", () => {
     const summary = buildDeterministicGameCoach(facts, "en", "provider offline");
 
     expect(facts.moves[1]).toMatchObject({ classification: "blunder", winPercentLoss: 23 });
-    expect(summary.trainingRecommendations[0]?.title).toBe("Tactical scan");
+    expect(summary.trainingRecommendations[0]?.title).toBe("Error review");
     expect(summary.source.language).toBe("en");
-    expect(summary.criticalMoments).toEqual([{ ply: 2, insight: "The canonical analysis records a 23.0-point win-percentage swing." }]);
+    expect(summary.criticalMoments).toEqual([{ ply: 2, insight: "This move cost 23.0 win-percentage points." }]);
+  });
+
+  it("counts V2 quality and annotations in separate layers", () => {
+    const facts = buildGameCoachFacts(v2Analysis({
+      // Book and Forced are annotations, not quality bands: counting them as
+      // quality would inflate every claim about the engine's first choice.
+      white: { best: 2, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 },
+      black: { best: 0, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 1 },
+    }, { white: { book: 2 }, black: {} }));
+    const summary = buildDeterministicGameCoach(facts, "en", "provider offline");
+
+    expect(facts.players.white.qualityCounts?.best).toBe(2);
+    expect(facts.players.white.classificationCounts.book).toBeUndefined();
+    expect(summary.summary).toContain("2 moves matched the engine's first choice");
+    expect(summary.strengths).toContain("2 moves matched the engine's first choice.");
+    expect(summary.weaknesses).toEqual(["The game recorded 1 blunder."]);
+  });
+
+  it("never claims Best-or-better from Excellent alone", () => {
+    const facts = buildGameCoachFacts(v2Analysis({
+      white: { best: 0, excellent: 3, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 },
+    }));
+    const summary = buildDeterministicGameCoach(facts, "en", "provider offline");
+
+    expect(summary.summary).toContain("no move matched the engine's first choice");
+    expect(summary.strengths).toEqual(["There is not enough evidence for a best-move claim."]);
+    expect(summary.summary).not.toContain("Best or better");
+  });
+
+  it("explains an annotated key moment from its own evidence instead of a zero swing", () => {
+    const brilliant = buildGameCoachFacts(v2Analysis(
+      { white: { best: 1, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 } },
+      { white: { brilliant: 1, critical: 1 } },
+      [{ ply: 1, classification: "brilliant", winPercentSwing: 0 }, { ply: 2, classification: "great", winPercentSwing: 0.2 }],
+      { moveAnnotations: { 1: ["brilliant", "critical"], 2: ["critical"] } },
+    ));
+    const summary = buildDeterministicGameCoach(brilliant, "en", "provider offline");
+
+    expect(summary.criticalMoments[0]?.insight).toBe("A verified brilliant move: it invests material and the engine's best reply keeps the compensation.");
+    expect(summary.criticalMoments[1]?.insight).toBe("This was the only reasonable choice: every alternative was at least ten win-percentage points worse.");
+    expect(summary.criticalMoments.map((moment) => moment.insight).join(" ")).not.toContain("0.0-point");
+
+    const chinese = buildDeterministicGameCoach(brilliant, "zh-CN", "provider offline");
+    expect(chinese.criticalMoments[0]?.insight).toContain("精彩着法");
+    expect(chinese.weaknesses).toEqual(["没有错误超过记录的阈值。"]);
+  });
+
+  it("names a missing mate or win as recorded, without claiming an unnamed tactic", () => {
+    const facts = buildGameCoachFacts(v2Analysis(
+      { black: { best: 0, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 1 } },
+      { black: { missed_win: 1, missed_mate: 1 } },
+      [{ ply: 2, classification: "missed_mate", winPercentSwing: 18 }],
+      { moveAnnotations: { 2: ["missed_win", "missed_mate"] } },
+    ));
+    const summary = buildDeterministicGameCoach(facts, "en", "provider offline");
+
+    expect(summary.trainingRecommendations[0]).toEqual({
+      title: "Error review",
+      reason: "The game recorded 1 blunder, 1 missed win and 1 missed mate.",
+      focus: "List forcing moves, captures and direct threats before choosing a move.",
+    });
+    expect(summary.weaknesses).toEqual(["The game recorded 1 blunder, 1 missed win and 1 missed mate."]);
+    expect(summary.weaknesses[0]).not.toMatch(/tactic/i);
+    expect(summary.criticalMoments[0]?.insight).toBe("A forced mate was available here and the move let it go.");
+  });
+
+  it("derives confidence from how much of the record was re-searched", () => {
+    const unverified = buildDeterministicGameCoach(buildGameCoachFacts(v2Analysis({})), "en", "provider offline");
+    expect(unverified.confidence).toBe("low");
+
+    const verified = buildGameCoachFacts(v2Analysis({}, {}, [], { verifiedPlies: [1, 2] }));
+    expect(verified.moves.every((move) => move.verified === true)).toBe(true);
+    expect(buildDeterministicGameCoach(verified, "en", "provider offline").confidence).toBe("high");
+
+    const partial = buildGameCoachFacts(v2Analysis({}, {}, [], { verifiedPlies: [1] }));
+    expect(buildDeterministicGameCoach(partial, "en", "provider offline").confidence).toBe("medium");
   });
 });

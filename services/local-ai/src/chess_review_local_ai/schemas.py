@@ -446,6 +446,7 @@ class CoachGameMoveFacts(CoachModel):
     annotations: list[str] = Field(default_factory=list)
     accuracy: float = Field(ge=0, le=100)
     win_percent_loss: float = Field(ge=0)
+    verified: bool = False
     human_probability: float | None = Field(default=None, ge=0, le=1)
     human_difficulty: str | None = None
 

@@ -24,7 +24,7 @@ from .schemas import (
     CoachValidatedMove,
 )
 
-PROMPT_VERSION = "coach-v3"
+PROMPT_VERSION = "coach-v4"
 MOVE_TOKEN = re.compile(
     r"(?<![\w])(?:"
     r"[a-h][1-8][a-h][1-8][qrbn]?|"
