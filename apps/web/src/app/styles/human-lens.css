@@ -3,10 +3,10 @@
 
 .analysis-lens-panel {
   margin: 2px 0 4px;
-  padding: 14px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 14px 17px 13px 16px;
-  background: color-mix(in srgb, var(--wash-sage) 48%, var(--surface-paper));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--wash-sage) 32%, var(--surface-paper));
 }
 
 .lens-toolbar {
@@ -58,6 +58,18 @@
 }
 
 .human-quick-settings > summary::-webkit-details-marker { display: none; }
+
+/* Same chevron as the other floating triggers: the chip opens a panel. */
+.human-quick-settings > summary::after {
+  content: "⌄";
+  display: inline-block;
+  margin-left: 5px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1;
+  transition: transform .16s ease;
+}
+.human-quick-settings[open] > summary::after { transform: rotate(180deg); }
 
 .human-quick-settings[open] > .human-lens-controls {
   position: absolute;

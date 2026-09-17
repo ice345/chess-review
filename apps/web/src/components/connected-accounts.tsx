@@ -268,6 +268,20 @@ export function ConnectedAccounts({
     }
   }
 
+  if (compact && accounts.length === 0) {
+    return (
+      <section className="connected-accounts compact connected-accounts-quiet" id="connected-accounts">
+        <p>Optional: import games from a platform.</p>
+        <div className="account-link-inline" id="chesscom-link">
+          <input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Chess.com username" />
+          <button type="button" className="text-button" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button>
+          <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Connect Lichess in Settings</Link>
+        </div>
+        {notice && <p className="account-notice" role="status">{notice}</p>}
+      </section>
+    );
+  }
+
   return (
     <section className={`connected-accounts ${compact ? "compact" : ""}`} id="connected-accounts">
       <header>

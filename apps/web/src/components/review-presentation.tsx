@@ -5,7 +5,7 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import { formatMoveNumber, type GameAnalysisV2, type GamePhase, type MoveQuality } from "@chess-review/shared";
 import { classificationForAnnotation, QualityIcon, QUALITY_META } from "@chess-review/ui";
 import { displayPgnComment, importedAnnotations } from "../lib/imported-annotations";
-import { useReviewRuntime } from "./review-runtime";
+import { useWithheldPly } from "./review-session-state";
 import { useBoardDisplaySettings } from "../hooks/use-board-display-settings";
 import { ANNOTATION_LABEL, ANNOTATION_ORDER, displayedMoveQualityLabel, extraMoveAnnotations } from "../lib/move-quality-label";
 
@@ -33,9 +33,9 @@ export function ReviewOverview({
   onSelectPly: (ply: number) => void;
   allMomentsHref?: string;
 }) {
-  // Practice hides the solving ply here too: the critical list names the fault
-  // and its swing, which is the answer.
-  const hiddenPly = useReviewRuntime().retro.hiddenPly;
+  // Practice and a withheld guided moment hide the solving ply here too: the
+  // key-moment list names the fault and its swing, which is the answer.
+  const hiddenPly = useWithheldPly();
   const counts = QUALITY_ORDER.flatMap((quality) => {
     const white = analysis.white.qualityCounts[quality];
     const black = analysis.black.qualityCounts[quality];
@@ -77,7 +77,7 @@ export function ReviewOverview({
       </div>
 
       <div className="classification-summary">
-        <div className="eyebrow">MOVE QUALITY</div>
+        <div className="eyebrow">By quality</div>
         <div className="classification-heading"><span /><span /><strong>White</strong><strong>Black</strong></div>
         {counts.map(({ quality, white, black }) => (
           <div className="classification-count" key={quality}>
@@ -107,9 +107,9 @@ export function ReviewOverview({
       )}
 
       <div className="critical-list">
-        <div className="eyebrow">CRITICAL MOMENTS</div>
+        <div className="eyebrow">KEY MOMENTS</div>
         {analysis.criticalMoments.length === 0 ? (
-          <p className="quiet-empty">No critical swing crossed the current thresholds.</p>
+          <p className="quiet-empty">No swing crossed the current thresholds.</p>
         ) : analysis.criticalMoments.slice(0, 3).map((critical) => {
           const move = analysis.moves[critical.ply - 1];
           if (!move) return null;
@@ -125,10 +125,12 @@ export function ReviewOverview({
                 event.currentTarget.closest(".context-panel")?.scrollTo({ top: 0 });
               }}
             >
-              {/* The overview's critical list also names the fault and its swing. */}
+              {/* The overview's key-moment list also names the fault and its swing. The
+                  icon keeps the move's own label, so a Mistake reads as a Mistake and a
+                  Critical choice reads as Critical. */}
               {hiddenPly === critical.ply
                 ? <QualityIcon classification="book" size={25} decorative title="Hidden while solving" />
-                : <QualityIcon classification={iconClassification} size={25} title="Critical" />}
+                : <QualityIcon classification={iconClassification} size={25} title={QUALITY_META[iconClassification].label} />}
               <span>{formatMoveNumber(move.fenBefore, move.color)} {move.san}</span>
               <strong className={swing > 0 ? "critical-loss" : "critical-quiet"}>
                 {hiddenPly === critical.ply ? "Hidden while solving" : swing > 0 ? `−${swing.toFixed(1)}%` : "Only reasonable move"}
@@ -147,24 +149,29 @@ export function ReviewMoves({
   currentPly,
   onSelectPly,
   filter = "all",
+  contextWindow,
 }: {
   analysis: GameAnalysisV2;
   currentPly: number;
   onSelectPly: (ply: number) => void;
   filter?: "all" | "critical" | "errors";
+  /** Review keeps a context window around the current ply; Moves shows the game. */
+  contextWindow?: number;
 }) {
   const criticalPlies = new Set(analysis.criticalMoments.map((moment) => moment.ply));
-  const hiddenPly = useReviewRuntime().retro.hiddenPly;
+  const hiddenPly = useWithheldPly();
   // Emphasis and the "Key" filter share one definition of a key move, so the
   // calmer view can never disagree with what the filter shows.
   const keyOnlyEmphasis = useBoardDisplaySettings().moveEmphasis === "key";
   const listRef = useRef<HTMLDivElement>(null);
+  const windowCentre = Math.max(currentPly, 1);
   const moves = analysis.moves.filter((move) => (
-    filter === "all"
-    || (filter === "critical" && criticalPlies.has(move.ply))
-    || (filter === "errors" && (["inaccuracy", "mistake", "blunder"] as MoveQuality[]).includes(move.quality)
-      || move.annotations.includes("missed_win")
-      || move.annotations.includes("missed_mate"))
+    (contextWindow === undefined || Math.abs(move.ply - windowCentre) <= contextWindow)
+    && (filter === "all"
+      || (filter === "critical" && criticalPlies.has(move.ply))
+      || (filter === "errors" && (["inaccuracy", "mistake", "blunder"] as MoveQuality[]).includes(move.quality)
+        || move.annotations.includes("missed_win")
+        || move.annotations.includes("missed_mate")))
   ));
   const imported = useMemo(() => importedAnnotations(analysis), [analysis]);
   useLayoutEffect(() => {

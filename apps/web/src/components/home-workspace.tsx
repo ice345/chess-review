@@ -192,7 +192,7 @@ export function HomeWorkspace() {
             <button type="submit" className="primary import-submit" disabled={!ready || busy}>
               {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
             </button>
-            <button type="button" className="text-action" disabled={busy} onClick={kind === "pgn" ? loadExample : loadStartingPosition}>
+            <button type="button" className="secondary import-example" disabled={busy} onClick={kind === "pgn" ? loadExample : loadStartingPosition}>
               {kind === "pgn" ? "Load example game" : "Use starting position"}
             </button>
             <small id="import-help" className="import-note">{kind === "pgn" ? "Example: Morphy’s 17-move Opera Game. " : "FEN opens a position study. "}Your library is saved in this browser.</small>

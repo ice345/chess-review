@@ -1,21 +1,21 @@
-.home-hero { width: min(1220px,calc(100% - 44px)); margin: 0 auto; padding: 20px 0 28px; display: grid; gap: 18px; }
-.home-copy h1 { max-width: 100%; margin: 0 0 8px; color: var(--ink-primary); font: 500 clamp(30px,3vw,40px)/1.15 Georgia, "Songti SC", serif; letter-spacing: -.045em; }
+.home-hero { width: min(1220px,calc(100% - 44px)); margin: 0 auto; padding: 16px 0 20px; display: grid; gap: 14px; }
+.home-copy h1 { max-width: 100%; margin: 0 0 6px; color: var(--ink-primary); font: 500 clamp(26px,2.6vw,36px)/1.15 Georgia, "Songti SC", serif; letter-spacing: -.045em; }
 .home-copy h1 em { color: var(--ink-secondary); font-style: normal; }
 .home-copy > p { max-width: 100%; margin: 0; color: var(--ink-secondary); font-size: 16px; line-height: 1.5; }
 .home-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 48px); align-items: start; }
 .home-board { grid-column: 1; grid-row: 1; margin: 0; display: grid; justify-items: stretch; gap: 10px; }
 .home-board-frame { width: 100%; max-width: 500px; aspect-ratio: 1; }
 .home-board figcaption { color: var(--ink-muted); font-size: var(--type-caption); }
-.import-card { min-width: 0; grid-column: 2; grid-row: 1; padding: 20px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-paper); box-shadow: var(--shadow-paper); }
-.import-heading h2 { margin: 3px 0 12px; color: var(--ink-primary); font: 500 25px Georgia, "Songti SC", serif; letter-spacing: -.035em; }
+.import-card { min-width: 0; grid-column: 2; grid-row: 1; padding: 16px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-paper); box-shadow: var(--shadow-paper); }
+.import-heading h2 { margin: 2px 0 8px; color: var(--ink-primary); font: 500 22px Georgia, "Songti SC", serif; letter-spacing: -.035em; }
 .source-tabs { padding: 4px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 11px; background: color-mix(in srgb, var(--wash-blue) 55%, var(--surface-raised)); }
 .source-tabs button { min-height: 44px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; }
 .source-tabs button.active { background: var(--surface-paper); color: var(--accent-primary); box-shadow: 0 1px 5px rgba(52,72,78,.06); }
 .import-field { margin-top: 12px; display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
-.import-field textarea { width: 100%; min-height: 116px; padding: 12px; resize: vertical; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-paper); color: var(--ink-primary); font: 14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
-.import-field textarea::placeholder { color: var(--ink-faint); }
+.import-field textarea { width: 100%; min-height: 88px; padding: 10px; resize: vertical; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-paper); color: var(--ink-primary); font: 14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.import-field textarea::placeholder { color: var(--ink-muted); }
 .import-submit { min-height: 44px; width: 100%; margin-top: 10px; }
-.import-card .text-action { min-height: 44px; width: 100%; margin-top: 3px; font-size: 13px; }
+.import-card .import-example { min-height: 44px; width: 100%; margin-top: 8px; font-size: 13px; }
 .import-note { display: block; margin-top: 9px; color: var(--ink-muted); font-size: 12px; line-height: 1.45; text-align: center; }
 .recent-section { width: min(1220px,calc(100% - 44px)); margin: 0 auto; padding: 34px 0 66px; border-top: 1px solid var(--line-soft); }
 .recent-section h2 { margin: 5px 0 18px; font-size: 25px; }

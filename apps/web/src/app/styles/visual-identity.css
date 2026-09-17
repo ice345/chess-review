@@ -13,7 +13,8 @@
 }
 
 .brand-mark svg { width: 72%; height: 72%; }
-.app-header.compact .brand-mark { width: 32px; height: 32px; border-radius: 50%; }
+.app-header.compact .brand-mark,
+.review-home .brand-mark { width: 32px; height: 32px; border-radius: 50%; }
 
 .home-chess-identity {
   width: fit-content;
@@ -30,7 +31,7 @@
 
 .home-chess-identity > span { display: grid; gap: 4px; }
 .home-chess-identity b { color: var(--ink-primary); font: 500 15px var(--font-serif); }
-.home-chess-identity small { color: var(--ink-faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.home-chess-identity small { color: var(--ink-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 
 @media (max-width: 760px) {
   .home-chess-identity { margin-bottom: 20px; }

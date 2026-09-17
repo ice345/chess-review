@@ -7,8 +7,16 @@ import {
   QualityIcon,
 } from "@chess-review/ui";
 import { useReviewRuntime } from "../review-runtime";
+import {
+  annotationsLabel,
+  baselineOnlyCaveat,
+  engineChoiceLabel,
+  moveEvidenceSentence,
+  sacrificeLabel,
+  verificationLabel,
+  winningChancesLabel,
+} from "../../lib/move-evidence-copy";
 import { displayedMoveQualityLabel } from "../../lib/move-quality-label";
-import { formatEngineScore } from "../../lib/review-format";
 
 function percentage(value: number): string {
   return (value * 100).toFixed(value < 0.1 ? 1 : 0) + "%";
@@ -31,15 +39,29 @@ export function CurrentMoveVerdict({ move }: { move: MoveAnalysisV2 }) {
         <div className="move-verdict objective-verdict">
           <QualityIcon classification={move.classification} size={24} />
           <strong>{label} · {displayedMoveQualityLabel(move)}</strong>
-          <details>
+          <p className="move-verdict-sentence">{moveEvidenceSentence(move)}</p>
+          {baselineOnlyCaveat(move) !== null && <p className="move-verdict-caveat">{baselineOnlyCaveat(move)}</p>}
+          <details className="move-verdict-why">
             <summary>Why?</summary>
-            <p>
-              {move.classificationReason.precedenceRule.replaceAll("-", " ")}
-              · Win% loss {move.classificationReason.winPercentLoss.toFixed(1)}
-              · Accuracy {move.accuracy.toFixed(1)}
-              · {formatEngineScore(move.evaluationBefore)} → {formatEngineScore(move.playedMoveScore)}
-              {move.annotations.length > 0 ? ` · Annotations ${move.annotations.map((annotation) => annotation.replaceAll("_", " ")).join(", ")}` : ""}
-            </p>
+            <dl className="move-verdict-evidence">
+              <div><dt>Engine</dt><dd>{engineChoiceLabel(move.classificationReason)}</dd></div>
+              <div><dt>Winning chances</dt><dd>{winningChancesLabel(move.classificationReason)}</dd></div>
+              <div><dt>Accuracy</dt><dd>{move.accuracy.toFixed(1)}</dd></div>
+              <div><dt>Search</dt><dd>{verificationLabel(move)}</dd></div>
+              {sacrificeLabel(move.classificationReason) !== null && (
+                <div><dt>Sacrifice</dt><dd>{sacrificeLabel(move.classificationReason)}</dd></div>
+              )}
+              {move.annotations.length > 0 && (
+                <div><dt>Annotations</dt><dd>{annotationsLabel(move.annotations)}</dd></div>
+              )}
+              {move.classificationReason.exclusions.length > 0 && (
+                <div><dt>Ruled out</dt><dd>{move.classificationReason.exclusions.join(", ").replaceAll("-", " ")}</dd></div>
+              )}
+            </dl>
+            <details className="move-verdict-internals">
+              <summary>Classification internals</summary>
+              <code>{(move.classificationReason.qualityRule ?? move.classificationReason.precedenceRule)}</code>
+            </details>
           </details>
         </div>
       )}

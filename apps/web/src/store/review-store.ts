@@ -36,12 +36,21 @@ interface ReviewState {
   analysis: GameAnalysisV2 | null;
   currentPly: number;
   positionFen: string;
+  /**
+   * A practisable key moment the guided review placed the board on with its
+   * analysis withheld, so "try it before the answer" is a real choice. Null in
+   * ordinary free analysis. Any other navigation clears it: browsing is a
+   * decision to look, not a solve.
+   */
+  concealedPly: number | null;
   orientation: "white" | "black";
   branch: AnalysisBranchTree | null;
   error: string | null;
   loadPgn: (pgn: string) => void;
   loadFen: (fen: string) => void;
   goToPly: (ply: number) => void;
+  concealAnswer: (ply: number) => void;
+  clearConcealment: () => void;
   setAnalysis: (analysis: GameAnalysisV2 | null) => void;
   setOrientation: (orientation: "white" | "black") => void;
   startEngineLine: (rank: number, moves: ReplayedUciMove[]) => void;
@@ -66,6 +75,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   analysis: null,
   currentPly: 0,
   positionFen: initialFen,
+  concealedPly: null,
   orientation: "white",
   branch: null,
   error: null,
@@ -74,7 +84,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       const game = parsePgn(pgn);
       const division = divideGame(game);
       const opening = recognizeOpening(game) ?? null;
-      set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, branch: null, error: null });
+      set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, branch: null, error: null, concealedPly: null });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "PGN 解析失败。" });
     }
@@ -100,8 +110,12 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (!game) return;
     const bounded = Math.max(0, Math.min(game.plies.length, ply));
     const positionFen = bounded === 0 ? game.initialFen : game.plies[bounded - 1]?.fenAfter ?? game.initialFen;
-    set({ currentPly: bounded, positionFen, branch: null });
+    // Moving the board anywhere retires a withheld answer, including back onto the
+    // concealed ply: the visitor has chosen to look.
+    set({ currentPly: bounded, positionFen, branch: null, concealedPly: null });
   },
+  concealAnswer: (ply) => set({ concealedPly: ply > 0 ? ply : null }),
+  clearConcealment: () => set({ concealedPly: null }),
   setAnalysis: (analysis) => set({ analysis }),
   setOrientation: (orientation) => set({ orientation }),
   startEngineLine: (rank, moves) => {

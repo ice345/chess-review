@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
-import { buildReviewPlayerIdentities, orderPlayersForBoard } from "./player-identity";
+import { buildReviewPlayerIdentities, learnerColorForRecord, orderPlayersForBoard } from "./player-identity";
 
 const account: PlatformAccount = {
   id: "chesscom:ada",
@@ -82,5 +82,20 @@ describe("review player identity", () => {
     }, "chesscom");
     expect(players.white.avatarUrl).toBeUndefined();
     expect(players.black.avatarUrl).toBe("https://images.chesscomfiles.com/uploads/v1/user/mikhail.png");
+  });
+});
+
+describe("learner identity", () => {
+  it("takes the learner from the connected account, not from the board flip", () => {
+    // The synced record's preferredOrientation is the account's own color.
+    expect(learnerColorForRecord({ external: game.external, preferredOrientation: "black" })).toBe("black");
+    expect(learnerColorForRecord({ external: game.external, preferredOrientation: "white" })).toBe("white");
+    expect(learnerColorForRecord({ external: game.external })).toBeNull();
+  });
+
+  it("leaves a manually imported game anonymous", () => {
+    // A manual PGN can suggest an orientation without claiming who is studying.
+    expect(learnerColorForRecord({ preferredOrientation: "white" })).toBeNull();
+    expect(learnerColorForRecord({})).toBeNull();
   });
 });

@@ -17,6 +17,6 @@ export function displayedMoveQualityLabel(move: Pick<MoveAnalysisV2, "classifica
 }
 
 /** Annotations whose V3 silhouette is not already the row's classification icon. */
-export function extraMoveAnnotations(move: Pick<MoveAnalysisV2, "classification" | "annotations">): MoveAnnotation[] {
+export function extraMoveAnnotations(move: Pick<MoveAnalysisV2, "classification"> & { readonly annotations: readonly MoveAnnotation[] }): MoveAnnotation[] {
   return move.annotations.filter((annotation) => classificationForAnnotation(annotation) !== move.classification);
 }

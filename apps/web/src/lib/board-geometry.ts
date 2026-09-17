@@ -9,7 +9,11 @@
  * intent, so it never claims a size the layout refused.
  */
 export const BOARD_SIZE_MIN = 320;
-export const BOARD_SIZE_MAX = 720;
+// Kept above the automatic default's ceiling (`--review-board-default` caps at
+// 760px) so a visitor on a large display still has headroom to grow the board
+// beyond what the responsive default chose. The layout clamp still decides what
+// the viewport can actually afford.
+export const BOARD_SIZE_MAX = 800;
 export const BOARD_SIZE_STEP = 20;
 
 /**

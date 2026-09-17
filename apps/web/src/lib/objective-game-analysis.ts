@@ -8,6 +8,7 @@ import type { GameAnalysisV2, GameDivision, OpeningInfo } from "@chess-review/sh
 import {
   BrowserStockfishPool,
   STOCKFISH_VERSION,
+  type EngineDiagnostics,
   type GameReviewProgress,
 } from "@chess-review/stockfish";
 
@@ -18,6 +19,8 @@ export interface ObjectiveGameAnalysisOptions {
   signal?: AbortSignal;
   onProgress?: (progress: GameReviewProgress) => void;
   createdAt?: string;
+  /** The run's own evidence: stage boundaries, cancellations and per-search context. */
+  diagnostics?: EngineDiagnostics;
 }
 
 /**
@@ -35,6 +38,7 @@ export async function analyzeObjectiveGame(
     multiPv: CLASSIFICATION_MULTI_PV,
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+    ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
   });
   const common = {
     game,
@@ -55,6 +59,7 @@ export async function analyzeObjectiveGame(
     plies: plan.requests.map((request) => request.ply),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+    ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
   });
   const positionAnalyses = [...baseline.positionAnalyses];
   for (const [index, analysis] of verified.positionAnalyses) positionAnalyses[index] = analysis;

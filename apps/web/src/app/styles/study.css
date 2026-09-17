@@ -18,7 +18,7 @@
 }
 .study-player-select { width: min(330px, 100%); display: grid; gap: 6px; color: var(--ink-muted); font-size: var(--type-caption); }
 .study-player-select select { height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-paper); }
-.study-sections, .study-empty, .study-notice, .study-scope, .study-nav { width: min(1060px, calc(100% - 40px)); margin-inline: auto; }
+.study-sections, .study-empty, .study-notice, .study-scope, .study-nav, .study-runs-only { width: min(1060px, calc(100% - 40px)); margin-inline: auto; }
 .study-nav { margin: 0 auto 22px; padding-bottom: 6px; display: flex; flex-wrap: nowrap; align-items: end; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--line-soft); scrollbar-width: thin; }
 .study-nav-group { display: flex; flex: 0 0 auto; flex-direction: column; justify-content: flex-end; gap: 3px; padding: 0 16px 2px; border-left: 1px solid var(--line-soft); }
 .study-nav-group:first-child { padding-left: 0; border-left: 0; }
@@ -227,7 +227,8 @@
 .study-highlight-card[data-kind="clean-conversion"] { background: color-mix(in srgb, var(--wash-sage) 28%, var(--surface-paper)); border-color: color-mix(in srgb, #668c75 16%, var(--line-soft)); }
 .study-highlight-card[data-kind="best-game"] { background: color-mix(in srgb, var(--wash-blue) 32%, var(--surface-paper)); border-color: color-mix(in srgb, #4e7182 16%, var(--line-soft)); }
 
-.history-run-heading { margin-top: 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; }
+.history-run-heading,
+.history-analysis-heading { margin-top: 17px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 750; }
 .history-past-runs { margin-top: 10px; border-top: 1px solid var(--line-soft); }
 .history-past-runs > summary { padding: 11px 2px 4px; cursor: pointer; color: var(--ink-secondary); font-size: var(--type-caption); font-weight: 700; }
 .history-job-list-past { margin-top: 5px; opacity: .86; }
@@ -250,6 +251,8 @@
 }
 
 @media (max-width: 560px) {
+  /* The report body takes a tighter phone gutter than the page stack above it
+     (heading, Today card, queue band, status line, run journal). */
   .study-sections, .study-empty, .study-notice, .study-scope, .study-nav { width: min(100% - 24px, 1060px); }
   .study-filters, .highlight-grid, .history-analysis-controls, .history-job-list article { grid-template-columns: 1fr; }
   .history-job-list .history-job-card { grid-template-columns: 1fr; }
@@ -269,7 +272,10 @@
   .study-nav-group { padding-inline: 12px; }
 }
 
-.training-queue-panel { width: min(1220px, calc(100% - 32px)); margin: 16px auto 24px; padding: 18px 0; border-block: 1px solid var(--line); }
+/* One page column: the queue band keeps hairline rules and no card chrome, but it
+   takes the same measure as the Today card above it and the report below it, so
+   the page has one left edge and one right edge. */
+.training-queue-panel { width: min(1060px, calc(100% - 40px)); margin: 16px auto 24px; padding: 18px 0; border-block: 1px solid var(--line); }
 .training-queue-panel h2 { margin: 0 0 8px; font-size: 23px; }
 .training-queue-panel > p { color: var(--ink-secondary); font-size: 13px; line-height: 1.5; }
 .training-queue-panel .training-actions button { min-height: 44px; }
@@ -279,3 +285,31 @@
 .training-session-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; max-width: 100%; }
 .training-session-actions button, .training-session-actions a { min-height: 44px; display: inline-flex; align-items: center; }
 .training-session-actions small { flex-basis: 100%; font-size: 12px; }
+/* The three outcome buttons are one decision; the exit link is navigation, so it never
+   shares a row with them and cannot read as a fourth choice. */
+.training-session-actions .text-button { flex-basis: 100%; }
+
+/* Today: the training entry point, before the report that justifies it. It takes
+   the same measure as the heading, the queue band, the status line and the report,
+   so the page reads as one column instead of a full-bleed card over a column. */
+.training-today {
+  display: grid;
+  gap: var(--space-block);
+  justify-items: start;
+  width: min(1060px, calc(100% - 40px));
+  margin: 0 auto var(--space-section);
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-paper);
+  box-shadow: var(--shadow-paper);
+}
+.training-today > header { display: grid; gap: 2px; }
+.training-today h2 { margin: 0; color: var(--ink-primary); font-size: 19px; }
+.training-today p { margin: 0; max-width: var(--measure-prose); color: var(--ink-secondary); font-size: 13px; }
+.training-today-progress strong { color: var(--ink-primary); }
+.training-today-next a { color: var(--accent-primary); text-decoration: underline; text-underline-offset: 2px; }
+.training-today-facts { color: var(--ink-muted) !important; font-size: 12px; }
+.training-today-note { color: var(--ink-muted) !important; font-size: 12px; }
+.training-today > button.primary { min-height: 44px; }
+.training-today-error { color: var(--danger) !important; }

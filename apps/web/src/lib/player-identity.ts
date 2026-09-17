@@ -67,3 +67,19 @@ export function orderPlayersForBoard(
     ? { top: players.black, bottom: players.white }
     : { top: players.white, bottom: players.black };
 }
+
+/**
+ * Who the review is helping, or null for an anonymous study of two other players.
+ *
+ * A connected game knows which account played it, so its color is a real learner
+ * identity. `preferredOrientation` on a manually imported game is only the board
+ * direction the file suggested — flipping the board must not change who the
+ * summary attributes mistakes to, and a famous game imported from a PGN has no
+ * learner at all. Until a first-class learner identity exists, that distinction is
+ * the whole rule: account-backed records have a learner, manual ones do not, and
+ * an anonymous review states the mover on every fact instead of guessing.
+ */
+export function learnerColorForRecord(record: { external?: { accountId?: string } | undefined; preferredOrientation?: PlayerColor }): PlayerColor | null {
+  if (record.external === undefined) return null;
+  return record.preferredOrientation ?? null;
+}

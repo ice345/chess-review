@@ -20,11 +20,11 @@
   align-items: center;
   gap: 8px;
   transform: translateX(calc((var(--eval-gutter) + 10px) / 2));
-  /* The transform makes this row a stacking context, so its popovers (board
-     settings) would otherwise paint under the board that follows it. The row
-     carries the toolbar menus, so it sits above every board overlay. */
+  /* The transform makes this row a stacking context. Chessboard arrows use
+     their own z-index inside the board; without isolating the board they
+     compete in this workspace and paint through the settings menu. */
   position: relative;
-  z-index: 9;
+  z-index: 24;
 }
 .board-player-header .player-strip { width: auto; flex: 1; margin: 0; transform: none; }
 .board-toolbar { display: flex; flex: none; gap: 6px; }
@@ -74,14 +74,16 @@
   color: var(--accent-brass);
 }
 
-.board-controls { position: relative; }
+.board-controls { position: relative; z-index: 2; }
 .board-controls > summary { list-style: none; }
 .board-controls > summary::-webkit-details-marker { display: none; }
 
 .board-controls-menu {
-  width: min(248px, calc(100vw - 32px));
+  width: min(280px, calc(100vw - 32px));
   gap: 8px;
   padding: 10px;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .board-size-row { display: grid; gap: 4px; }
@@ -103,9 +105,21 @@
 .board-controls-menu .text-button:hover { background: var(--wash-blue); }
 .board-controls-note { color: var(--ink-muted); font-size: 12px; line-height: 1.45; }
 
-/* The size control has no effect where the layout stays responsive. */
+.board-controls-menu .move-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  padding-top: 8px;
+}
+.board-controls-menu .move-entry > label,
+.board-controls-menu .move-entry > small,
+.board-controls-menu .move-entry-message,
+.board-controls-menu .move-entry-error { grid-column: 1 / -1; }
+.board-controls-menu .move-entry input { flex: none; min-width: 0; width: 100%; }
+
+/* Size is a desktop preference; the rest of the menu stays on every width. */
 @media (max-width: 900px) {
-  .board-controls { display: none; }
+  .board-size-row { display: none; }
 }
 
 .player-strip {
@@ -264,6 +278,8 @@
 
 .board-wrap {
   position: relative;
+  z-index: 1;
+  isolation: isolate;
   width: var(--board-size);
   height: var(--board-size);
   overflow: visible;
@@ -403,4 +419,49 @@
   .player-avatar { width: 28px; height: 28px; }
   .move-status { flex-wrap: wrap; padding: 4px 0; }
   .move-status .return-to-game { min-height: 44px; }
+}
+
+/* Keyboard move entry lives in Board settings so the board column stays an instrument. */
+.move-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-row) var(--space-block);
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line-soft);
+}
+.move-entry > label {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.move-entry input {
+  flex: 1 1 130px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-paper);
+  color: var(--ink-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.move-entry input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.move-entry > button { min-height: 36px; }
+.move-entry > small { flex: 1 1 100%; color: var(--ink-muted); font-size: 11.5px; }
+.move-entry-message, .move-entry-error { flex: 1 1 100%; margin: 0; font-size: 12px; }
+.move-entry-message { color: var(--ink-secondary); }
+.move-entry-error { color: var(--danger); }
+
+/* Announced to assistive technology, never drawn. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

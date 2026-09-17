@@ -4,7 +4,7 @@
 .brand > span:last-child { display: grid; gap: 1px; }
 .brand > span:last-child { transform: none; }
 .brand strong { color: var(--ink-primary); font-size: 14px; letter-spacing: -.01em; }
-.brand small { color: var(--ink-faint); font-size: 9px; letter-spacing: .11em; text-transform: uppercase; }
+.brand small { color: var(--ink-faint); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; }
 .app-header nav { display: flex; gap: 6px; }
 .app-header nav a { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 11px; border-radius: 9px; color: var(--ink-muted); font-size: 12px; }
 .app-header nav a:hover { background: color-mix(in srgb, var(--wash-blue) 62%, var(--surface-raised)); color: var(--ink-primary); }

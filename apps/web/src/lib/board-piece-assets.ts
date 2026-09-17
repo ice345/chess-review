@@ -26,3 +26,23 @@ export type PieceAssetKey = (typeof PIECE_ASSET_KEYS)[number];
 export function boardPieceImageKey(piece: string): PieceAssetKey {
   return `${piece === piece.toUpperCase() ? "w" : "b"}${piece.toUpperCase()}` as PieceAssetKey;
 }
+
+const PIECE_NAMES: Record<PieceAssetKey, string> = {
+  wP: "White pawn", wN: "White knight", wB: "White bishop", wR: "White rook", wQ: "White queen", wK: "White king",
+  bP: "Black pawn", bN: "Black knight", bB: "Black bishop", bR: "Black rook", bQ: "Black queen", bK: "Black king",
+};
+
+/** What a screen reader calls a piece: "White knight". */
+export function boardPieceName(key: PieceAssetKey): string {
+  return PIECE_NAMES[key];
+}
+
+/** What a screen reader calls a square: "Square e4".
+ *
+ * The square groups the piece that stands on it, whose own name says what it is;
+ * the squares themselves are not focusable, so operating the board is the move
+ * entry, the transport and the named move and candidate buttons.
+ */
+export function boardSquareDescription(square: string): string {
+  return `Square ${square}`;
+}

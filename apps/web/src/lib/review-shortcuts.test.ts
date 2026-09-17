@@ -28,6 +28,6 @@ describe("review shortcuts", () => {
   it("labels keys for the overlay and groups them", () => {
     expect(shortcutKeysLabel(REVIEW_SHORTCUTS.find((shortcut) => shortcut.action === "previous")!)).toBe("← / J");
     expect(shortcutKeysLabel(REVIEW_SHORTCUTS.find((shortcut) => shortcut.action === "togglePlayback")!)).toBe("Space");
-    expect(shortcutsInGroup("Board").map((shortcut) => shortcut.action)).toEqual(["flipBoard", "toggleFocus"]);
+    expect(shortcutsInGroup("Board").map((shortcut) => shortcut.action)).toEqual(["flipBoard", "toggleFocus", "toggleMoveEntry"]);
   });
 });

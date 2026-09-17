@@ -8,17 +8,20 @@ import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core"
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
 import { BoardQualityBadge, QUALITY_META, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
-import { AppHeader } from "./app-header";
+import { LocalDataNotice } from "./local-data-notice";
 import { TrainingSession } from "./training-session";
 import { ReviewRuntimeProvider } from "./review-runtime";
+import { ReviewSessionProvider } from "./review-session-state";
 import { BoardControls } from "./review/board-controls";
 import { BoardFlipButton } from "./review/board-flip-button";
 import { BoardFocusButton } from "./review/board-focus-button";
 import { ShortcutHelp } from "./review/shortcut-help";
 import { EvaluationBar } from "./review/evaluation-bar";
+import { MoveEntry } from "./review/move-entry";
 import { MoveTransport } from "./review/move-transport";
 import { PlayerStrip } from "./review/player-strip";
 import { useBoardGeometryPreference } from "../hooks/use-board-geometry-preference";
+import { useDismissibleDetails } from "../hooks/use-dismissible-details";
 import { PIECE_ANIMATION_MS, useBoardDisplaySettings } from "../hooks/use-board-display-settings";
 import { useReviewKeyboardShortcuts } from "../hooks/use-review-keyboard-shortcuts";
 import { usePlayerIdentities } from "../hooks/use-player-identities";
@@ -32,6 +35,7 @@ import { useRetrospect } from "../hooks/use-retrospect";
 import { useReviewRecord } from "../hooks/use-review-record";
 import { useReviewNotebook } from "../hooks/use-review-notebook";
 import { useBoardPieces } from "../hooks/use-board-pieces";
+import { boardSquareDescription } from "../lib/board-piece-assets";
 import { loadAppSettings } from "../lib/app-settings";
 import { useLocalAiHealth } from "../lib/use-local-ai-health";
 import {
@@ -43,6 +47,7 @@ import {
   type StockfishCandidateIdentity,
 } from "../lib/board-analysis-arrows";
 import { boardMoveHintStyles, pieceMatchesTurn } from "../lib/board-move-hints";
+import { concealedAnswerPly, withheldPresentation } from "../lib/practice-presentation";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { orderPlayersForBoard } from "../lib/player-identity";
 import { downloadBlob, renderDisplayedPositionCard, renderGameReviewCard, renderPositionCard, reviewFilename } from "../lib/png-export";
@@ -87,6 +92,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     reviewState,
     reviewError,
     reviewProgress,
+    runDiagnostics,
+    runDiagnosticsSummary,
     engineResult,
     engineState,
     engineError,
@@ -231,6 +238,16 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     void analysisRuntime.analyzeContinuations();
   }, [analysisRuntime.analyzeContinuations, analysisRuntime.continuationResult, branchPositionFen, canonicalPositionResult, humanRuntime.mode, loadState, record]);
 
+  // Whatever the visitor can see in free analysis counts as having seen the answer
+  // for that ply: arrows, evaluation and the verdict panel are all on screen. A
+  // later practice attempt at the same position is still useful, but it is not a
+  // first-time solve, and the session records that. A withheld answer is not
+  // visible, so it does not count.
+  useEffect(() => {
+    if (retro.active || state.currentPly === 0 || state.concealedPly === state.currentPly) return;
+    retro.noteAnswerExposed(state.currentPly);
+  }, [retro.active, retro.noteAnswerExposed, state.concealedPly, state.currentPly]);
+
   // The promotion chooser owns Escape while it is open, and every other
   // shortcut stays suspended until it closes.
   useEffect(() => {
@@ -261,6 +278,15 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     setFocusBoard(false);
   }, [pausePlayback]);
 
+  useDismissibleDetails();
+
+  const boardControlsRef = useRef<HTMLDetailsElement>(null);
+  const openMoveEntry = useCallback(() => {
+    const menu = boardControlsRef.current;
+    if (menu) menu.open = true;
+    window.requestAnimationFrame(() => document.getElementById("board-move-input")?.focus());
+  }, []);
+
   useReviewKeyboardShortcuts({
     previous: navigatePrevious,
     next: navigateNext,
@@ -270,6 +296,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     leaveVariation,
     flipBoard,
     toggleFocus: toggleFocusBoard,
+    toggleMoveEntry: openMoveEntry,
     toggleHelp: openShortcutHelp,
   }, { suspended: pendingPromotion !== null || shortcutHelpOpen });
 
@@ -278,7 +305,12 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   if (loadState !== "ready" || !record) {
     return (
       <main className="review-loading">
-        <AppHeader compact />
+        <LocalDataNotice />
+        <div className="review-titlebar">
+          <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
+            <span className="brand-mark"><BlueBishopMark decorative /></span>
+          </Link>
+        </div>
         <section>
           <span className="brand-mark"><BlueBishopMark decorative /></span>
           <h1>{loadState === "missing" ? "Review not found" : loadState === "error" ? "Unable to open review" : "Preparing workspace"}</h1>
@@ -300,14 +332,19 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     ?? currentAnalysis?.evaluationAfter
     ?? state.analysis?.moves[0]?.evaluationBefore
     ?? null;
+  // Guided review and free exploration are the product's two working modes, so
+  // both are reachable from the titlebar. Analysis is the existing Engine Lab
+  // route (engine, explorer, tablebase) under the name that says what it is for;
+  // burying it under More left the free half of the product looking like a
+  // utility beside History and Settings.
   const primary = [
     { href: root, label: "Review" },
     { href: `${root}/moves`, label: "Moves" },
     { href: `${root}/coach`, label: "Study" },
+    { href: `${root}/engine`, label: "Analysis" },
   ];
   const more = [
     { href: `${root}/notebook`, label: "Notebook" },
-    { href: `${root}/engine`, label: "Engine" },
   ];
   const sectionHref = (href: string) => (
     trainingId
@@ -451,6 +488,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     engineResult,
     engineState,
     engineError,
+    runDiagnostics,
+    runDiagnosticsSummary,
     continuationLines,
     continuationLength,
     continuationResult,
@@ -488,6 +527,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     generateGameCoach: coachRuntime.generateGame,
     retryBranchMoveQuality: branchQualityRuntime.retry,
     navigateToPly,
+    playMove: playBoardMove,
+    concealAnswer: state.concealAnswer,
+    clearConcealment: state.clearConcealment,
     pausePlayback,
     retro,
     openNotebookPosition: (rootPly: number, line: string[]) => {
@@ -513,12 +555,28 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     persistEnrichedAnalysis,
   };
 
+  // What a screen reader hears after every move or route change.
+  const positionAnnouncement = state.branch
+    ? `Analysis variation, ${selectedBranchMove?.san ?? "root"}.`
+    : currentMove === null
+      ? `Starting position. ${state.game?.initialFen.split(" ")[1] === "b" ? "Black" : "White"} to move.`
+      : `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "\u2026"} ${currentMove.san}. ${currentMove.color === "white" ? "Black" : "White"} to move.`;
+
+  // Practice owns the answer; a withheld guided moment borrows the same policy so
+  // the board, the exports and the panels cannot disagree about what is visible.
+  const concealed = concealedAnswerPly({ concealedPly: state.concealedPly, currentPly: state.currentPly, practiceActive: retro.active }) !== null;
+  const presentation = withheldPresentation(retro.presentation, concealed);
+  const analysesHidden = presentation.hideAnalysisExports;
+
   return (
     <ReviewRuntimeProvider value={runtime}>
       <main className="review-shell">
-        <AppHeader compact />
+        <LocalDataNotice />
         <div className="review-titlebar">
-          <div><span className="kicker">{record.kind === "pgn" ? "Game review" : "Position study"}</span><strong>{record.title}</strong><small>{record.subtitle}</small></div>
+          <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
+            <span className="brand-mark"><BlueBishopMark decorative /></span>
+          </Link>
+          <div className="review-title"><strong>{record.title}</strong><small>{record.subtitle}</small></div>
           <nav className="review-nav" aria-label="Review sections">
             {primary.map((item) => (
               <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={sectionHref(item.href)} key={item.href}>
@@ -533,6 +591,9 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                 {more.map((item) => (
                   <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={sectionHref(item.href)} key={item.href}>{item.label}</Link>
                 ))}
+                <Link href="/history">History</Link>
+                <Link href="/training">Training</Link>
+                <Link href="/settings">Settings</Link>
               </div>
             </details>
             <details key={`export-${pathname}`}><summary>Export</summary><div className="action-menu">
@@ -560,13 +621,16 @@ export function ReviewShell({ children }: { children: ReactNode }) {
               {shareCopied && <small role="status">Share link copied to clipboard</small>}
               {shareUrl !== null && <input className="share-link-value" aria-label="Share link" readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} />}
               {record.kind === "pgn" && <small className="export-note">Original keeps imported comments and variations. Annotated adds analysis to the mainline. A share link opens the game in the recipient's own browser — nothing is uploaded.</small>}
-              <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Canonical JSON", () => { if (state.analysis) downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json")); })}>Canonical JSON</button>
-              <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Annotated PGN", () => { if (state.analysis) downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn")); })}>Annotated PGN</button>
-              <button type="button" disabled={exportBusy} onClick={() => void runExport("Position PNG", exportPositionPng)}>Position PNG</button>
-              <button type="button" disabled={exportBusy || !state.analysis} onClick={() => void runExport("Review PNG", exportReviewPng)}>Review PNG</button>
-              {exportBusy && <small role="status">Preparing export…</small>}
+              {/* Every one of these carries the answer for the position being
+                  solved, so they wait until the attempt is finished. */}
+              <button type="button" disabled={exportBusy || !state.analysis || analysesHidden} onClick={() => void runExport("Canonical JSON", () => { if (state.analysis) downloadText(exportAnalysisJson(state.analysis), "application/json", reviewFilename(state.analysis, "analysis.json")); })}>Canonical JSON</button>
+              <button type="button" disabled={exportBusy || !state.analysis || analysesHidden} onClick={() => void runExport("Annotated PGN", () => { if (state.analysis) downloadText(exportAnnotatedPgn(state.analysis), "application/x-chess-pgn", reviewFilename(state.analysis, "annotated.pgn")); })}>Annotated PGN</button>
+              <button type="button" disabled={exportBusy || analysesHidden} onClick={() => void runExport("Position PNG", exportPositionPng)}>Position PNG</button>
+              <button type="button" disabled={exportBusy || !state.analysis || analysesHidden} onClick={() => void runExport("Review PNG", exportReviewPng)}>Review PNG</button>
+              {analysesHidden
+                ? <small role="status">Analysis exports are withheld while you solve this position.</small>
+                : exportBusy && <small role="status">Preparing export…</small>}
             </div></details>
-            <Link className="review-settings-link" href="/settings">Settings</Link>
           </div>
         </div>
 
@@ -581,23 +645,17 @@ export function ReviewShell({ children }: { children: ReactNode }) {
               <div className="board-player-header">
                 <PlayerStrip player={orderedPlayers.top} />
                 <div className="board-toolbar">
-                <button
-                  type="button"
-                  className="sound-toggle-button"
-                  aria-label={soundRuntime.soundEnabled ? "Mute chess sounds" : "Unmute chess sounds"}
-                  aria-pressed={!soundRuntime.soundEnabled}
-                  title={soundRuntime.soundEnabled ? "Mute chess sounds" : "Unmute chess sounds"}
-                  onClick={soundRuntime.toggleMuted}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 9v6h4l5 4V5L9 9H5Z" />
-                    {soundRuntime.soundEnabled
-                      ? <><path d="M17 9.2c.8.75 1.2 1.68 1.2 2.8s-.4 2.05-1.2 2.8" /><path d="M19.2 7c1.35 1.35 2.05 3 2.05 5s-.7 3.65-2.05 5" /></>
-                      : <><path d="m17 9 4 6" /><path d="m21 9-4 6" /></>}
-                  </svg>
-                </button>
-                <BoardControls geometry={boardGeometry} onShowShortcuts={openShortcutHelp} />
-                <BoardFocusButton focused={focusBoard} onToggle={toggleFocusBoard} />
+                <BoardControls
+                  menuRef={boardControlsRef}
+                  geometry={boardGeometry}
+                  onShowShortcuts={openShortcutHelp}
+                  soundEnabled={soundRuntime.soundEnabled}
+                  onToggleSound={soundRuntime.toggleMuted}
+                  focusBoard={focusBoard}
+                  onToggleFocus={toggleFocusBoard}
+                  moveEntry={<MoveEntry compact />}
+                />
+                {focusBoard && <BoardFocusButton focused={focusBoard} onToggle={toggleFocusBoard} />}
                 <BoardFlipButton onFlip={flipBoard} />
                 </div>
               </div>
@@ -607,7 +665,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                   stockfish={displayedScore}
                   maia={humanRuntime.positionAnalysis}
                   orientation={state.orientation}
-                  valuesHidden={!retro.presentation.showEvalValues}
+                  valuesHidden={!presentation.showEvalValues}
                 />
                 <div className="board-wrap" ref={boardGeometry.boardRef}>
                   <Chessboard options={{
@@ -619,12 +677,28 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       ? []
                       : retro.presentation.showFaultArrow && retro.current
                         ? [faultArrow(retro.current.faultUci)].flatMap((arrow) => arrow ? [arrow] : [])
-                        : boardDisplay.boardArrows && retro.presentation.showEngineArrows ? boardArrows : [],
+                        : boardDisplay.boardArrows && presentation.showEngineArrows ? boardArrows : [],
                     arrowOptions: { ...defaultArrowOptions, arrowWidthDenominator: 9, opacity: .76 },
                     boardOrientation: state.orientation,
                     showNotation: boardDisplay.boardCoordinates === "inside",
                     animationDurationInMs: PIECE_ANIMATION_MS[boardDisplay.pieceAnimation],
                     squareStyles: boardSquareStyles,
+                    // Name each square for assistive technology. The renderer replaces
+                    // the library's own square content, so it reapplies the highlight
+                    // styles the library would otherwise have drawn.
+                    // A group, not an image: the square's content holds the
+                    // library's draggable piece button, and role="img" would make
+                    // that button presentational. The group names the square; the
+                    // piece renderers name the piece inside it.
+                    squareRenderer: ({ square, children }) => (
+                      <div
+                        style={{ width: "100%", height: "100%", ...(boardSquareStyles[square] ?? {}) }}
+                        role="group"
+                        aria-label={boardSquareDescription(square)}
+                      >
+                        {children}
+                      </div>
+                    ),
                     canDragPiece: ({ piece }) => !pendingPromotion && !retro.evaluating && retro.status !== "rejected" && retro.status !== "rewinding" && pieceMatchesTurn(piece.pieceType, state.positionFen),
                     onPieceDrag: ({ piece, square }) => {
                       if (square && pieceMatchesTurn(piece.pieceType, state.positionFen)) setSelectedSquare(square);
@@ -691,7 +765,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       <button type="button" className="promotion-cancel" onClick={() => setPendingPromotion(null)}>Cancel</button>
                     </div>
                   )}
-                  {!pendingPromotion && boardDisplay.boardQualityBadge && retro.presentation.showMoveBadge && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
+                  {!pendingPromotion && boardDisplay.boardQualityBadge && presentation.showMoveBadge && (state.branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
                     ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={state.orientation} classification={selectedBranchQuality.classification} />
                     : currentAnalysis && !state.branch
                       ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={state.orientation} classification={currentAnalysis.classification} />
@@ -729,6 +803,12 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                   onNext={navigateNext}
                   onLast={navigateLast}
                 />
+                {/* The board's squares are not focusable and carry no names, so the
+                    workspace states what the board holds: FEN on demand, plus a polite
+                    announcement after every move. Operating the board is typed-move
+                    entry in Board settings, the transport, and the named move/candidate buttons. */}
+                <p className="sr-only">{`Board position: ${state.positionFen}`}</p>
+                <p className="sr-only" role="status" aria-live="polite">{positionAnnouncement}</p>
               </div>
             </section>
 
@@ -736,7 +816,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
           <aside className={`context-panel${pathname === `${root}/moves` ? " moves-context" : ""}${trainingId ? " training-context" : ""}`}>
             {trainingId && <TrainingSession taskId={trainingId} positionKey={query.get("position")} record={record} />}
-            {children}
+            <ReviewSessionProvider gameId={gameId} analysis={state.analysis}>{children}</ReviewSessionProvider>
           </aside>
         </div>
         {shortcutHelpOpen && <ShortcutHelp onClose={() => setShortcutHelpOpen(false)} />}

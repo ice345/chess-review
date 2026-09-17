@@ -6,35 +6,41 @@
 
 .review-titlebar {
   min-width: 0;
-  min-height: 50px;
-  padding: 6px max(22px, calc((100vw - 1280px) / 2));
+  min-height: 48px;
+  padding: 4px max(16px, calc((100vw - 1280px) / 2));
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto;
+  grid-template-columns: auto minmax(120px, 1fr) auto auto;
   align-items: center;
-  gap: 16px;
+  gap: 10px 14px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--surface-raised);
 }
 
-.review-titlebar > div:first-child {
+.review-home {
+  min-width: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.review-home:hover { background: var(--wash-blue); }
+
+.review-title {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  column-gap: 9px;
   align-items: baseline;
 }
 
-.review-titlebar > div:first-child .kicker { display: none; }
-
-.review-titlebar > div:first-child strong,
-.review-titlebar > div:first-child small {
+.review-title strong,
+.review-title small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.review-titlebar > div:first-child strong { color: var(--ink-primary); font-size: 14px; }
-.review-titlebar > div:first-child small { color: var(--ink-muted); font-size: 12px; }
+.review-title strong { color: var(--ink-primary); font-size: 14px; }
+.review-title small { color: var(--ink-muted); font-size: 12px; }
 
 .review-nav {
   display: flex;
@@ -83,6 +89,24 @@
 
 .review-actions summary::-webkit-details-marker { display: none; }
 
+/* The trigger says it opens a panel instead of reading as a label: the same
+   chevron the Training scope uses, turned while the panel is open. Only the
+   "opens" cue is added; the chip keeps its border, padding and type. */
+.review-actions summary::after {
+  content: "⌄";
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1;
+  transition: transform .16s ease;
+}
+
+/* Rotation follows the native open state. `.review-more.open` is the section
+   indicator (the current route lives under More), not "this menu is open", so it
+   must not turn the chevron. */
+.review-actions details[open] > summary::after { transform: rotate(180deg); }
+
 .action-menu {
   position: absolute;
   z-index: 120;
@@ -116,33 +140,30 @@
 .action-menu button:hover,
 .action-menu a:hover { background: var(--wash-blue); color: var(--accent-primary); }
 .review-more.open > summary,
+.review-actions details[open] > summary,
 .action-menu a.active {
   background: var(--wash-blue);
   color: var(--accent-primary);
 }
 
-.review-settings-link {
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  color: var(--ink-secondary);
-  font-size: 12px;
-}
-
-@media (max-width: 900px) {
-  .review-settings-link { display: none; }
-}
-
+/* The board is the workspace, so surplus width becomes board and then margin —
+   never panel mass. The fixed cap used to be 680px, which froze the board from
+   about 1600px wide upward: at 2560×1440 the board stayed 680px while 640px sat
+   empty on each side and 530px of the height budget went unused. The contextual
+   column is bounded instead of taking `1fr`, so widening the viewport cannot let
+   it rival the board; what neither column needs stays as negative space. */
 .review-workspace {
   --eval-gutter: 40px;
-  --review-board-default: min(600px, 37.5vw, max(360px, calc(100dvh - 296px)));
+  --review-context-max: 560px;
+  --review-board-default: min(760px, 46vw, max(380px, calc(100dvh - 232px)));
   --review-board-size: var(--review-board-default);
-  width: min(1280px, calc(100% - 40px), calc(var(--review-board-size) * 2 + 164px));
-  margin: 12px auto 20px;
+  width: min(1440px, calc(100% - 40px), calc(var(--review-board-size) * 2 + 164px));
+  margin: 8px auto 12px;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, var(--review-context-max));
   grid-template-rows: auto;
   gap: 24px;
+  justify-content: center;
   align-items: stretch;
 }
 
@@ -152,7 +173,7 @@
    responsive default untouched. */
 @media (min-width: 901px) {
   .review-workspace {
-    --review-board-max: clamp(320px, calc(100vw - 434px), 720px);
+    --review-board-max: clamp(320px, calc(100vw - 434px), 800px);
     --review-board-size: clamp(320px, var(--review-board-preference, var(--review-board-default)), var(--review-board-max));
   }
 }
@@ -168,7 +189,7 @@
 @media (min-width: 901px) {
   .review-workspace.focus-board {
     width: min(calc(100% - 40px), calc(var(--review-board-size) + 60px));
-    --review-board-size: min(calc(100dvh - 250px), calc(100vw - 140px), 960px);
+    --review-board-size: min(calc(100dvh - 168px), calc(100vw - 140px), 960px);
   }
 }
 
@@ -257,7 +278,7 @@
 .review-loading {
   min-height: 100dvh;
   display: grid;
-  grid-template-rows: 54px 1fr;
+  grid-template-rows: auto 48px 1fr;
 }
 
 .review-loading > section { display: grid; place-content: center; justify-items: center; text-align: center; }
@@ -267,13 +288,14 @@
 
 @media (max-width: 900px) {
   .review-titlebar {
-    padding: 9px 12px;
-    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 6px 12px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
-  .review-titlebar > div:first-child { grid-column: 1 / -1; }
-  .review-titlebar > div:first-child small { display: none; }
-  .review-nav { overflow-x: auto; }
+  .review-title { grid-column: 2; }
+  .review-title small { display: none; }
+  .review-nav { grid-column: 1 / -1; overflow-x: auto; }
+  .review-actions { grid-column: 3; grid-row: 1; }
   .review-nav a { padding-inline: 10px; }
 
   .review-workspace {
@@ -293,7 +315,9 @@
 @media (max-width: 560px) {
   .review-nav { gap: 2px; }
   .review-nav a { min-height: 44px; padding: 8px 6px; font-size: 12px; }
-  .review-actions summary { min-height: 44px; display: grid; place-content: center; padding: 0 8px; font-size: 12px; }
+  /* The chevron is a second grid item, so the narrow chip lays its label and
+     glyph out in one row instead of stacking them. */
+  .review-actions summary { min-height: 44px; display: grid; grid-auto-flow: column; place-content: center; align-items: center; padding: 0 8px; font-size: 12px; }
   .review-workspace { width: min(100% - 16px, 650px); }
   .review-workspace { --review-board-size: min(calc(100vw - 62px), 520px); }
   .timeline-panel .evaluation-graph svg { height: 190px; }

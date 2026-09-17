@@ -41,6 +41,11 @@ export interface PracticeTally {
   skipped: number;
   unavailable: number;
   processed: number;
+  /**
+   * Attempted positions whose answer was already on screen before the attempt
+   * started. A solve there is practice, not a first-time solve.
+   */
+  afterExposure: number;
 }
 
 interface AttemptOutcome {
@@ -99,6 +104,10 @@ export interface RetroRuntime {
   retryUnsolved: () => void;
   attempt: (uci: string) => Promise<void>;
   hiddenPly: number | null;
+  /** The answer for the position being solved was already shown in free analysis. */
+  answerExposed: boolean;
+  /** Records that the answer for this ply was available on screen. */
+  noteAnswerExposed: (ply: number) => void;
 }
 
 export function useRetrospect({
@@ -119,6 +128,8 @@ export function useRetrospect({
   const [queuePlies, setQueuePlies] = useState<number[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<Record<number, ExerciseResultKind>>({});
+  const [exposedAttempts, setExposedAttempts] = useState<Record<number, true>>({});
+  const exposedPlies = useRef<Set<number>>(new Set());
   const [lastOutcome, setLastOutcome] = useState<AttemptOutcome | null>(null);
   const [hintSquare, setHintSquare] = useState<string | null>(null);
   const engine = useRef<BrowserStockfish | null>(null);
@@ -194,8 +205,17 @@ export function useRetrospect({
     setCurrentIndex(index);
     setStatus(nextStatus);
     setHintSquare(null);
+    // Free analysis showed this position's facts earlier in the workspace; the
+    // attempt is still valid practice, but it is not a first-time solve.
+    if (exposedPlies.current.has(retrospective.faultPly)) {
+      setExposedAttempts((previous) => (previous[retrospective.faultPly] ? previous : { ...previous, [retrospective.faultPly]: true }));
+    }
     goToPly(retrospective.promptPly);
   }, [goToPly]);
+
+  const noteAnswerExposed = useCallback((ply: number) => {
+    if (ply > 0) exposedPlies.current.add(ply);
+  }, []);
 
   const advanceFrom = useCallback((fromIndex: number, recorded: Record<number, ExerciseResultKind>, plies: number[]) => {
     abort.current?.abort();
@@ -230,6 +250,7 @@ export function useRetrospect({
     setColor(nextColor);
     setQueuePlies(plies);
     setResults({});
+    setExposedAttempts({});
     setCurrentIndex(0);
     setLastOutcome(null);
     setActive(true);
@@ -267,6 +288,7 @@ export function useRetrospect({
     setColor(move.color);
     setQueuePlies([faultPly]);
     setResults({});
+    setExposedAttempts({});
     setCurrentIndex(0);
     setLastOutcome(null);
     setHintSquare(null);
@@ -443,8 +465,9 @@ export function useRetrospect({
       skipped: count("skipped"),
       unavailable: count("unavailable"),
       processed: values.length,
+      afterExposure: Object.keys(exposedAttempts).filter((ply) => results[Number(ply)] !== undefined).length,
     };
-  }, [results]);
+  }, [exposedAttempts, results]);
 
   const presentation = practicePresentation({ active, status });
   const locked = active && practiceAnswerOwed(status);
@@ -475,5 +498,7 @@ export function useRetrospect({
     retryUnsolved,
     attempt,
     hiddenPly: locked ? current?.faultPly ?? null : null,
+    answerExposed: current !== null && exposedAttempts[current.faultPly] === true,
+    noteAnswerExposed,
   };
 }

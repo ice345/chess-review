@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { practiceMoves } from "@chess-review/analysis";
-import { formatMoveNumber, type GameAnalysisV2, type MoveQuality } from "@chess-review/shared";
+import { formatMoveNotation, formatMoveNumber, type GameAnalysisV2, type MoveQuality } from "@chess-review/shared";
 import { QualityIcon } from "@chess-review/ui";
 import { useReviewStore } from "../../store/review-store";
 import { useReviewRuntime } from "../review-runtime";
-import { allKeyMomentsVisited, criticalMomentPlies, keyMomentPosition, nextCriticalPly, previousCriticalPly } from "../../lib/critical-moment-navigation";
+import { criticalMomentPlies, keyMomentPosition, nextCriticalPly, previousCriticalPly } from "../../lib/critical-moment-navigation";
+import { useReviewSession } from "../review-session-state";
 import { displayedMoveQualityLabel } from "../../lib/move-quality-label";
 import { ReviewCompletion } from "./review-completion";
 
@@ -26,36 +28,48 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
   const runtime = useReviewRuntime();
   const currentPly = useReviewStore((store) => store.currentPly);
   const branch = useReviewStore((store) => store.branch);
-  const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set());
+  const { progress, counts } = useReviewSession();
   const [finished, setFinished] = useState(false);
 
   const plies = useMemo(() => criticalMomentPlies(analysis.criticalMoments), [analysis.criticalMoments]);
   const position = keyMomentPosition(analysis.criticalMoments, currentPly);
   const previous = previousCriticalPly(analysis.criticalMoments, currentPly);
   const next = nextCriticalPly(analysis.criticalMoments, currentPly);
-  const complete = allKeyMomentsVisited(analysis.criticalMoments, visited);
+  const complete = counts.browsedEverything;
 
-  useEffect(() => {
-    if (!position) return;
-    setVisited((current) => current.has(currentPly) ? current : new Set(current).add(currentPly));
-  }, [currentPly, position]);
+  /** The same eligibility rule the practice queue uses, asked per ply. */
+  const practisable = useMemo(() => (ply: number) => {
+    const move = analysis.moves[ply - 1];
+    if (!move || !PRACTICE_QUALITIES.includes(move.quality)) return false;
+    if (!move.stockfish.bestMove) return false;
+    return practiceMoves(analysis.moves, move.color, runtime.retro.includeInaccuracies).some((candidate) => candidate.ply === ply);
+  }, [analysis, runtime.retro.includeInaccuracies]);
 
-  const solvable = useMemo(() => {
-    if (!position) return null;
-    const move = analysis.moves[currentPly - 1];
-    if (!move || !PRACTICE_QUALITIES.includes(move.quality)) return null;
-    if (!move.stockfish.bestMove) return null;
-    if (!practiceMoves(analysis.moves, move.color, runtime.retro.includeInaccuracies).some((candidate) => candidate.ply === currentPly)) return null;
-    return move;
-  }, [analysis, currentPly, position, runtime.retro.includeInaccuracies]);
+  const solvable = useMemo(() => (position ? analysis.moves[currentPly - 1] ?? null : null), [analysis, currentPly, position]);
+  const withheld = useReviewStore((store) => store.concealedPly) === currentPly && currentPly > 0;
+
+  /** Guided navigation offers a practisable moment blind instead of showing it. */
+  function goToMoment(ply: number) {
+    runtime.navigateToPly(ply);
+    if (practisable(ply)) runtime.concealAnswer(ply);
+  }
 
   if (finished) {
+    const tally = runtime.retro.tally;
     return (
       <ReviewCompletion
         analysis={analysis}
-        player={runtime.record.preferredOrientation ?? null}
+        record={runtime.record}
         gameId={runtime.gameId}
-        tally={runtime.retro.tally}
+        session={{
+          ...progress,
+          attempted: tally.processed,
+          solvedUnassisted: tally.solved,
+          hinted: tally.hinted,
+          revealed: tally.revealed,
+          skipped: tally.skipped,
+          afterExposure: tally.afterExposure,
+        }}
         onClose={() => setFinished(false)}
       />
     );
@@ -63,37 +77,75 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
 
   if (plies.length === 0) return null;
 
+  const firstMove = analysis.moves[plies[0]! - 1];
+  const atStart = currentPly === 0 && !branch;
+  const nextIsPrimary = position === null && next !== null;
+
   return (
-    <section className="key-moment-nav" aria-label="Key moments">
+    <section className="key-moment-nav" aria-label={atStart ? "Review next step" : "Key moments"}>
+      {atStart && firstMove && (
+        <p className="key-moment-lead">
+          Start with a key moment
+          <strong>{formatMoveNotation({ fenBefore: firstMove.fenBefore, color: firstMove.color, san: firstMove.san })} · {displayedMoveQualityLabel(firstMove)}</strong>
+          <Link href={`/review/${runtime.gameId}/coach?ply=${firstMove.ply}`}>Open in Study →</Link>
+        </p>
+      )}
       <div className="key-moment-row">
         <button
           type="button"
           className="key-moment-step"
           disabled={previous === null}
-          onClick={() => previous !== null && runtime.navigateToPly(previous)}
+          onClick={() => previous !== null && goToMoment(previous)}
         >
           ← Previous key moment
         </button>
         <span className="key-moment-progress" role="status">
           {position
             ? `Moment ${position.index} of ${position.total}`
-            : `${plies.length} key ${plies.length === 1 ? "moment" : "moments"} · ${visited.size} seen`}
+            : `${plies.length} key ${plies.length === 1 ? "moment" : "moments"} · ${counts.seen} seen`}
         </span>
         <button
           type="button"
-          className="key-moment-step"
+          className={nextIsPrimary ? "primary key-moment-step" : "key-moment-step"}
           disabled={next === null}
-          onClick={() => next !== null && runtime.navigateToPly(next)}
+          onClick={() => next !== null && goToMoment(next)}
         >
           Next key moment →
         </button>
+        {/* The exit lives with the progress it reports, not on a row of its own:
+            ending the review is a secondary action at every point but the end. */}
+        <div className="key-moment-finish">
+          {complete && <span role="status">You have seen every key moment.</span>}
+          <button type="button" className={complete ? "primary" : "text-button"} onClick={() => setFinished(true)}>
+            {complete ? "Finish review" : "Finish review early"}
+          </button>
+        </div>
       </div>
 
-      {solvable && !branch && (
+      {withheld ? (
+        <div className="key-moment-action">
+          <span className="key-moment-action-fact">
+            Solve this position before seeing what the engine says about it.
+          </span>
+          <button
+            type="button"
+            className="primary key-moment-retry"
+            onClick={() => {
+              runtime.pausePlayback();
+              runtime.retro.startAt(currentPly);
+            }}
+          >
+            Try it
+          </button>
+          <button type="button" className="text-button" onClick={() => runtime.clearConcealment()}>
+            Show the analysis
+          </button>
+        </div>
+      ) : solvable && !branch && practisable(solvable.ply) && (
         <div className="key-moment-action">
           <span className="key-moment-action-fact">
             <QualityIcon classification={solvable.classification} size={20} />
-            {formatMoveNumber(solvable.fenBefore, solvable.color)} {solvable.san} · {displayedMoveQualityLabel(solvable)} · try it before the answer
+            {formatMoveNumber(solvable.fenBefore, solvable.color)} {solvable.san} · {displayedMoveQualityLabel(solvable)} · try it again without the answer
           </span>
           <button
             type="button"
@@ -108,12 +160,6 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
         </div>
       )}
 
-      <div className="key-moment-finish">
-        {complete && <span role="status">You have seen every key moment.</span>}
-        <button type="button" className={complete ? "primary" : "text-button"} onClick={() => setFinished(true)}>
-          {complete ? "Finish review" : "Finish review early"}
-        </button>
-      </div>
     </section>
   );
 }

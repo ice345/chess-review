@@ -19,7 +19,7 @@
 }
 
 .coach-teaching-sequence > section > span {
-  color: var(--ink-faint);
+  color: var(--ink-muted);
   font: italic 400 11px Georgia, "Songti SC", serif;
 }
 

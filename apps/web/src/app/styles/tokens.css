@@ -19,10 +19,14 @@
   --wash-sage: #e8eee4;
   --wash-cream: #f3ecdf;
 
-  /* Ink */
+  /* Ink. Contrast is a contract, not a preference: functional text must clear
+     4.5:1 against every surface below, and `ink-faint` may decorate but never
+     carry words a visitor needs. Measured pairs are asserted by
+     `src/lib/contrast.test.ts`. */
   --ink-primary: #2d4654;
-  --ink-secondary: #566e78;
-  --ink-muted: #5f747d;
+  --ink-secondary: #546a73;
+  --ink-muted: #566b74;
+  /* Decorative only: rules, separators, 2.7–3.3:1 against the surfaces. */
   --ink-faint: #829096;
 
   /* Rules */
@@ -31,10 +35,10 @@
   --line-accent: #b4c6c5;
 
   /* Actions */
-  --accent-primary: #587493;
+  --accent-primary: #54708f;
   --accent-hover: #496783;
   --accent-ink: #fffef9;
-  --focus-ring: #587493;
+  --focus-ring: #54708f;
 
   /* Board */
   --board-square-light: #eee8d9;
@@ -84,5 +88,13 @@
   --type-caption: 11px;
   --type-body: 14px;
   --type-heading: 27px;
+
+  /* Reading rhythm. Ratio-based scale for sections, blocks and rows, plus a
+     measure for prose. New stylesheets use these names; older ones keep their
+     literal values until they are touched. */
+  --space-section: 14px;
+  --space-block: 8px;
+  --space-row: 6px;
+  --measure-prose: 62ch;
   font-family: var(--font-sans);
 }

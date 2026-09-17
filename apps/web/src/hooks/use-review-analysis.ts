@@ -7,6 +7,13 @@ import type { GameAnalysisV2, GameDivision, OpeningInfo, StockfishMoveAnalysis }
 import {
   BrowserStockfish,
   BrowserStockfishPool,
+  createEngineDiagnostics,
+  defaultSearcherFactory,
+  reviewWorkerBudget,
+  summarizeEngineDiagnostics,
+  type EngineDiagnostics,
+  type EngineDiagnosticsSnapshot,
+  type EngineDiagnosticsSummary,
   type GameReviewProgress,
 } from "@chess-review/stockfish";
 import type { ReviewRunState } from "../components/review-runtime";
@@ -16,7 +23,7 @@ import type { AppSettings } from "../lib/app-settings";
 import { selectedBranchMoves } from "../lib/analysis-branch";
 import { analyzeObjectiveGame } from "../lib/objective-game-analysis";
 import { markSyncedGameAnalyzed } from "../lib/platform-library";
-import { withReviewRun } from "../lib/review-runs";
+import { listReviewRuns, recordReviewRunDiagnostics, withReviewRun } from "../lib/review-runs";
 import { getReviewRecord } from "../lib/review-library";
 import { useReviewStore } from "../store/review-store";
 
@@ -68,11 +75,20 @@ export function useReviewAnalysis({
   const engineResult = engineOutput?.fen === positionFen ? engineOutput.result : null;
   const continuationResult = continuationOutput?.fen === positionFen ? continuationOutput.result : null;
 
+  // The last run's own evidence: kept for this session from the run's recorder, and
+  // written into the run record so a reload (or a closed tab) still has it.
+  const [runDiagnostics, setRunDiagnostics] = useState<EngineDiagnosticsSnapshot | null>(null);
+  const [runDiagnosticsSummary, setRunDiagnosticsSummary] = useState<EngineDiagnosticsSummary | null>(null);
+  const runDiagnosticsRecorder = useRef<EngineDiagnostics | null>(null);
+
   const runFullGame = useCallback(async (
     game: NormalizedGame,
     division: GameDivision,
     opening: OpeningInfo | null,
     depth: number,
+    // The visitor asking again means asking the engine again: an explicit
+    // "Re-analyze" must not answer from the cache it was supposed to replace.
+    options: { refresh?: boolean } = {},
   ) => {
     if (reviewAbort.current) return;
     const cacheOptions = { depth, multiPv: CLASSIFICATION_MULTI_PV };
@@ -92,7 +108,7 @@ export function useReviewAnalysis({
             { algorithmVersion: analysis.algorithmVersion, depth: analysis.engine.depth },
           );
         };
-        const cached = await getCachedAnalysis(game, cacheOptions);
+        const cached = options.refresh ? null : await getCachedAnalysis(game, cacheOptions);
         signal.throwIfAborted();
         if (cached) {
           useReviewStore.getState().setAnalysis(cached);
@@ -103,7 +119,9 @@ export function useReviewAnalysis({
         useReviewStore.getState().setAnalysis(null);
         // The pool sizes itself from the visitor's device; the shared scheduler
         // still caps concurrent analysis jobs and prioritizes current-board work.
-        const pool = new BrowserStockfishPool();
+        const diagnostics = createEngineDiagnostics();
+        runDiagnosticsRecorder.current = diagnostics;
+        const pool = new BrowserStockfishPool(reviewWorkerBudget(), defaultSearcherFactory, diagnostics);
         reviewPool.current = pool;
         const analysis = await analysisScheduler.run(
           "background-game",
@@ -112,6 +130,7 @@ export function useReviewAnalysis({
             division,
             opening,
             signal,
+            diagnostics,
             onProgress: (progress) => { setReviewProgress(progress); report(progress); },
           }),
           signal,
@@ -120,7 +139,7 @@ export function useReviewAnalysis({
         await markCurrent(analysis);
         signal.throwIfAborted();
         useReviewStore.getState().setAnalysis(analysis);
-      }, controller.signal);
+      }, controller.signal, () => runDiagnosticsRecorder.current?.snapshot());
       setReviewState((state) => state === "cached" ? "cached" : "complete");
     } catch (error) {
       if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
@@ -133,7 +152,43 @@ export function useReviewAnalysis({
       reviewPool.current?.terminate();
       reviewPool.current = null;
       reviewAbort.current = null;
+      // The evidence outlives the run, whichever way it ended.
+      const snapshot = runDiagnosticsRecorder.current?.snapshot() ?? null;
+      runDiagnosticsRecorder.current = null;
+      // A pass that never started an engine has nothing to report.
+      if (snapshot && snapshot.events.length > 0) {
+        setRunDiagnostics(snapshot);
+        setRunDiagnosticsSummary(summarizeEngineDiagnostics(snapshot));
+        // The run store is keyed by the review id, which is the route's gameId.
+        void recordReviewRunDiagnostics(gameId, snapshot).catch(() => undefined);
+      }
     }
+  }, [gameId]);
+
+  // While a run is in flight its evidence is readable too: a stalled run is exactly
+  // the case this exists for, and it never reaches the settle-time write.
+  useEffect(() => {
+    if (reviewState !== "running") return;
+    const timer = window.setInterval(() => {
+      const snapshot = runDiagnosticsRecorder.current?.snapshot();
+      if (!snapshot || snapshot.events.length === 0) return;
+      setRunDiagnostics(snapshot);
+      setRunDiagnosticsSummary(summarizeEngineDiagnostics(snapshot));
+    }, 2_000);
+    return () => window.clearInterval(timer);
+  }, [reviewState]);
+
+  // The evidence a previous session left behind, so a run that never reported back
+  // is still readable.
+  useEffect(() => {
+    let active = true;
+    void listReviewRuns().then((runs) => {
+      if (!active) return;
+      const persisted = runs.find((run) => run.reviewId === gameId)?.diagnostics ?? null;
+      setRunDiagnostics(persisted);
+      setRunDiagnosticsSummary(persisted ? summarizeEngineDiagnostics(persisted) : null);
+    }).catch(() => undefined);
+    return () => { active = false; };
   }, [gameId]);
 
   useEffect(() => {
@@ -166,7 +221,7 @@ export function useReviewAnalysis({
   const analyzeFullGame = useCallback(async () => {
     const review = useReviewStore.getState();
     if (!review.game || !review.division) return;
-    await runFullGame(review.game, review.division, review.opening, reviewDepth);
+    await runFullGame(review.game, review.division, review.opening, reviewDepth, { refresh: true });
   }, [reviewDepth, runFullGame]);
 
   const cancelFullGame = useCallback(() => {
@@ -269,6 +324,8 @@ export function useReviewAnalysis({
     setReviewState,
     reviewError,
     reviewProgress,
+    runDiagnostics,
+    runDiagnosticsSummary,
     engineResult,
     engineState,
     engineError,

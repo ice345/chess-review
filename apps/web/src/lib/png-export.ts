@@ -417,7 +417,7 @@ export async function renderGameReviewCard(analysis: AnyGameAnalysis): Promise<B
   }
   context.fillStyle = "#71848d";
   context.font = "500 12px system-ui";
-  context.fillText(`${analysis.moves.length} plies · ${analysis.criticalMoments.length} critical moments · ${analysis.algorithmVersion}`, 70, 635);
+  context.fillText(`${analysis.moves.length} plies · ${analysis.criticalMoments.length} key moments · ${analysis.algorithmVersion}`, 70, 635);
   return toBlob(element);
 }
 

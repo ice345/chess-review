@@ -10,7 +10,7 @@ import type {
   MaiaPositionAnalysis,
   StockfishMoveAnalysis,
 } from "@chess-review/shared";
-import type { GameReviewProgress } from "@chess-review/stockfish";
+import type { EngineDiagnosticsSnapshot, EngineDiagnosticsSummary, GameReviewProgress } from "@chess-review/stockfish";
 import type { ReviewRecord } from "../lib/review-library";
 import type { LocalAiHealth, MaiaModelState } from "../lib/local-ai";
 import type { CoachRequestProvider } from "../lib/local-ai";
@@ -34,6 +34,9 @@ export interface ReviewRuntimeValue {
   reviewState: ReviewRunState;
   reviewError: string | null;
   reviewProgress: GameReviewProgress | null;
+  /** What the last whole-game run's engine actually did, with the persisted timeline. */
+  runDiagnostics: EngineDiagnosticsSnapshot | null;
+  runDiagnosticsSummary: EngineDiagnosticsSummary | null;
   reviewDepth: 10 | 12 | 15;
   setReviewDepth: Dispatch<SetStateAction<10 | 12 | 15>>;
   reviewMultiPv: 1 | 2 | 3 | 4 | 5;
@@ -78,6 +81,11 @@ export interface ReviewRuntimeValue {
   generateGameCoach: () => Promise<void>;
   retryBranchMoveQuality: () => void;
   navigateToPly: (ply: number) => void;
+  /** The board's own move path, so typed input cannot take a different route. */
+  playMove: (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
+  /** Offer this practisable moment blind: its analysis stays hidden until revealed or attempted. */
+  concealAnswer: (ply: number) => void;
+  clearConcealment: () => void;
   pausePlayback: () => void;
   /** In-place mistake practice session (Lichess-style "Learn from your mistakes"). */
   retro: RetroRuntime;

@@ -117,7 +117,7 @@ export function AnalysisLensPanel({ objective }: { objective: StockfishMoveAnaly
           {/* Practice hides the position's evidence, and Maia's ranked candidates
               are evidence about the position the visitor is being asked to solve.
               They also play on click, so they must not be reachable mid-answer. */}
-          {runtime.retro.locked && <p className="utility-empty" role="status">Human-model candidates are hidden while you solve this position.</p>}
+          {runtime.retro.locked && <p className="utility-note" role="status">Human-model candidates are hidden while you solve this position.</p>}
 
           {result && !runtime.retro.locked && (
             <>

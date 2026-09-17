@@ -86,7 +86,7 @@ export function TablebasePanel({ fen }: { fen: string }) {
         Sends this position to the public Syzygy tablebase through this site&rsquo;s server. Only the position leaves this
         machine; the answer is cached in this browser.
       </small>
-      {state.status === "loading" && <p className="utility-empty" role="status">Looking up the tables…</p>}
+      {state.status === "loading" && <p className="utility-note" role="status">Looking up the tables…</p>}
       {state.status === "error" && <p className="error" role="alert">{state.message}</p>}
       {playError && <p className="error" role="alert">{playError}</p>}
       {state.status === "ready" && <TablebaseResultView result={state.result} onPlay={playMove} />}

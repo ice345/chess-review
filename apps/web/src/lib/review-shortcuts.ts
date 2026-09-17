@@ -15,6 +15,7 @@ export type ReviewShortcutAction =
   | "leaveVariation"
   | "flipBoard"
   | "toggleFocus"
+  | "toggleMoveEntry"
   | "toggleHelp";
 
 export type ReviewShortcutGroup = "Navigation" | "Board" | "Help";
@@ -36,6 +37,7 @@ export const REVIEW_SHORTCUTS: readonly ReviewShortcut[] = [
   { action: "leaveVariation", keys: ["Escape"], label: "Leave a variation, or exit focus board", group: "Navigation" },
   { action: "flipBoard", keys: ["f"], label: "Flip board", group: "Board" },
   { action: "toggleFocus", keys: ["z"], label: "Focus board, or leave focus", group: "Board" },
+  { action: "toggleMoveEntry", keys: ["/"], label: "Type a move", group: "Board" },
   { action: "toggleHelp", keys: ["?"], label: "Show this shortcut list", group: "Help" },
 ];
 

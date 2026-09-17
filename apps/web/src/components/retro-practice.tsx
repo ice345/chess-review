@@ -6,9 +6,16 @@ import type { GameAnalysisV2, PlayerColor } from "@chess-review/shared";
 import type { RetroRuntime } from "../hooks/use-retrospect";
 import { useReviewStore } from "../store/review-store";
 import { useReviewRuntime } from "./review-runtime";
+import { learnerColorForRecord } from "../lib/player-identity";
 
 function sideName(color: PlayerColor): string {
   return color === "white" ? "White" : "Black";
+}
+
+/** The side that actually has positions to practise; White when both or neither do. */
+function sideWithPractice(analysis: GameAnalysisV2): PlayerColor {
+  const count = (color: PlayerColor) => practiceQueue(analysis.moves, color, false).eligible.length;
+  return count("black") > count("white") ? "black" : "white";
 }
 
 export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
@@ -16,17 +23,15 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   const retro = runtime.retro;
   const currentPly = useReviewStore((store) => store.currentPly);
   const branch = useReviewStore((store) => store.branch);
-  const knownColor = runtime.record.preferredOrientation;
-  const [color, setColor] = useState<PlayerColor>(knownColor ?? "white");
+  // Orientation is not identity: a manual import has no learner, so the side is
+  // the visitor's choice and the default is the side with something to practise.
+  const knownColor = learnerColorForRecord(runtime.record);
+  const [color, setColor] = useState<PlayerColor>(() => knownColor ?? sideWithPractice(analysis));
 
   const queue = useMemo(
     () => practiceQueue(analysis.moves, color, retro.includeInaccuracies),
     [analysis, color, retro.includeInaccuracies],
   );
-  const whiteName = analysis.game.headers.White ?? "White";
-  const blackName = analysis.game.headers.Black ?? "Black";
-  const playerName = color === "white" ? whiteName : blackName;
-
   const offTrack = Boolean(
     retro.active
     && retro.locked
@@ -45,31 +50,33 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
 
   if (!retro.active) {
     const count = queue.eligible.length;
+    const sideChooser = (
+      <div className="practice-setup" role="group" aria-label="Which side to practise">
+        <button type="button" className={color === "white" ? "secondary active" : "secondary"} onClick={() => setColor("white")}>White</button>
+        <button type="button" className={color === "black" ? "secondary active" : "secondary"} onClick={() => setColor("black")}>Black</button>
+      </div>
+    );
     return <section className="retro-practice retro-idle" aria-label="Learn from your mistakes">
       <div className="retro-idle-row">
-        <span className="retro-idle-who">{playerName} · {count === 1 ? "1 position" : `${count} positions`}</span>
-        {(!knownColor || count === 0) && (
-          <div className="practice-setup" role="group" aria-label="Which side to practise">
-            <button type="button" className={color === "white" ? "secondary active" : "secondary"} onClick={() => setColor("white")}>White</button>
-            <button type="button" className={color === "black" ? "secondary active" : "secondary"} onClick={() => setColor("black")}>Black</button>
-          </div>
-        )}
-        <details className="practice-filters">
-          <summary>Filters</summary>
-          <label className="practice-inline-check">
-            <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
-            Include inaccuracies
-          </label>
-        </details>
-        {/* Nothing to practise is a state, not a disabled button: the explanation
-            takes the row's place instead of leaving a dead primary action far right. */}
-        {count > 0 && (
-          <button type="button" className="primary" onClick={() => begin(color)}>
-            Review {sideName(color)}&apos;s {count} {count === 1 ? "position" : "positions"}
+        {count > 0 ? (
+          <button type="button" className="text-button retro-idle-start" onClick={() => begin(color)}>
+            Practice {sideName(color)}&apos;s {count} {count === 1 ? "position" : "positions"}
           </button>
+        ) : (
+          <p className="utility-note">{emptyCopy(queue, color)}</p>
         )}
+        {count === 0 && sideChooser}
+        <details className="practice-options">
+          <summary>Options</summary>
+          <div className="practice-options-menu">
+            {!knownColor && count > 0 && sideChooser}
+            <label className="practice-inline-check">
+              <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
+              Include inaccuracies
+            </label>
+          </div>
+        </details>
       </div>
-      {count === 0 && <p className="utility-empty">{emptyCopy(queue, color)}</p>}
     </section>;
   }
 
@@ -81,9 +88,12 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   return <section className="retro-practice" aria-label="Learn from your mistakes" data-status={retro.status}>
     <header className="retro-head">
       <strong>Learn from your mistakes</strong>
+      {retro.answerExposed && <span className="retro-exposure" role="status">Review practice</span>}
       <span>{position} / {total}</span>
       <button type="button" className="text-button retro-close" onClick={() => retro.stop()}>Exit</button>
     </header>
+
+    {retro.answerExposed && <p className="retro-lead retro-exposure-note">You have already seen this position&rsquo;s analysis. Solving it here is practice, not a first-time find.</p>}
 
     {retro.status === "complete" && <CompletePanel retro={retro} side={side} />}
 
