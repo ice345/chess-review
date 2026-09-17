@@ -48,8 +48,97 @@ export interface ExplorerPositionV1 {
   opening?: { eco: string; name: string };
 }
 
-export function explorerCacheKey(fen: string, source: ExplorerSource): string {
-  return `${source}\u0000${fen}`;
+/** Rating floors the players database can be restricted to. */
+export const EXPLORER_RATING_FLOORS = [1200, 1600, 2000, 2200] as const;
+export type ExplorerRatingFloor = (typeof EXPLORER_RATING_FLOORS)[number];
+
+/** Every rating bucket the upstream players database counts. */
+export const EXPLORER_RATING_BUCKETS = [1200, 1400, 1600, 1800, 2000, 2200, 2500] as const;
+
+export const EXPLORER_SPEEDS = ["ultraBullet", "bullet", "blitz", "rapid", "classical", "correspondence"] as const;
+export type ExplorerSpeed = (typeof EXPLORER_SPEEDS)[number];
+
+/**
+ * Which games a player-database answer counts.
+ *
+ * The explorer is third-party census data, so its population is part of the claim:
+ * "blitz and rapid among 1600+" and "every speed at every rating" are different
+ * numbers about different games, and neither may be labelled as the other.
+ */
+export interface ExplorerPopulationV1 {
+  /** Lowest rating bucket included; null includes every rating. */
+  ratingFloor: ExplorerRatingFloor | null;
+  /** Speeds included; an empty list includes every speed. */
+  speeds: ExplorerSpeed[];
+}
+
+/** Club-strength blitz, rapid and classical: the population this panel starts on. */
+export const EXPLORER_DEFAULT_POPULATION: ExplorerPopulationV1 = {
+  ratingFloor: 1600,
+  speeds: ["blitz", "rapid", "classical"],
+};
+
+/** The buckets at or above the floor, which is how the upstream request counts ratings. */
+export function explorerRatingBuckets(ratingFloor: ExplorerRatingFloor | null): number[] {
+  if (ratingFloor === null) return [];
+  return EXPLORER_RATING_BUCKETS.filter((bucket) => bucket >= ratingFloor);
+}
+
+/**
+ * Order-insensitive identity for one population. Two requests that describe the
+ * same games must not occupy two cache entries, and two different populations must
+ * never share one.
+ */
+export function explorerPopulationKey(population: ExplorerPopulationV1): string {
+  const rating = population.ratingFloor === null ? "all-ratings" : `${population.ratingFloor}+`;
+  const speeds = [...population.speeds].sort();
+  return `${rating}|${speeds.length === 0 ? "all-speeds" : speeds.join(",")}`;
+}
+
+/** How the numbers name their own population, e.g. "rated 1600+ · blitz, rapid, classical". */
+export function explorerPopulationLabel(population: ExplorerPopulationV1): string {
+  const rating = population.ratingFloor === null ? "all ratings" : `rated ${population.ratingFloor}+`;
+  const speeds = population.speeds.length === 0 ? "all speeds" : population.speeds.join(", ");
+  return `${rating} · ${speeds}`;
+}
+
+/** Query values for one population, so the client and the route agree on the encoding. */
+export function explorerPopulationQuery(population: ExplorerPopulationV1): { rating: string; speeds: string } {
+  return {
+    rating: population.ratingFloor === null ? "all" : String(population.ratingFloor),
+    speeds: population.speeds.length === 0 ? "all" : population.speeds.join(","),
+  };
+}
+
+/**
+ * Reads a population from query values. Returns null when a value is not part of the
+ * contract, so the caller rejects the request instead of silently answering about a
+ * population nobody asked for.
+ */
+export function parseExplorerPopulation(rating: string | null, speeds: string | null): ExplorerPopulationV1 | null {
+  let ratingFloor: ExplorerRatingFloor | null = null;
+  if (rating !== null && rating !== "all" && rating !== "") {
+    const value = Number(rating);
+    if (!(EXPLORER_RATING_FLOORS as readonly number[]).includes(value)) return null;
+    ratingFloor = value as ExplorerRatingFloor;
+  }
+  let parsedSpeeds: ExplorerSpeed[] = [];
+  if (speeds !== null && speeds !== "all" && speeds !== "") {
+    const requested = speeds.split(",").map((value) => value.trim()).filter((value) => value !== "");
+    if (requested.length === 0) return null;
+    const unique = new Set<string>();
+    for (const value of requested) {
+      if (!(EXPLORER_SPEEDS as readonly string[]).includes(value)) return null;
+      unique.add(value);
+    }
+    parsedSpeeds = [...unique] as ExplorerSpeed[];
+  }
+  return { ratingFloor, speeds: parsedSpeeds };
+}
+
+/** Cache identity: database, population and position. Never one of the three alone. */
+export function explorerCacheKey(fen: string, source: ExplorerSource, population: ExplorerPopulationV1 = EXPLORER_DEFAULT_POPULATION): string {
+  return `${source}\u0000${explorerPopulationKey(population)}\u0000${fen}`;
 }
 
 /** Position identity (EPD): move counters and halfmove clocks cannot change what is played. */

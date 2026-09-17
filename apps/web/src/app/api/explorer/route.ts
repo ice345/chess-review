@@ -1,6 +1,13 @@
 import { fenToEpd, normalizeFen } from "@chess-review/chess-core";
-import { EXPLORER_SOURCES, normalizeExplorerPosition, type ExplorerSource } from "@chess-review/openings";
+import {
+  EXPLORER_SOURCES,
+  normalizeExplorerPosition,
+  parseExplorerPopulation,
+  type ExplorerPopulationV1,
+  type ExplorerSource,
+} from "@chess-review/openings";
 import { platformRequest } from "../../../lib/server/platform-request";
+import { explorerRequestHeaders, explorerUpstreamUrl } from "../../../lib/server/explorer-upstream";
 import { fetchProvider, readProviderJson } from "../../../lib/server/platform-response";
 
 /*
@@ -12,12 +19,11 @@ import { fetchProvider, readProviderJson } from "../../../lib/server/platform-re
  * lichess.org through this site's server"), gives the deployment a rate limit it
  * controls, and lets the response be validated before any of it reaches the UI.
  *
- * Only the position identity (EPD) and the source are forwarded. No game, PGN,
- * account or identifier from the local library is part of the request.
+ * Only the position identity (EPD), the source and the population that was asked for
+ * are forwarded. No game, PGN, account or identifier from the local library is part
+ * of the request. The upstream token (`LICHESS_EXPLORER_TOKEN`) stays on the server.
  */
 
-const HEADERS = { Accept: "application/json", "User-Agent": "OpenChessReview/0.1 https://github.com/ice345/chess-review" };
-const EXPLORER_ORIGIN = "https://explorer.lichess.ovh";
 /** Public explorer databases are bounded; a huge position would answer with an error anyway. */
 const MAX_FEN_LENGTH = 128;
 
@@ -38,33 +44,34 @@ function positionFen(value: string | null): string {
   }
 }
 
-function upstreamUrl(source: ExplorerSource, epd: string): string {
-  const query = new URLSearchParams({ variant: "standard", fen: epd, moves: "12", topGames: "0" });
-  if (source === "masters") {
-    query.set("speeds", "blitz,rapid,classical");
-    return `${EXPLORER_ORIGIN}/masters?${query.toString()}`;
-  }
-  // Human games at club strength and above: the explorer is a study tool here,
-  // not a popularity poll of every casual blitz game.
-  query.set("speeds", "blitz,rapid,classical");
-  query.set("ratings", "1600,1800,2000,2200,2500");
-  query.set("recentGames", "0");
-  return `${EXPLORER_ORIGIN}/lichess?${query.toString()}`;
-}
-
 export async function GET(request: Request) {
   return platformRequest(request, async (request, signal) => {
     let epd: string;
     let selected: ExplorerSource;
+    let population: ExplorerPopulationV1;
     try {
       const url = new URL(request.url);
       selected = source(url.searchParams.get("source"));
       epd = positionFen(url.searchParams.get("fen"));
+      const parsed = parseExplorerPopulation(url.searchParams.get("rating"), url.searchParams.get("speeds"));
+      if (!parsed) throw new ExplorerInputError("That explorer population is not one this site supports.");
+      population = parsed;
     } catch (error) {
       if (error instanceof ExplorerInputError) return Response.json({ error: error.message }, { status: 400 });
       throw error;
     }
-    const response = await fetchProvider(upstreamUrl(selected, epd), { headers: HEADERS, cache: "no-store", signal, redirect: "error" });
+    // The explorer has required authentication since 2026-03-03. Without a token the
+    // request would answer 401, which reads to the visitor as a broken site: say what
+    // is actually missing, and keep the state distinguishable from a rate limit or an
+    // outage so the panel can offer the right thing.
+    const token = process.env.LICHESS_EXPLORER_TOKEN?.trim();
+    if (!token) {
+      return Response.json(
+        { error: "The opening explorer needs a Lichess API token on this deployment.", unconfigured: true },
+        { status: 503 },
+      );
+    }
+    const response = await fetchProvider(explorerUpstreamUrl(selected, epd, population), { headers: explorerRequestHeaders(token), cache: "no-store", signal, redirect: "error" });
     if (response.status === 429) return Response.json({ error: "The opening explorer is rate limiting requests. Try again shortly." }, { status: 429, headers: { "Retry-After": response.headers.get("Retry-After") ?? "60" } });
     // 404 is how the explorer reports a position with no games at all.
     if (response.status === 404) {
