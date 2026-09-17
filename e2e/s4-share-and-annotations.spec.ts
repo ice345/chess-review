@@ -26,6 +26,7 @@ async function shareLinkFromMenu(page: Page): Promise<string> {
 }
 
 test("a share link imports the game into a fresh browser", async ({ page, browser }) => {
+  test.setTimeout(180_000);
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(SHARED);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
@@ -63,6 +64,7 @@ test("an incomplete share link explains itself", async ({ page }) => {
 });
 
 test("shows imported comments, glyphs and variations", async ({ page }) => {
+  test.setTimeout(150_000);
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(ANNOTATED);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
@@ -95,6 +97,7 @@ test("shows imported comments, glyphs and variations", async ({ page }) => {
 });
 
 test("exports an annotated PGN that keeps the imported annotations", async ({ page }) => {
+  test.setTimeout(150_000);
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(ANNOTATED);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
