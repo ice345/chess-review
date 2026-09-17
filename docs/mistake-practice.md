@@ -15,12 +15,23 @@ between sessions.
 
 ## Flow
 
-1. The launcher is one Review strip: player · N positions, then **Review White's
-   N positions**. Account colour is the default when the game is linked.
-   White/Black is asked when the game has no account identity, **or** when the
-   current side has nothing to practise (so “try the other side” is not a dead
-   end). Inaccuracies stay under Filters. Empty copy comes from the selector
-   (`opening-theory` vs `missing-engine-evidence` vs no faults).
+1. The launcher is a stable **Practice setup** stack in the Review panel, not a
+   button that only appears when something is wrong. Both sides are always shown
+   with their counts — 0 is ordinary — the selected side carries a quiet wash, and
+   an empty side stays selectable but muted, because “the other side has nothing
+   to practise” is information rather than a dead end. **Include inaccuracies** is
+   a filter inside the setup. Choosing a side never starts practice; one secondary
+   action starts the selected side, which keeps the guided key-moment step the only
+   primary action on the start screen. Account colour is the default when the game
+   is linked. Empty copy comes from the selector (`opening-theory` vs
+   `missing-engine-evidence` vs no faults), which is also why a side can
+   legitimately read 0 positions.
+
+   The selection is workspace state: it survives leaving the panel (Review, Moves,
+   Study) and is still selected when the visitor returns from a session, and it is
+   never written to the review record, the library or a backup. A reload, or a
+   newly loaded PGN/FEN, starts from the account colour again — White when the game
+   has no account identity — because that is a new workspace.
 2. Starting practice switches the sidebar to the exercise. Engine arrows, eval
    numbers, the previous-move verdict, game summary and coach answers hide. A
    red arrow marks the original mistake only while the board is still on the
@@ -147,11 +158,14 @@ never contradict the engine.
 
 ## Deliberate limits
 
-Finite-depth engine judgement, not proof of a unique solution. No durable attempt
-history, Elo, mastery or spaced repetition is claimed. Existing Training's **Mark
-position reviewed** remains a separate action. Original Accuracy, quality and
-annotations, Great/Brilliant, game phase and the analysis algorithm version are
-unchanged by practising.
+Finite-depth engine judgement, not proof of a unique solution. Practice itself claims
+no durable attempt history, Elo, mastery or spaced repetition: a session result is not
+recorded as a Training review and does not touch the Training mastery ladder, which
+has its own outcomes and due dates (see
+[Player intelligence and training](advanced-study.md#reviewed-is-not-mastered)).
+Training's own **Mark position reviewed** / **I knew this move** / **I guessed**
+actions remain separate. Original Accuracy, quality and annotations, Great/Brilliant,
+game phase and the analysis algorithm version are unchanged by practising.
 
 Next: durable attempt records with backup/delete compatibility, then a training
 queue that schedules real attempts separately from source-position reviews.

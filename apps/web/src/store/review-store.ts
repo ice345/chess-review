@@ -17,6 +17,7 @@ import type {
   HumanAnalysis,
   MaiaModel,
   OpeningInfo,
+  PlayerColor,
 } from "@chess-review/shared";
 import {
   appendBranchLine,
@@ -44,6 +45,17 @@ interface ReviewState {
    */
   concealedPly: number | null;
   orientation: "white" | "black";
+  /**
+   * The side Practice will run, for as long as this review is loaded. It is the
+   * visitor's choice, not the board orientation and not the learner identity:
+   * null means "nothing chosen yet", so the Practice setup falls back to the
+   * learner's colour and then to the side with more to practise.
+   *
+   * Loading another game clears it, which is why it lives beside the loaded
+   * review rather than in the panel: switching review sections unmounts the
+   * Practice panel, and the choice must survive that.
+   */
+  practiceColor: PlayerColor | null;
   branch: AnalysisBranchTree | null;
   error: string | null;
   loadPgn: (pgn: string) => void;
@@ -53,6 +65,7 @@ interface ReviewState {
   clearConcealment: () => void;
   setAnalysis: (analysis: GameAnalysisV2 | null) => void;
   setOrientation: (orientation: "white" | "black") => void;
+  setPracticeColor: (color: PlayerColor) => void;
   startEngineLine: (rank: number, moves: ReplayedUciMove[]) => void;
   playAnalysisMove: (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
   playHumanCandidate: (uci: string, targetElo: number, probability: number) => boolean;
@@ -77,6 +90,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   positionFen: initialFen,
   concealedPly: null,
   orientation: "white",
+  practiceColor: null,
   branch: null,
   error: null,
   loadPgn: (pgn) => {
@@ -84,7 +98,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       const game = parsePgn(pgn);
       const division = divideGame(game);
       const opening = recognizeOpening(game) ?? null;
-      set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, branch: null, error: null, concealedPly: null });
+      set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, branch: null, error: null, concealedPly: null, practiceColor: null });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "PGN 解析失败。" });
     }
@@ -100,6 +114,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         positionFen: normalizeFen(fen),
         branch: null,
         error: null,
+        practiceColor: null,
       });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "FEN 无效。" });
@@ -118,6 +133,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   clearConcealment: () => set({ concealedPly: null }),
   setAnalysis: (analysis) => set({ analysis }),
   setOrientation: (orientation) => set({ orientation }),
+  setPracticeColor: (practiceColor) => set({ practiceColor }),
   startEngineLine: (rank, moves) => {
     if (moves.length === 0) return;
     const current = get();

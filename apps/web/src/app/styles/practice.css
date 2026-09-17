@@ -29,66 +29,72 @@
 .retro-exposure-note { color: var(--ink-muted); font-size: 12px; }
 .retro-close { min-width: 44px; min-height: 44px; }
 
+/* Idle setup: a quiet stack, not a card. The selected side is a hairline and a
+   slight wash; the start action sizes to its copy so it cannot out-width the
+   guided CTA on the start screen. */
 .retro-idle {
   padding: 2px 0 10px;
   margin-bottom: 8px;
+  justify-items: start;
+  gap: 8px;
 }
-.retro-idle-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-}
-.retro-idle-row > .utility-note { flex: 1 1 160px; }
-.retro-idle-start {
-  min-height: 44px;
-  padding: 0;
+.practice-heading {
+  margin: 0;
+  color: var(--ink-secondary);
   font-size: 13px;
+  font-weight: 650;
 }
-
-.practice-setup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.practice-setup button { min-height: 36px; min-width: 44px; padding: 0 10px; }
-.practice-setup button.active { outline: 2px solid var(--ink-secondary); }
-.practice-options { position: relative; font-size: 13px; color: var(--ink-secondary); }
-.practice-options > summary {
-  min-height: 44px;
-  padding: 0 8px;
+.practice-setup {
   display: flex;
-  align-items: center;
-  color: var(--ink-muted);
-  cursor: pointer;
-  list-style: none;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
 }
-.practice-options > summary::-webkit-details-marker { display: none; }
-/* Same chevron as the titlebar popovers: the trigger opens a panel, and the
-   glyph turns while it is open. */
-.practice-options > summary::after {
-  content: "⌄";
-  display: inline-block;
-  margin-left: 5px;
+.practice-side {
+  min-height: 44px;
+  min-width: 72px;
+  padding: 4px 12px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 1px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.practice-side small {
   color: var(--ink-muted);
   font-size: 11px;
-  line-height: 1;
-  transition: transform .16s ease;
+  font-weight: 500;
 }
-.practice-options[open] > summary::after { transform: rotate(180deg); }
-.practice-options[open] > summary { color: var(--ink-primary); }
-.practice-options-menu {
-  position: absolute;
-  z-index: 24;
-  right: 0;
-  top: calc(100% - 4px);
-  min-width: 220px;
-  padding: 8px 10px;
-  display: grid;
+.practice-side[aria-pressed="true"] {
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--wash-blue) 50%, transparent);
+  color: var(--ink-primary);
+}
+.practice-side[data-empty="true"] {
+  color: var(--ink-muted);
+}
+.retro-idle-start {
+  min-height: 44px;
+  width: auto;
+  justify-self: start;
+  padding: 0 12px;
+  font-size: 13px;
+}
+.practice-inline-check {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-paper);
-  box-shadow: var(--shadow-floating);
-  isolation: isolate;
+  min-height: 44px;
+  justify-self: start;
 }
-.practice-inline-check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 
 
 .retro-lead { margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.4; }
@@ -123,6 +129,5 @@
 
 @media (max-width: 700px) {
   .practice-setup { gap: 10px; }
-  .retro-idle-row > .primary { margin-left: 0; flex: 1 1 100%; }
   .retro-choices button { flex: 1 1 auto; }
 }

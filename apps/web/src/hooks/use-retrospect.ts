@@ -285,6 +285,11 @@ export function useRetrospect({
     clearTimers();
     sessionId.current += 1;
     attemptId.current += 1;
+    // The fault's own colour, not the Practice setup selection. A guided moment
+    // practises that exact ply; if the visitor had White selected in the setup
+    // and this moment is Black's, the session follows Black. The setup choice
+    // is left alone and is what `retro.start` uses the next time practice is
+    // begun from the setup panel.
     setColor(move.color);
     setQueuePlies([faultPly]);
     setResults({});

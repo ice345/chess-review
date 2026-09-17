@@ -1,37 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { practiceQueue, type PracticeQueue } from "@chess-review/analysis";
 import type { GameAnalysisV2, PlayerColor } from "@chess-review/shared";
 import type { RetroRuntime } from "../hooks/use-retrospect";
 import { useReviewStore } from "../store/review-store";
 import { useReviewRuntime } from "./review-runtime";
 import { learnerColorForRecord } from "../lib/player-identity";
-
-function sideName(color: PlayerColor): string {
-  return color === "white" ? "White" : "Black";
-}
-
-/** The side that actually has positions to practise; White when both or neither do. */
-function sideWithPractice(analysis: GameAnalysisV2): PlayerColor {
-  const count = (color: PlayerColor) => practiceQueue(analysis.moves, color, false).eligible.length;
-  return count("black") > count("white") ? "black" : "white";
-}
+import { practiceEmptyCopy, practiceSetup, practiceSideName } from "../lib/practice-setup";
 
 export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   const runtime = useReviewRuntime();
   const retro = runtime.retro;
   const currentPly = useReviewStore((store) => store.currentPly);
   const branch = useReviewStore((store) => store.branch);
+  // Session-scoped to this review: the choice survives leaving and re-entering
+  // the Practice panel, and the store clears it when another game is loaded.
+  const practiceColor = useReviewStore((store) => store.practiceColor);
+  const setPracticeColor = useReviewStore((store) => store.setPracticeColor);
   // Orientation is not identity: a manual import has no learner, so the side is
   // the visitor's choice and the default is the side with something to practise.
   const knownColor = learnerColorForRecord(runtime.record);
-  const [color, setColor] = useState<PlayerColor>(() => knownColor ?? sideWithPractice(analysis));
 
-  const queue = useMemo(
-    () => practiceQueue(analysis.moves, color, retro.includeInaccuracies),
-    [analysis, color, retro.includeInaccuracies],
-  );
+  const setup = practiceSetup({ analysis, includeInaccuracies: retro.includeInaccuracies, selected: practiceColor, knownColor });
   const offTrack = Boolean(
     retro.active
     && retro.locked
@@ -49,40 +38,51 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   }
 
   if (!retro.active) {
-    const count = queue.eligible.length;
-    const sideChooser = (
+    const { startable } = setup;
+    return <section className="retro-practice retro-idle" aria-label="Practice setup">
+      <p className="practice-heading">Practice your mistakes</p>
       <div className="practice-setup" role="group" aria-label="Which side to practise">
-        <button type="button" className={color === "white" ? "secondary active" : "secondary"} onClick={() => setColor("white")}>White</button>
-        <button type="button" className={color === "black" ? "secondary active" : "secondary"} onClick={() => setColor("black")}>Black</button>
-      </div>
-    );
-    return <section className="retro-practice retro-idle" aria-label="Learn from your mistakes">
-      <div className="retro-idle-row">
-        {count > 0 ? (
-          <button type="button" className="text-button retro-idle-start" onClick={() => begin(color)}>
-            Practice {sideName(color)}&apos;s {count} {count === 1 ? "position" : "positions"}
+        {setup.sides.map((side) => (
+          <button
+            key={side.color}
+            type="button"
+            className="practice-side"
+            aria-label={`${practiceSideName(side.color)}, ${side.count} ${side.count === 1 ? "position" : "positions"}`}
+            aria-pressed={side.color === setup.selected}
+            // An empty side stays in the selector and stays selectable: its
+            // explanation is the answer to "why can I not practise this side?".
+            data-empty={side.count === 0 ? "true" : undefined}
+            onClick={() => setPracticeColor(side.color)}
+          >
+            <span>{practiceSideName(side.color)}</span>
+            <small>{side.count} {side.count === 1 ? "position" : "positions"}</small>
           </button>
-        ) : (
-          <p className="utility-note">{emptyCopy(queue, color)}</p>
-        )}
-        {count === 0 && sideChooser}
-        <details className="practice-options">
-          <summary>Options</summary>
-          <div className="practice-options-menu">
-            {!knownColor && count > 0 && sideChooser}
-            <label className="practice-inline-check">
-              <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
-              Include inaccuracies
-            </label>
-          </div>
-        </details>
+        ))}
       </div>
+      <label className="practice-inline-check">
+        <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
+        Include inaccuracies
+      </label>
+      {/* Secondary by contract: at the start ply the guided route owns the one
+          primary action, and practice is the second layer of that screen. */}
+      {startable.count > 0 ? (
+        <button type="button" className="secondary retro-idle-start" onClick={() => begin(startable.color)}>
+          Practice {practiceSideName(startable.color)}&apos;s {startable.count} {startable.count === 1 ? "position" : "positions"}
+        </button>
+      ) : (
+        <p className="utility-note">{practiceEmptyCopy(startable)}</p>
+      )}
     </section>;
   }
 
   const total = retro.totalCount;
   const position = Math.min(retro.currentIndex + 1, Math.max(total, 1));
-  const side = sideName(retro.color);
+  // The running session's own colour, which the guided-moment entry
+  // (`retro.startAt`) sets from the fault's mover. That deliberately overrides
+  // the setup selection: a key moment practises that exact fault, whichever side
+  // played it, and the setup selection is restored the next time practice starts
+  // from this panel.
+  const side = practiceSideName(retro.color);
   const last = retro.currentIndex + 1 >= total;
 
   return <section className="retro-practice" aria-label="Learn from your mistakes" data-status={retro.status}>
@@ -172,21 +172,6 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   </section>;
 }
 
-function emptyCopy(queue: PracticeQueue<GameAnalysisV2["moves"][number]>, color: PlayerColor): string {
-  const side = sideName(color);
-  if (queue.excluded.length === 0) {
-    return `No mistakes were recorded for ${side}.`;
-  }
-  const theory = queue.excluded.filter((item) => item.reason === "opening-theory").length;
-  const evidence = queue.excluded.filter((item) => item.reason === "missing-engine-evidence").length;
-  if (theory > 0 && evidence === 0) {
-    return `${theory} ${theory === 1 ? "fault" : "faults"} for ${side} stayed inside recognised opening theory, so there is nothing to practise.`;
-  }
-  if (evidence > 0 && theory === 0) {
-    return `Engine evidence is not ready for ${side}'s faults yet. Re-analyse the game, or try the other side.`;
-  }
-  return `${theory} opening-theory ${theory === 1 ? "fault" : "faults"} and ${evidence} without usable engine evidence were excluded for ${side}.`;
-}
 
 function CompletePanel({ retro, side }: { retro: RetroRuntime; side: string }) {
   const { tally } = retro;

@@ -5,11 +5,15 @@ import { goToReviewSection, mockLocalAi, seedReview, writeStores } from "./fixtu
 test.use({ serviceWorkers: "block" });
 
 function markPracticeFault(move: { fenBefore: string; stockfish: unknown; quality: string }) {
+  const black = move.fenBefore.split(" ")[1] === "b";
+  const bestMove = black ? "d7d5" : "d2d4";
+  const second = black ? "g8f6" : "g1f3";
+  const third = black ? "c7c5" : "f2f3";
   move.quality = "mistake";
-  move.stockfish = { fen: move.fenBefore, depth: 12, score: { kind: "cp", cp: 22 }, bestMove: "d2d4", lines: [
-    { rank: 1, depth: 12, score: { kind: "cp", cp: 22 }, pv: ["d2d4", "d7d5"] },
-    { rank: 2, depth: 12, score: { kind: "cp", cp: 18 }, pv: ["g1f3", "d7d5"] },
-    { rank: 3, depth: 12, score: { kind: "cp", cp: -200 }, pv: ["f2f3"] },
+  move.stockfish = { fen: move.fenBefore, depth: 12, score: { kind: "cp", cp: 22 }, bestMove, lines: [
+    { rank: 1, depth: 12, score: { kind: "cp", cp: 22 }, pv: [bestMove, black ? "d2d4" : "d7d5"] },
+    { rank: 2, depth: 12, score: { kind: "cp", cp: 18 }, pv: [second, black ? "d2d4" : "d7d5"] },
+    { rank: 3, depth: 12, score: { kind: "cp", cp: -200 }, pv: [third] },
   ] };
 }
 
@@ -20,7 +24,8 @@ async function enter(page: Page, {
   faultPly = 1,
   extraFaultPly,
   knownSide = true,
-}: { humanFacts?: boolean; start?: boolean; bookFault?: boolean; faultPly?: number; extraFaultPly?: number; knownSide?: boolean } = {}) {
+  linked = false,
+}: { humanFacts?: boolean; start?: boolean; bookFault?: boolean; faultPly?: number; extraFaultPly?: number; knownSide?: boolean; linked?: boolean } = {}) {
   await mockLocalAi(page, "offline");
   await page.route("**/api/platforms/lichess/config", (route) => route.fulfill({ json: { configured: false } }));
   await page.route("**/api/platforms/lichess/session", (route) => route.fulfill({ json: { connected: false } }));
@@ -52,7 +57,21 @@ async function enter(page: Page, {
       findDifficulty: { label: "natural", score: 12, evidence: { experimental: true, maiaProbability: 0.34, probabilityBand: "common", legalMoveCount: 20, isEngineBest: false, isForced: false, isForcing: false, isSacrifice: false, tacticalMotifCount: 0, adjustments: [] } },
     };
   }
-  await writeStores(page, { "objective-analyses": [[fixture.cacheKey, fixture.analysis]] });
+  if (linked) {
+    fixture.record.external = {
+      provider: "chesscom",
+      externalGameId: "fixture-practice",
+      accountId: "chesscom:hikaru",
+      username: "Hikaru",
+      importedAt: "2026-08-23T00:00:00.000Z",
+    };
+    await writeStores(page, {
+      "review-records": [[fixture.record.id, fixture.record]],
+      "objective-analyses": [[fixture.cacheKey, fixture.analysis]],
+    });
+  } else {
+    await writeStores(page, { "objective-analyses": [[fixture.cacheKey, fixture.analysis]] });
+  }
   await page.goto(`/review/${fixture.record.id}`);
   if (start) await startButton(page).click();
   return fixture;
@@ -60,6 +79,8 @@ async function enter(page: Page, {
 
 const panel = (page: Page) => page.locator(".retro-practice");
 const startButton = (page: Page) => page.getByRole("button", { name: /Practice (White|Black)'s \d+ positions?/ });
+const sideChooser = (page: Page) => page.getByRole("group", { name: "Which side to practise" });
+const sideButton = (page: Page, color: "White" | "Black") => sideChooser(page).getByRole("button", { name: new RegExp(`^${color},`) });
 const continueButton = (page: Page) => panel(page).getByRole("button", { name: /^(Next|View this session)$/ });
 async function play(page: Page, from: string, to: string) {
   await page.locator(`.board-wrap [data-square="${from}"]`).first().click();
@@ -237,12 +258,13 @@ test("hides Maia human candidates while an answer is owed", async ({ page }) => 
 });
 
 test("the practice panel stays inside a phone viewport", async ({ page }) => {
-  // The idle panel gained a select plus a primary button in one flex row; this
-  // guards the narrow layout the rewrite would otherwise leave uncovered.
   await page.setViewportSize({ width: 390, height: 844 });
   await enter(page, { start: false });
   const setup = page.locator(".retro-idle");
   await expect(setup).toBeVisible();
+  await expect(sideButton(page, "White")).toBeVisible();
+  await expect(sideButton(page, "Black")).toBeVisible();
+  expect(Math.round(await sideButton(page, "White").evaluate((element) => element.getBoundingClientRect().height))).toBeGreaterThanOrEqual(44);
   expect(await setup.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -263,6 +285,7 @@ test("the side selector and the theory exclusion decide what Start offers", asyn
   const empty = page.locator(".retro-practice .utility-note");
 
   // With nothing to practise the panel shows why, and offers no dead action.
+  await expect(sideChooser(page)).toBeVisible();
   await expect(start).toHaveCount(0);
   await expect(empty).toContainText("White");
   // A fault existed and was skipped as theory, so the copy must say that rather
@@ -271,7 +294,7 @@ test("the side selector and the theory exclusion decide what Start offers", asyn
   await expect(empty).not.toContainText("No mistakes were recorded");
   await expect(empty).not.toContainText("try the other side");
 
-  await page.getByRole("button", { name: "Black", exact: true }).click();
+  await sideButton(page, "Black").click();
   await expect(start).toHaveCount(0);
   await expect(empty).toContainText("Black");
   // Black genuinely has no fault, so here the "nothing recorded" copy is correct.
@@ -287,16 +310,14 @@ test("the side selector and the theory exclusion decide what Start offers", asyn
 });
 
 test("a linked account with nothing to practise can still switch side", async ({ page }) => {
-  await enter(page, { start: false, bookFault: true });
-  await expect(page.getByRole("group", { name: "Which side to practise" })).toBeVisible();
-  await page.getByRole("button", { name: "Black", exact: true }).click();
+  await enter(page, { start: false, bookFault: true, linked: true });
+  await expect(sideChooser(page)).toBeVisible();
+  await sideButton(page, "Black").click();
   await expect(page.locator(".retro-practice .utility-note")).toContainText("Black");
 });
 
-
 test("an inaccuracy only becomes available when it is included", async ({ page }) => {
   const fixture = await enter(page, { start: false });
-  await expect(page.getByRole("group", { name: "Which side to practise" })).toHaveCount(0);
   const reviewUrl = page.url();
   // Make White's fault an inaccuracy only, which practice excludes by default.
   const relaxed = structuredClone(fixture.analysis);
@@ -307,10 +328,101 @@ test("an inaccuracy only becomes available when it is included", async ({ page }
   await page.goto(reviewUrl);
 
   const start = startButton(page);
+  await expect(sideChooser(page)).toBeVisible();
   await expect(start).toHaveCount(0);
-  await page.locator(".practice-options summary").click();
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+  await sideButton(page, "Black").click();
   await page.getByRole("checkbox", { name: "Include inaccuracies" }).check();
+  // The filter changes White's count, not the selected side.
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+  await expect(sideButton(page, "White")).toContainText("1 position");
+  await expect(start).toHaveCount(0);
+  await sideButton(page, "White").click();
   await expect(start).toBeEnabled();
+  await expect(start).toHaveText(/White/);
+});
+
+test("the setup keeps both sides visible and starts the selected side", async ({ page }) => {
+  await enter(page, { start: false });
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+  await expect(sideButton(page, "White")).toContainText("1 position");
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "false");
+  await expect(sideButton(page, "Black")).toContainText("0 positions");
+  await expect(startButton(page)).toHaveText(/White/);
+
+  // Selecting the empty side never starts practice; it only changes the explanation.
+  await sideButton(page, "Black").click();
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+  await expect(startButton(page)).toHaveCount(0);
+  await expect(page.locator(".retro-practice .utility-note")).toContainText("Black");
+  await expect(panel(page)).not.toContainText("Find a better move");
+
+  await sideButton(page, "White").click();
+  await expect(startButton(page)).toHaveText(/White/);
+  await startButton(page).click();
+  await expect(panel(page)).toContainText("White to move");
+  await panel(page).getByRole("button", { name: "Exit" }).click();
+  await expect(page.locator(".retro-idle")).toBeVisible();
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+  await expect(sideButton(page, "Black")).toBeVisible();
+});
+
+test("each side keeps its own count when the other is empty or both have work", async ({ page }) => {
+  await enter(page, { start: false, faultPly: 2 });
+  await expect(sideButton(page, "White")).toContainText("0 positions");
+  await expect(sideButton(page, "Black")).toContainText("1 position");
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+  await expect(startButton(page)).toHaveText(/Black/);
+
+  await enter(page, { start: false, extraFaultPly: 2 });
+  await expect(sideButton(page, "White")).toContainText("1 position");
+  await expect(sideButton(page, "Black")).toContainText("1 position");
+  await expect(sideChooser(page)).toBeVisible();
+});
+
+test("the setup is keyboard operable", async ({ page }) => {
+  await enter(page, { start: false, extraFaultPly: 2 });
+  await sideButton(page, "White").focus();
+  await expect(sideButton(page, "White")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(sideButton(page, "Black")).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("checkbox", { name: "Include inaccuracies" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(startButton(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(panel(page)).toContainText("Black to move");
+});
+
+test("the selected side survives leaving the panel and resets on reload", async ({ page }) => {
+  await enter(page, { start: false, extraFaultPly: 2 });
+  await sideButton(page, "Black").click();
+  await expect(startButton(page)).toHaveText(/Black/);
+
+  await page.getByRole("link", { name: "Moves", exact: true }).click();
+  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+
+  await startButton(page).click();
+  await panel(page).getByRole("button", { name: "Exit" }).click();
+  await expect(page.locator(".retro-idle")).toBeVisible();
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+
+  await page.reload();
+  await expect(page.locator(".retro-idle")).toBeVisible();
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("a known learner colour still offers the other side", async ({ page }) => {
+  await enter(page, { start: false, linked: true });
+  await expect(sideChooser(page)).toBeVisible();
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+  await expect(startButton(page)).toHaveText(/White/);
+  await sideButton(page, "Black").click();
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+  await expect(startButton(page)).toHaveCount(0);
 });
 
 test("a mid-game fault hides the coach evidence for that ply", async ({ page }) => {
