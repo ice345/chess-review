@@ -22,9 +22,13 @@ test("output language is independent of interface language and offline facts sta
   await expect(page.getByLabel("Coach output language")).toHaveValue("en");
   await page.getByLabel("Coach output language").selectOption("zh-CN");
   await page.goto(`/review/${record.id}/coach?ply=1`);
-  await page.getByRole("button", { name: "讲解 e4", exact: true }).click();
+  // The lesson is Chinese; the controls around it are not. The interface language
+  // owns the panel's own words, and it is still English.
+  await page.getByRole("button", { name: "Explain e4", exact: true }).click();
   await expect(page.locator(".coach-result")).toContainText("先看什么");
-  await expect(page.getByRole("button", { name: "生成本局总结", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Build whole-game study", exact: true })).toBeVisible();
+  // The summary names the lesson's language, which is the one thing on this panel
+  // that is allowed to be Chinese while the interface is English.
   await expect(page.locator(".coach-configuration-summary")).toContainText("简体中文");
   await page.reload();
   await expect(page.locator(".coach-result")).toContainText("先看什么");

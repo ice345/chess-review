@@ -510,6 +510,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     humanPositionError: humanRuntime.error,
     humanServiceState: humanRuntime.serviceState,
     coachProvider: coachRuntime.provider,
+    uiLanguage: settings.uiLanguage,
     coachLanguage: coachRuntime.language,
     coachModel: coachRuntime.selectedModel,
     coachServiceState: coachRuntime.serviceState,

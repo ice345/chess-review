@@ -22,10 +22,12 @@ configuration. Local health requests time out after 5 seconds, coaching/Maia
 requests after 120 seconds, explicit Maia downloads after 15 minutes. Cancellation
 is propagated. No automatic model download or per-move LLM generation is added.
 
-The interface is English. New preferences default Coach output to English;
-existing Chinese preferences and matching-language cached lessons remain valid.
-Changing output language affects generated/deterministic prose, not controls or
-chess facts. Public Study builds summaries directly from canonical facts; it does
+The interface is English by default and has its own preference, so the language
+of a lesson and the language of the interface around it are two decisions. New
+preferences default both to English; existing Chinese preferences and
+matching-language cached lessons remain valid. Changing output language affects
+generated/deterministic prose and the section labels that caption it, never
+controls or chess facts. Public Study builds summaries directly from canonical facts; it does
 not require an AI account.
 
 ## Public platform API controls
@@ -162,7 +164,8 @@ failure mode and verification steps.
 
 ## Validation and external boundaries
 
-`e2e/r4.spec.ts` checks local capability states, independent output language,
+`e2e/r4.spec.ts` checks local capability states, the interface/output language
+split (r4-browser-core: a Chinese lesson leaves the panel English),
 help layout and API headers. After a Browser Core production build, run:
 
 ```sh

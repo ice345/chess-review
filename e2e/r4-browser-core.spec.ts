@@ -84,3 +84,37 @@ test("public settings, study and metadata reflect only implemented capabilities"
     expect((await response.body()).length, `${icon} must not be empty`).toBeGreaterThan(0);
   }
 });
+
+test("a Chinese lesson never turns the interface Chinese", async ({ page }) => {
+  const { record } = await seedReview(page);
+  // The old panel took its own words from the lesson's language, so asking for a
+  // Chinese lesson translated the buttons, the status and the accuracy line.
+  await page.goto("/settings");
+  await page.getByRole("combobox", { name: "Interface language", exact: true }).selectOption("en");
+  await page.getByRole("combobox", { name: "Coach output language", exact: true }).selectOption("zh-CN");
+
+  await page.goto(`/review/${record.id}/coach`);
+  const panel = page.locator(".coach-tab");
+  await expect(panel.getByRole("button", { name: "Build whole-game study", exact: true })).toBeVisible();
+  // Everything the panel says in its own voice, minus the two regions that belong to
+  // the lesson: the lesson's prose and the summary that names its language.
+  const chrome = await panel.evaluate((node) => [...node.children]
+    .filter((child) => !child.classList.contains("game-coach-result") && !child.classList.contains("coach-source-panel"))
+    .map((child) => (child as HTMLElement).innerText)
+    .join("\n"));
+  expect(chrome, "the controls and status of the English interface must be English").not.toMatch(/[\u4e00-\u9fff]/);
+
+  await panel.getByRole("button", { name: "Build whole-game study", exact: true }).click();
+  const lesson = page.locator(".game-coach-result");
+  await expect(lesson).toBeVisible();
+  // The lesson is written in Chinese, labels included: its own section headings
+  // caption its own prose, so they follow the lesson rather than the interface.
+  expect(await lesson.innerText(), "a Chinese lesson must be written in Chinese").toMatch(/[\u4e00-\u9fff]/);
+
+  // Choosing the interface language is what turns the panel, and only the panel.
+  await page.goto("/settings");
+  await page.getByRole("combobox", { name: "Interface language", exact: true }).selectOption("zh-CN");
+  await page.goto(`/review/${record.id}/coach`);
+  await expect(page.getByRole("button", { name: "生成本局总结", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Moves", exact: true })).toBeVisible();
+});

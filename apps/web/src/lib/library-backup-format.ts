@@ -94,6 +94,7 @@ function external(value: unknown): ExternalGameReference {
 export function backupSettings(value: unknown): AppSettings {
   const v = object(value);
   return {
+    uiLanguage: choice(v.uiLanguage, ["en", "zh-CN"], "interface language"),
     coachProvider: choice(v.coachProvider, ["ollama", "openai-compatible"], "coach provider"),
     coachLanguage: choice(v.coachLanguage, ["en", "zh-CN"], "coach language"), coachModel: text(v.coachModel, "model", 256),
     reviewDepth: choice(v.reviewDepth, [10, 12, 15], "review depth"), reviewMultiPv: choice(v.reviewMultiPv, [1, 2, 3, 4, 5], "engine lines"),

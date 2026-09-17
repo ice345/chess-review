@@ -1,5 +1,6 @@
 import { isLocalSessionInvalid, LocalDataChangedError } from "./browser-storage";
-import type { CoachLanguage } from "@chess-review/shared";
+import { UI_LANGUAGES } from "@chess-review/shared";
+import type { CoachLanguage, UiLanguage } from "@chess-review/shared";
 import type { CoachRequestProvider, MaiaModel } from "./local-ai";
 import type { ChessSoundTheme } from "./chess-sound";
 import type { PieceSetId } from "./board-piece-assets";
@@ -16,6 +17,8 @@ export type MoveEmphasis = "key" | "all";
 export const MOVE_EMPHASIS: readonly MoveEmphasis[] = ["key", "all"];
 
 export interface AppSettings {
+  /** The language of the interface itself. CoachLanguage is a separate decision. */
+  uiLanguage: UiLanguage;
   coachProvider: CoachRequestProvider;
   coachLanguage: CoachLanguage;
   coachModel: string;
@@ -41,6 +44,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  uiLanguage: "en",
   coachProvider: "ollama",
   coachLanguage: "en",
   coachModel: "gemma4:12b-it-qat",
@@ -95,6 +99,7 @@ export function loadAppSettings(): AppSettings {
       boardQualityBadge: stored.boardQualityBadge !== false,
       pieceAnimation: choice(stored.pieceAnimation, PIECE_ANIMATIONS, "natural"),
       moveEmphasis: choice(stored.moveEmphasis, MOVE_EMPHASIS, "key"),
+      uiLanguage: choice(stored.uiLanguage, UI_LANGUAGES, "en"),
     };
   } catch {
     return DEFAULT_APP_SETTINGS;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { DEPLOYMENT_MODE } from "../lib/deployment";
 import { useEffect, useRef, useState } from "react";
-import type { CoachLanguage } from "@chess-review/shared";
+import type { CoachLanguage, UiLanguage } from "@chess-review/shared";
 import { LOCAL_DATA_RETENTION } from "../lib/local-data";
 import { AppHeader } from "./app-header";
 import { LibraryBackupPanel } from "./library-backup-panel";
@@ -78,6 +78,11 @@ export function SettingsPage() {
       <section className="utility-heading"><h1>Settings</h1><p>{enhanced ? "Enhanced Local" : "Browser Core"} · Your games and review progress are saved in this browser.</p><Link className="text-button" href="/help">Help, capabilities and data privacy →</Link></section>
       <div className={`settings-grid${enhanced ? "" : " browser-core-settings"}`}>
         <section className="settings-card">
+          <div><span className="kicker">This interface</span><h2>Language</h2></div>
+          <label>Interface language<select value={settings.uiLanguage} onChange={(event) => update({ ...settings, uiLanguage: event.target.value as UiLanguage })}><option value="en">English</option><option value="zh-CN">简体中文</option></select></label>
+          <small>Interface language covers the lesson panel — its controls, its status and the grounding behind an explanation — which is the part of the workspace translated today. The rest of the interface is English. A lesson itself is written in the Coach output language, set in Explanation layer.</small>
+        </section>
+        <section className="settings-card">
           <div><span className="kicker">Review defaults</span><h2>Objective analysis</h2></div>
           <label>Depth<select value={settings.reviewDepth} onChange={(event) => update({ ...settings, reviewDepth: Number(event.target.value) as AppSettings["reviewDepth"] })}><option value={10}>10 · Fast</option><option value={12}>12 · Balanced</option><option value={15}>15 · Thorough</option></select></label>
           <label>Engine Lab lines<select value={settings.reviewMultiPv} onChange={(event) => update({ ...settings, reviewMultiPv: Number(event.target.value) as AppSettings["reviewMultiPv"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
@@ -110,7 +115,7 @@ export function SettingsPage() {
             {ollamaModels.map((model) => <option value={model} key={model}>{model}</option>)}
           </select></label>
           <small>{ollamaModels.length > 0 ? `${ollamaModels.length} installed Ollama model${ollamaModels.length === 1 ? "" : "s"} detected. The selected model is passed explicitly to every request.` : "Start Ollama and check the local runtime to discover installed models."}</small></>}
-          {!enhanced && <small>Grounded summaries are built from objective analysis on this device. Generative AI is not provided by this website. Output language does not change the English interface.</small>}
+          {!enhanced && <small>Grounded summaries are built from objective analysis on this device. Generative AI is not provided by this website. Output language changes what a lesson says, never the controls around it; the interface has its own language.</small>}
         </section>
         <section className="settings-card">
           <div><span className="kicker">Board feedback</span><h2>Board and display</h2></div>

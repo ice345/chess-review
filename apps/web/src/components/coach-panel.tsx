@@ -276,7 +276,13 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
   const health = runtime.coachHealth;
   const notice = runtime.coachNotice;
   const running = runtime.coachTask?.status === "running" ? runtime.coachTask.kind : null;
-  const copy = COPY[language];
+  // Two languages, two jobs. The interface's own words — controls, status, the
+  // grounding disclosure — follow the interface preference. The labels that caption
+  // a lesson follow the language that lesson was written in, which is also the
+  // language the lesson itself is selected by below.
+  const uiLanguage = runtime.uiLanguage;
+  const lesson = COPY[language];
+  const copy = COPY[uiLanguage];
   const providerReady = coachProviderReady(health, provider, selectedModel);
   const usingFactsFallback = !providerReady
     || serviceState === "not-provided"
@@ -290,12 +296,12 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
   const coach = move?.coach?.source.language === language ? move.coach : undefined;
   const gameCoach = analysis.coachSummary?.source.language === language ? analysis.coachSummary : undefined;
   const teachingSteps = coach ? [
-    { key: "notice", label: copy.notice, value: coach.notice },
-    { key: "idea", label: copy.idea, value: coach.moveIdea },
-    { key: "problem", label: copy.problem, value: coach.problem },
-    { key: "consequence", label: copy.consequence, value: coach.consequence },
-    { key: "alternative", label: copy.alternative, value: coach.practicalAlternative },
-    { key: "takeaway", label: copy.takeaway, value: coach.takeaway },
+    { key: "notice", label: lesson.notice, value: coach.notice },
+    { key: "idea", label: lesson.idea, value: coach.moveIdea },
+    { key: "problem", label: lesson.problem, value: coach.problem },
+    { key: "consequence", label: lesson.consequence, value: coach.consequence },
+    { key: "alternative", label: lesson.alternative, value: coach.practicalAlternative },
+    { key: "takeaway", label: lesson.takeaway, value: coach.takeaway },
   ].filter((step): step is { key: string; label: string; value: string } => Boolean(step.value)) : [];
   const practiceLocked = runtime.retro.locked;
   const lowEvidence = factsCannotSupportDepth(analysis);
@@ -304,12 +310,14 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
   const providerLabel = serviceState === "not-provided"
     ? copy.browserCore
     : provider === "ollama" ? copy.localOllama : copy.openaiCompatible;
+  // Both branches exist because the raw notice is written in English: an English
+  // interface shows it as it is, a Chinese one shows our own sentence for the state.
   const fallbackNotice = isWorkingFallbackNotice(notice);
   const visibleFallbackNotice = fallbackNotice
-    ? (language === "zh-CN" ? copy.fallbackUsed : notice)
+    ? (uiLanguage === "zh-CN" ? copy.fallbackUsed : notice)
     : null;
   const errorNotice = notice && !fallbackNotice
-    ? (language === "zh-CN" ? copy.stale : notice)
+    ? (uiLanguage === "zh-CN" ? copy.stale : notice)
     : null;
   const selectedMoveLabel = move
     ? formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san })
@@ -330,7 +338,7 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
         </div>
       </div>
       {usingFactsFallback && <p className="coach-provenance">{copy.fallbackReady}</p>}
-      <p>{analysis.opening?.name ?? copy.startingPosition}{language === "zh-CN" ? "。" : ". "}{copy.accuracyLine(
+      <p>{analysis.opening?.name ?? copy.startingPosition}{uiLanguage === "zh-CN" ? "。" : ". "}{copy.accuracyLine(
         analysis.white.accuracy?.toFixed(0) ?? "—",
         analysis.black.accuracy?.toFixed(0) ?? "—",
         analysis.criticalMoments.length,
@@ -378,12 +386,12 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
           <h3>{gameCoach.headline}</h3>
           <p>{gameCoach.summary}</p>
           <div className="coach-two-column">
-            <section><strong>{copy.strengths}</strong>{gameCoach.strengths.map((item) => <p key={item}>{item}</p>)}</section>
-            <section><strong>{copy.weaknesses}</strong>{gameCoach.weaknesses.map((item) => <p key={item}>{item}</p>)}</section>
+            <section><strong>{lesson.strengths}</strong>{gameCoach.strengths.map((item) => <p key={item}>{item}</p>)}</section>
+            <section><strong>{lesson.weaknesses}</strong>{gameCoach.weaknesses.map((item) => <p key={item}>{item}</p>)}</section>
           </div>
           {gameCoach.criticalMoments.length > 0 && (
             <section className="coach-critical">
-              <strong>{copy.criticalMoments}</strong>
+              <strong>{lesson.criticalMoments}</strong>
               {gameCoach.criticalMoments.map((moment) => {
                 const recorded = analysis.moves[moment.ply - 1];
                 if (!recorded) return null;
@@ -405,7 +413,7 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
           )}
           {lowEvidence ? (
             <section className="training-list">
-              <strong>{copy.training}</strong>
+              <strong>{lesson.training}</strong>
               <div>
                 <p>{copy.lowEvidence}</p>
                 <small>{copy.lowEvidenceCheck}</small>
@@ -413,7 +421,7 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
             </section>
           ) : (
             <section className="training-list">
-              <strong>{copy.training}</strong>
+              <strong>{lesson.training}</strong>
               {gameCoach.trainingRecommendations.map((item) => (
                 <div key={item.title}><b>{item.title}</b><p>{item.reason}</p><small>{item.focus}</small></div>
               ))}
@@ -439,12 +447,12 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
               ))}
             </div>
           )}
-          {teachingSteps.length === 0 && coach.whyMoveWorks && <section><strong>{copy.whyWorks}</strong><p>{coach.whyMoveWorks}</p></section>}
-          {teachingSteps.length === 0 && coach.whatWentWrong && <section><strong>{copy.whatWentWrong}</strong><p>{coach.whatWentWrong}</p></section>}
-          {teachingSteps.length === 0 && coach.betterPlan && <section><strong>{copy.betterPlan}</strong><p>{coach.betterPlan}</p></section>}
-          {coach.humanPerspective && <section><strong>{copy.humanPerspective}</strong><p>{coach.humanPerspective}</p></section>}
-          {coach.tacticalIdea && <section><strong>{copy.tacticalIdea}</strong><p>{coach.tacticalIdea}</p></section>}
-          {!coach.takeaway && coach.trainingTip && <section className="training-tip"><strong>{copy.trainingTip}</strong><p>{coach.trainingTip}</p></section>}
+          {teachingSteps.length === 0 && coach.whyMoveWorks && <section><strong>{lesson.whyWorks}</strong><p>{coach.whyMoveWorks}</p></section>}
+          {teachingSteps.length === 0 && coach.whatWentWrong && <section><strong>{lesson.whatWentWrong}</strong><p>{coach.whatWentWrong}</p></section>}
+          {teachingSteps.length === 0 && coach.betterPlan && <section><strong>{lesson.betterPlan}</strong><p>{coach.betterPlan}</p></section>}
+          {coach.humanPerspective && <section><strong>{lesson.humanPerspective}</strong><p>{coach.humanPerspective}</p></section>}
+          {coach.tacticalIdea && <section><strong>{lesson.tacticalIdea}</strong><p>{coach.tacticalIdea}</p></section>}
+          {!coach.takeaway && coach.trainingTip && <section className="training-tip"><strong>{lesson.trainingTip}</strong><p>{coach.trainingTip}</p></section>}
           {coach.validatedLines.map((line) => (
             <section className="validated-line" key={`${line.start}-${line.label}`}>
               <strong>{line.label}</strong>
@@ -458,12 +466,14 @@ export function CoachPanel({ analysis, move, onSelectPly }: {
 
       <section className="coach-source-panel" style={{ order: 3 }} aria-label={copy.sourceRegion}>
         <div className="coach-configuration-summary">
-          <span>{providerLabel} · {copy.languageName}</span>
+          {/* The one label that names a language names the lesson's, in its own script. */}
+          <span>{providerLabel} · {lesson.languageName}</span>
           <Link href="/settings">{copy.configure}</Link>
         </div>
         {visibleFallbackNotice && <p className="coach-provenance">{visibleFallbackNotice}</p>}
         {errorNotice && <p className="coach-notice">{errorNotice}</p>}
-        {language === "en" && <p className="service-message">{serviceText}</p>}
+        {/* The service status is written in English, so it is shown in an English interface. */}
+        {uiLanguage === "en" && <p className="service-message">{serviceText}</p>}
         <details className="coach-grounding">
           <summary>{copy.sourceRegion}</summary>
           <span>{copy.writtenFromStockfish}</span>

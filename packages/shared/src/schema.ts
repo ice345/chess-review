@@ -307,6 +307,10 @@ export interface HumanAnalysis {
 
 export type CoachProvider = "ollama" | "openai-compatible" | "deterministic";
 export type CoachLanguage = "en" | "zh-CN";
+/** The language the interface itself is written in. Independent of CoachLanguage,
+    which only decides the language a lesson is written in. */
+export type UiLanguage = "en" | "zh-CN";
+export const UI_LANGUAGES: readonly UiLanguage[] = ["en", "zh-CN"];
 
 export interface CoachMaterialFacts {
   white: Record<"pawn" | "knight" | "bishop" | "rook" | "queen", number>;

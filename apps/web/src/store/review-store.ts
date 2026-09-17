@@ -100,7 +100,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       const opening = recognizeOpening(game) ?? null;
       set({ game, division, opening, analysis: null, currentPly: 0, positionFen: game.initialFen, branch: null, error: null, concealedPly: null, practiceColor: null });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : "PGN 解析失败。" });
+      set({ error: error instanceof Error ? error.message : "That PGN could not be parsed." });
     }
   },
   loadFen: (fen) => {
@@ -117,7 +117,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         practiceColor: null,
       });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : "FEN 无效。" });
+      set({ error: error instanceof Error ? error.message : "That FEN is not a valid position." });
     }
   },
   goToPly: (ply) => {

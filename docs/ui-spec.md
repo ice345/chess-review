@@ -300,9 +300,12 @@ misconfigured services; missing models have a separate setup state. Its Maia
 selector and Coach poll for recovery without hiding objective review. Settings
 lists the installed Ollama catalog and 5M/23M/79M Maia cache states. Choosing a
 model never downloads it silently. Health responses are validated before UI use.
-The interface is English; Coach output has an independent English/Chinese
-preference, preserving existing choices. Home and Settings link to Help for
-setup, capabilities, data destinations, backups and manual feedback.
+The interface language is its own preference — English or 简体中文, English by
+default — and covers the lesson panel, which is the translated surface today;
+Coach output has an independent English/Chinese preference, preserving existing
+choices. Choosing a Chinese lesson does not translate the controls around it.
+Home and Settings link to Help for setup, capabilities, data destinations,
+backups and manual feedback.
 
 ## Chess audio
 

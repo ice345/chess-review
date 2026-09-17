@@ -3,6 +3,7 @@
 import { createContext, useContext, type Dispatch, type SetStateAction } from "react";
 import type {
   CoachLanguage,
+  UiLanguage,
   GameAnalysisV2,
   HumanAnalysis,
   MaiaModel,
@@ -64,6 +65,8 @@ export interface ReviewRuntimeValue {
   humanPositionError: string | null;
   humanServiceState: MaiaServiceState;
   coachProvider: CoachRequestProvider;
+  /** The language of the interface itself; CoachLanguage is what a lesson is written in. */
+  uiLanguage: UiLanguage;
   coachLanguage: CoachLanguage;
   coachModel: string;
   coachServiceState: LocalAiConnectionState;

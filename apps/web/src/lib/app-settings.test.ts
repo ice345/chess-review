@@ -49,6 +49,34 @@ describe("application settings", () => {
     expect(loadAppSettings().humanModel).toBe("maia3-23m");
   });
 
+  it("keeps the interface language independent of the coach output language", () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+      dispatchEvent: vi.fn(),
+    });
+    vi.stubGlobal("CustomEvent", class {
+      constructor(_name: string, _options?: unknown) {}
+    });
+
+    expect(DEFAULT_APP_SETTINGS).toMatchObject({ uiLanguage: "en", coachLanguage: "en" });
+
+    // The two languages are separate decisions: a Chinese lesson does not turn the
+    // interface Chinese, which is the whole point of the preference.
+    saveAppSettings({ ...DEFAULT_APP_SETTINGS, coachLanguage: "zh-CN" });
+    expect(loadAppSettings()).toMatchObject({ uiLanguage: "en", coachLanguage: "zh-CN" });
+
+    saveAppSettings({ ...DEFAULT_APP_SETTINGS, uiLanguage: "zh-CN", coachLanguage: "zh-CN" });
+    expect(loadAppSettings()).toMatchObject({ uiLanguage: "zh-CN", coachLanguage: "zh-CN" });
+
+    // A stored value outside the list is not a language.
+    values.set("open-chess-review-settings-v1", JSON.stringify({ uiLanguage: "de", coachLanguage: "zh-CN" }));
+    expect(loadAppSettings()).toMatchObject({ uiLanguage: "en", coachLanguage: "zh-CN" });
+  });
+
   it("keeps board display preferences inside their documented options", () => {
     const values = new Map<string, string>();
     vi.stubGlobal("window", {

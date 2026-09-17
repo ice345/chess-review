@@ -78,9 +78,14 @@ invalidates cached deterministic and provider text alike.
 Public production defaults to Browser Core. It never probes localhost AI and
 Study builds matching-language summaries from the existing canonical facts on
 request. Provider/model controls are shown only in Enhanced Local on a loopback
-hostname. Outer review navigation stays English. On the Study/coach surface,
-headings, buttons, empty states and fallback text follow the coach language
-preference, so a `zh-CN` lesson is not wrapped in English teaching chrome.
+hostname. Two languages meet on the Study/coach surface and they are chosen
+separately. **Interface language** (Settings → Language, English or 简体中文,
+default English) owns the panel's own words: headings, buttons, status, empty
+states, the accuracy line and the grounding disclosure. **Coach output language**
+owns the lesson: its prose and the section labels that caption that prose, so a
+Chinese lesson is not headed in English and an English interface is not headed in
+Chinese. The interface preference covers the lesson panel today; the rest of the
+workspace, including outward navigation, is English.
 Full capability, timeout and data-disclosure rules are in [web-service-boundaries.md](web-service-boundaries.md).
 
 Provider output must first match the strict Pydantic schema. Coach v4 keeps the v3 response contract: the six nullable teaching keys `notice`, `moveIdea`, `problem`, `consequence`, `practicalAlternative` and `takeaway` are required, and a provider that silently returns the old shape fails validation. What v4 changes is the deterministic text and its counting rules (above), so cached prose from either provider is invalidated with it. Both move explanations and whole-game summaries are validated against the requested language. A Chinese request that contains no meaningful Chinese output fails closed to deterministic Chinese copy. The UI presents the available values in that order and keeps source cards and validated lines separate from the teaching prose.
