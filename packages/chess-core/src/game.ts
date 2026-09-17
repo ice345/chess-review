@@ -269,6 +269,60 @@ export function playLegalBoardMove(fen: string, input: LegalBoardMove): Replayed
   };
 }
 
+export interface ResolvedMoveInput {
+  from: string;
+  to: string;
+  promotion?: "q" | "r" | "b" | "n";
+  /** Canonical UCI, always with the promotion piece when a pawn promotes. */
+  uci: string;
+  /** Canonical SAN as chess.js writes it. */
+  san: string;
+}
+
+/**
+ * Turn typed input into a legal move for this position, or null.
+ *
+ * This is the keyboard equivalent of dragging a piece: it accepts SAN (`Nf3`,
+ * `exd5`, `O-O`, `e8=Q+`) and UCI (`g1f3`, `e7e8q`), validates the move through
+ * chess.js, and returns canonical notation. A promotion must name its piece —
+ * `e8=Q` or `e7e8q` — because the board asks the same question with a chooser
+ * rather than guessing a queen. Nothing here evaluates or ranks a move.
+ */
+export function resolveMoveInput(fen: string, input: string): ResolvedMoveInput | null {
+  const text = input.trim().replace(/[!?]+$/, "");
+  if (text === "") return null;
+  // UCI-shaped input is read only as UCI, so a mistyped promotion letter
+  // ("e7e8k") is rejected instead of being silently read as a queen.
+  const uciShape = /^([a-h][1-8])([a-h][1-8])([a-z])?$/i.exec(text);
+  let candidate: string | { from: Square; to: Square; promotion?: "q" | "r" | "b" | "n" } = text;
+  if (uciShape) {
+    const promotion = uciShape[3]?.toLowerCase();
+    if (promotion !== undefined && !["q", "r", "b", "n"].includes(promotion)) return null;
+    candidate = {
+      from: uciShape[1]!.toLowerCase() as Square,
+      to: uciShape[2]!.toLowerCase() as Square,
+      ...(promotion === undefined ? {} : { promotion: promotion as "q" | "r" | "b" | "n" }),
+    };
+  }
+  const chess = new Chess(fen);
+  try {
+    const played = chess.move(candidate);
+    if (!played) return null;
+    const promotion = played.promotion === "q" || played.promotion === "r" || played.promotion === "b" || played.promotion === "n"
+      ? played.promotion
+      : undefined;
+    return {
+      from: played.from,
+      to: played.to,
+      ...(promotion === undefined ? {} : { promotion }),
+      uci: `${played.from}${played.to}${promotion ?? ""}`,
+      san: played.san,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** List every legal destination for one board piece.
  *
  * This is presentation-safe rules data for click-to-move hints. It does not

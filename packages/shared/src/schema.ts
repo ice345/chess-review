@@ -426,8 +426,26 @@ export interface CoachGameMoveFacts {
   annotations?: MoveAnnotation[];
   accuracy: number;
   winPercentLoss: number;
+  /** True when selective verification re-searched this move at the stronger depth. */
+  verified?: boolean;
   humanProbability?: number;
   humanDifficulty?: HumanFindDifficultyLabel;
+}
+
+/**
+ * One side's counts, with the V2 layers kept apart.
+ *
+ * `qualityCounts`/`annotationCounts` are the layers the Review tables and the
+ * Coach consume; `classificationCounts` remains the compatibility projection and
+ * is the only count a V1 analysis has.
+ */
+export interface CoachGamePlayerFacts {
+  color: PlayerColor;
+  accuracy?: number;
+  phaseAccuracy: Partial<Record<GamePhase, number>>;
+  classificationCounts: Partial<Record<MoveClassification, number>>;
+  qualityCounts?: Record<MoveQuality, number>;
+  annotationCounts?: Partial<Record<MoveAnnotation, number>>;
 }
 
 export interface CoachGameFacts {
@@ -435,7 +453,7 @@ export interface CoachGameFacts {
   headers: Record<string, string>;
   opening?: OpeningInfo;
   division: GameDivision;
-  players: { white: PlayerAnalysis; black: PlayerAnalysis };
+  players: { white: CoachGamePlayerFacts; black: CoachGamePlayerFacts };
   moves: CoachGameMoveFacts[];
   criticalMoments: CriticalMoment[];
 }
@@ -720,24 +738,56 @@ export interface TrainingQueueProgressV2 {
   notes?: string;
 }
 
-/** V2 records progress only; it does not claim a spaced-repetition schedule. */
+/** V2 records progress only. V3 reviews carry an outcome and a due date; see training-mastery. */
 export interface TrainingQueueItemV2 extends Omit<TrainingQueueItemV1, "version"> {
   version: 2;
   sourceReportVersion: "advanced-study-v2";
   progress: TrainingQueueProgressV2;
 }
 
+/** What one review of a source position was worth. */
+export type TrainingAttemptOutcome =
+  /** The move was produced before the evidence was shown. */
+  | "unaided"
+  /** The move was reached with help. A lapse, not mastery evidence. */
+  | "hinted"
+  /** The answer was already on screen. A review, never recall evidence. */
+  | "exposed"
+  /** Recorded before outcomes existed. Kept, and never counted as mastery. */
+  | "legacy";
+
+export type TrainingMasteryState = "learning" | "review" | "mastered";
+
 export interface TrainingPositionReview {
   gameId: string;
   ply: number;
   reviewedAt: string;
+  /** How the visitor judged their own recall. Absent on records written before outcomes. */
+  outcome?: TrainingAttemptOutcome;
+  /** Mastery after this review. */
+  mastery?: TrainingMasteryState;
+  /** Consecutive unaided reviews behind it. */
+  streak?: number;
+  /** Reviews recorded for this position, including this one. */
+  attempts?: number;
+  /** When this position is next worth reviewing. */
+  dueAt?: string;
 }
 
-/** Explicit acknowledgements of source positions, never puzzle answers or mastery. */
+/**
+ * Reviews of source positions with their outcome and mastery state. A review records
+ * what the visitor did with the position; it is never a puzzle answer and never a
+ * claim about a different position.
+ */
 export interface TrainingQueueItemV3 extends Omit<TrainingQueueItemV2, "version" | "progress"> {
   version: 3;
   progress: TrainingQueueProgressV2 & { positions: TrainingPositionReview[] };
-  completionKind?: "manual" | "reviewed";
+  /**
+   * How the task was completed. `mastered` means every position reached the mastered
+   * state through unaided reviews; an imported record may still say `reviewed`, which
+   * is normalised on read.
+   */
+  completionKind?: "manual" | "mastered" | "reviewed";
 }
 
 export type TrainingQueueItem = TrainingQueueItemV1 | TrainingQueueItemV2 | TrainingQueueItemV3;

@@ -21,3 +21,4 @@ describe("formatMoveNotation", () => {
     })).toBe("50… Ne5");
   });
 });
+
