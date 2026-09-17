@@ -1,6 +1,7 @@
 import { noLegalMoveTerminalStatus, type NormalizedGame } from "@chess-review/chess-core";
 import type { StockfishMoveAnalysis } from "@chess-review/shared";
 import { BrowserStockfish, type SearchOptions } from "./browser-engine";
+import type { EngineDiagnostics } from "./engine-diagnostics";
 
 export interface StockfishSearcher {
   search(fen: string, options: SearchOptions): Promise<StockfishMoveAnalysis>;
@@ -18,6 +19,13 @@ export interface GameReviewOptions {
   multiPv?: number;
   signal?: AbortSignal;
   onProgress?: (progress: GameReviewProgress) => void;
+  /**
+   * Records what the run actually did: worker spawns and exits, the UCI handshake,
+   * every search start and result, cancellations and failures, with elapsed time. A
+   * run that stalls without engine traffic is otherwise indistinguishable from a slow
+   * machine, and that is the failure this evidence exists for.
+   */
+  diagnostics?: EngineDiagnostics;
 }
 
 export interface GameReviewResult {
@@ -31,6 +39,7 @@ export interface GameVerificationOptions {
   plies: readonly number[];
   signal?: AbortSignal;
   onProgress?: (progress: GameReviewProgress) => void;
+  diagnostics?: EngineDiagnostics;
 }
 
 export interface GameVerificationResult {
@@ -40,7 +49,10 @@ export interface GameVerificationResult {
   playedMoveAnalyses: Map<number, StockfishMoveAnalysis>;
 }
 
-type SearcherFactory = () => StockfishSearcher;
+export type SearcherFactory = (diagnostics?: EngineDiagnostics) => StockfishSearcher;
+
+/** The production engine factory: one Stockfish 18 worker per pool slot. */
+export const defaultSearcherFactory: SearcherFactory = (diagnostics) => new BrowserStockfish("/engine/stockfish.js", diagnostics ?? null);
 
 /** Upper bound for a whole-game review, independent of how many cores exist. */
 export const MAX_REVIEW_WORKERS = 4;
@@ -76,7 +88,8 @@ export class BrowserStockfishPool {
 
   constructor(
     private readonly size = reviewWorkerBudget(),
-    private readonly factory: SearcherFactory = () => new BrowserStockfish(),
+    private readonly factory: SearcherFactory = defaultSearcherFactory,
+    private readonly diagnostics: EngineDiagnostics | null = null,
   ) {
     if (!Number.isInteger(size) || size < 1) throw new Error("Stockfish pool size must be positive.");
   }
@@ -94,6 +107,7 @@ export class BrowserStockfishPool {
     ));
     const searchablePositions = indexedPositions.filter((position) => position.terminal === null);
 
+    options.diagnostics?.record("review-start", { depth: options.depth, multiPv, positions: fens.length, workers: this.size });
     try {
       const searched = await this.runJobs(
         searchablePositions,
@@ -103,6 +117,7 @@ export class BrowserStockfishPool {
             multiPv,
             startFen: game.initialFen,
             moves: game.plies.slice(0, position.index).map((ply) => ply.uci),
+            tag: `position ${position.index}`,
             ...(options.signal === undefined ? {} : { signal: options.signal }),
           }),
         (completed) => options.onProgress?.({
@@ -132,6 +147,7 @@ export class BrowserStockfishPool {
             searchMoves: [item.uci],
             startFen: game.initialFen,
             moves: game.plies.slice(0, item.ply - 1).map((ply) => ply.uci),
+            tag: `played move ${item.ply}`,
             ...(options.signal === undefined ? {} : { signal: options.signal }),
           }),
         (completed) =>
@@ -162,9 +178,15 @@ export class BrowserStockfishPool {
         if (!analysis) throw new Error(`Missing Stockfish position analysis at index ${index}.`);
         return analysis;
       });
+      options.diagnostics?.record("review-complete", { positions: fens.length, searched: searchablePositions.length, restricted: missing.length });
       return { positionAnalyses: completedPositions, playedMoveAnalyses };
     } catch (error) {
-      if (options.signal?.aborted) this.terminate();
+      if (options.signal?.aborted) {
+        options.diagnostics?.record("review-cancelled", { stage: "positions" });
+        this.terminate();
+      } else {
+        options.diagnostics?.record("review-failed", { message: error instanceof Error ? error.message : String(error) });
+      }
       throw error;
     }
   }
@@ -189,6 +211,7 @@ export class BrowserStockfishPool {
     }));
     let completed = 0;
     const report = (total: number) => options.onProgress?.({ stage: "verification", completed, total });
+    options.diagnostics?.record("review-start", { stage: "verification", depth: options.depth, multiPv: options.multiPv, positions: positions.length, workers: this.size });
     const searched = await this.runJobs(
       positions,
       (worker, position) => worker.search(position.fen, {
@@ -196,6 +219,7 @@ export class BrowserStockfishPool {
         multiPv: options.multiPv,
         startFen: game.initialFen,
         moves: game.plies.slice(0, position.index).map((ply) => ply.uci),
+        tag: `verify position ${position.index}`,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       }),
       (positionCompleted) => {
@@ -227,6 +251,7 @@ export class BrowserStockfishPool {
         searchMoves: [item.uci],
         startFen: game.initialFen,
         moves: game.plies.slice(0, item.ply - 1).map((ply) => ply.uci),
+        tag: `verify played move ${item.ply}`,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       }),
       (restrictedCompleted) => {
@@ -247,7 +272,7 @@ export class BrowserStockfishPool {
 
   /** Workers are created on demand: a three-ply game never compiles four engines. */
   private workerAt(index: number): StockfishSearcher {
-    while (this.workers.length <= index) this.workers.push(this.factory());
+    while (this.workers.length <= index) this.workers.push(this.factory(this.diagnostics?.forWorker(index)));
     return this.workers[index]!;
   }
 
