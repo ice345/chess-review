@@ -99,6 +99,29 @@ Restricted evidence is recomputed against the final merged roots: a re-searched
 resulting position is also the next ply's root and may no longer list that ply's
 played move, so the transport supplies a fresh `searchmoves` override for it.
 
+## Baseline labels say so
+
+Selective verification re-searches a bounded selection of moves at a higher depth;
+a move outside that selection keeps its baseline classification. In a sharp
+position the baseline depth can rank the objectively best move third, which makes
+a strong label depth-sensitive rather than wrong. The C01 investigation
+(`audits/2026-09-15-c01-opera-evaluation-investigation.md`) reproduced exactly that
+in the Opera Game: at depth 10 / MultiPV 3 the shipped engine ranked `15. Bxd7+`
+third (cp +190 against cp +536 for the top line), producing a real ~21-point
+WinPercent loss and a Blunder, while the same engine ranks it first from depth 14
+and at the app's own verification configuration (depth 15, MultiPV 5). Ply 29 was
+not selected for verification, so the baseline value was persisted.
+
+Two consequences are part of the contract:
+
+- The planner's selection is what decides which labels get re-searched. A larger
+  budget would verify more moves, at a real cost in engine time.
+- A consequential label (mistake, blunder, Brilliant, Critical, missed win or
+  missed mate) that was not re-searched carries that fact in the UI:
+  `baselineOnlyCaveat()` in `apps/web/src/lib/move-evidence-copy.ts` states the
+  depth the label rests on. The number is never hidden, and the uncertainty is
+  never invented either.
+
 The locked regression corpus is
 `packages/analysis/src/fixtures/classification-v2-golden.ts`. It covers the former
 rank-three Interesting bug, saturated evaluations, Critical outcome uniqueness,

@@ -18,16 +18,46 @@ had.
   Review panel: *Previous key moment* / `Moment n of m` / *Next key moment*, the
   `Try again` action for the moment the board is on, and the finish action.
 - `components/review/review-completion.tsx` renders the end state:
-  the most important mistake, the best moment, one factual sentence about the
-  game, the session tally, the Training count for this game, and the handoff to
-  Moves, Training and Study.
-- `lib/review-completion.ts` derives those facts from the canonical analysis
-  only: the largest positive `winPercentSwing` among the key moments, the
-  best-classified move with the highest Accuracy, and the visitor's lowest-scoring
-  scored phase.
+  what this session actually viewed, the most important mistake, the good move
+  worth another look, one factual sentence about the game, the practice tally,
+  the Training contribution for this game, and the handoff to Moves, Training and
+  Study.
+- `lib/review-session.ts` owns the session's own counts, and
+  `lib/review-completion.ts` owns the teaching selection rules.
 - Practice gained a **Hint** step and a single-moment entry point
   (`useRetrospect.startAt`). Results now distinguish *hinted* from *solved*.
   See [`mistake-practice.md`](../mistake-practice.md).
+
+## Follow-up, 2026-09-15: the counts were not the session's
+
+The first version summarised the review with `analysis.criticalMoments.length`,
+which is a property of the analysis, not of the session. `Finish review early` on
+the starting position therefore announced "5 key moments reviewed" with zero
+visits. Three rules now apply.
+
+**The headline counts the session.** `reviewSessionCounts` intersects the seen
+plies with the moments of the current analysis, so the title reads `0 of 5 key
+moments viewed` and the detail keeps the remaining work visible. Viewing is never
+reported as learning: the practice tally is a separate line, and the full-browse
+case says `All 5 key moments viewed` with an explicit statement that viewing is
+not solving. A ply that a re-analysis no longer places there stops counting.
+
+**A game with no key moment can still be finished.** The headline becomes `No key
+moment crossed the thresholds` and the detail says so; no count is invented.
+
+**Selection is a stated rule, not maximum Accuracy.** The highlight prefers
+verified special good moves (Brilliant, then Critical, then Sacrifice) over
+ordinary Best moves, then Accuracy, then the earlier ply — a Brilliant at 100 and
+two Best moves at 100 no longer resolve by array order. The most important mistake
+requires real error evidence: a costly quality band or a missed win/mate
+annotation, with a positive canonical loss. A Critical good move with a 0.2-point
+loss is not a mistake. Both facts are scoped to the learner when one is known, and
+state the mover when the review covers both sides. The section is titled *Worth
+another look* because it is a teaching choice, not a new quality grade.
+
+**The Training count is a position count.** `trainingGameContribution` counts
+distinct `gameId:ply` positions this game contributed and the tasks that hold
+them, instead of counting queue items and calling them positions.
 
 ## Decisions worth recording
 

@@ -53,6 +53,30 @@ move at or past the fault while an answer is owed, so neither the move list, the
 evaluation graph nor the transport can disclose the answer. Display policy lives
 in `practicePresentation()` so each panel does not guess `active`/`locked`.
 
+## Answer exposure is recorded, not assumed
+
+Free analysis and the exercise disagree about what a visitor has seen. In free
+analysis the board shows the engine arrows, the evaluation and the verdict panel
+for the ply on screen; entering the exercise afterwards cannot unsee that. Rather
+than pretend every attempt is a cold read, the workspace records exposure:
+
+- `useRetrospect.noteAnswerExposed(ply)` is called whenever the board rests on a
+  ply with the analysis visible and no session running. That set is per workspace,
+  not per attempt.
+- Starting an attempt on such a ply sets `RetroRuntime.answerExposed`, shows the
+  **Review practice** chip and states plainly that the solve is practice rather
+  than a first-time find.
+- The practice tally carries `afterExposure`, and the end-of-review state says how
+  many attempts followed a position whose analysis had already been shown. A
+  solved-after-exposure position still counts as solved; the sentence denies the
+  "first-time solve" reading instead of rewriting the result.
+
+`practicePresentation().hideAnalysisExports` extends the same rule to the export
+menu: **Canonical JSON**, **Annotated PGN**, **Position PNG** and **Review PNG**
+are disabled with an explanatory line while an answer is owed, because each one
+contains the answer. Original PGN and the share link stay available: the share
+payload is the game's PGN, not its analysis.
+
 
 ## Canonical policy
 

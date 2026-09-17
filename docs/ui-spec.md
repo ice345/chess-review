@@ -4,7 +4,7 @@
 
 The product is route-based rather than a single analysis dashboard:
 
-- `/` owns PGN/FEN import, a decorative position preview, Chess.com/Lichess connect-and-sync, and recent reviews. Chess.com and Lichess are account actions, not import modes.
+- `/` owns PGN/FEN import, a live (non-interactive) position preview, a compact Chess.com/Lichess connect row, and recent reviews. Chess.com and Lichess are account actions, not import modes.
 - `/review/[gameId]` is the objective review.
 - `/review/[gameId]/moves` is the move explorer.
 - `/review/[gameId]/coach` is the Study surface for grounded move lessons and whole-game learning (the URL remains stable).
@@ -15,7 +15,9 @@ Import UI is never mounted inside the review workspace. A valid input is normali
 
 Home places paste, Open PGN file, Analyze game and the complete Opera Game
 example in its opening section. File selection/drop and pasted collections share
-an explicit multi-game chooser. Mobile reading/tab order puts the form before
+an explicit multi-game chooser. The board preview follows the paste; it is not
+a second analysis workspace. Unlinked Chess.com/Lichess intake on Home is one
+quiet row, not identity cards. Mobile reading/tab order puts the form before
 the non-interactive board preview. Returning users have a Continue last review
 link above the form. See [PGN import and export](pgn-import-export.md) for limits,
 source preservation and selection behavior.
@@ -25,14 +27,52 @@ source preservation and selection behavior.
 The nested review layout owns the board, evaluation bar, selected ply, orientation, move controls and current verdict. Review's Game Summary owns the evaluation timeline inside the contextual panel. Client-side transitions replace only the contextual right panel, so board state persists across Review, Moves, Study and Engine Lab.
 
 At desktop sizes the opening review fits the players, board and move transport
-within the viewport at the R2 acceptance sizes. Board size responds to both
-width and available height: measured 424px at 1280×720, 472px at 1366×768,
-540px at 1440×900 and 600px at 1920×1080. Sound/flip share the upper player row;
-the titlebar is compact. The contextual column scrolls within the board column's
-height. On Review, Game Summary stays in that column; the evaluation plot is
-collapsed until opened. No timeline is added below the board.
+within the viewport at the R2 acceptance sizes. Review uses one titlebar (mark,
+game title, Review/Moves/Study, More, Export). Board size responds to both
+width and available height; after the single-titlebar pass the default is
+about 488px at 1280×720 and about 662px at 1440×900, clamped by
+`100dvh - 232px` and `46vw` so the transport stays in the viewport. Flip stays on the player row; sound, focus board
+and typed-move entry live in Board settings (`/` opens the move field).
+The contextual column scrolls within the board column's height. On Review,
+Game Summary is collapsed until opened, and engine lines are behind a
+disclosure. No timeline is added below the board.
 
 Below the tablet breakpoint, the route panel stacks under the board and normal document scrolling resumes. Move navigation remains adjacent to the board. There must be no horizontal document overflow.
+
+## Vocabulary
+
+One word per meaning, in the interface and in the documentation. A term that
+names a measurement is stated as a measurement, and a term that names a judgement
+is stated as a judgement.
+
+| Term in the interface | Means | Never means |
+| --- | --- | --- |
+| **Key moment** | a ply this game's review navigates to, from the canonical critical-moment set | the annotation *Critical*, or a move's quality |
+| **Critical** (annotation) | the classification for an only-move that kept the game's outcome | a key moment; a mistake |
+| **Quality** / the annotation label | the classification assigned to one move (`Best`, `Blunder`, …) | Accuracy, or an evaluation |
+| **Winning chances** | the WinPercent metric behind Accuracy, 0–100 from the mover's side | an engine evaluation, or Maia's probability |
+| **Evaluation** | the engine's score, always normalised to White's point of view, in pawns | an outcome prediction |
+| **Maia probability** | how often humans near the target Elo played that move | a quality judgement |
+| **Accuracy** | the aggregate of per-move accuracy over a stated set of moves | an average loss, or a reliability that grows with sample size |
+| **Move N** / **N.** / **N…** | the move number, read from the position | a ply |
+| **Ply** | the internal one-based cursor over half-moves; a branch cursor says *branch ply*, a saved line says *from mainline ply* | a move number, or a count worth reading on its own |
+| An **evidence reference** | the move itself, named by its SAN | a move number derived from the ply: a game may start from a non-1 fullmove, so only a recorded FEN can produce the number |
+| **Game** | one imported or synced chess game | a position, or a Training item |
+| **Position** | one board state, identified by its FEN | a game |
+| **Reviewed** | the position was looked at in a Training session | solved, known, or mastered |
+| **Offline** | the request failed because the network or the local service was unreachable | misconfigured, or empty |
+| **Unavailable** | the service answered that it cannot serve this request | offline |
+| **Not configured** | no provider or model is set | unavailable, or an error |
+
+Rules that follow from the table:
+
+- A number is never shown without saying what it measures. Accuracy and winning
+  chances carry their own labels; a bare percentage is not used for either.
+- Maia and Stockfish numbers are never merged into one score.
+- "Reviewed" is not a mastery claim anywhere in the interface, including the
+  Training report and the review completion.
+- Failure states name the cause they actually observed; a failure is never
+  presented as an empty result.
 
 ## Information layers
 
@@ -42,7 +82,7 @@ The visual language distinguishes three sources:
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
 - Study: generated teaching from canonical facts, with concise provenance and grounding details on demand.
 
-The primary review navigation contains Review, Moves and Study. Notebook and Engine sit under More; Settings stays in the titlebar. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with a one-line key-moment entry when one exists (or a walk-through line when none does), the practice launcher and a compact move list, then the current-move line and analysis source. Whole-game Accuracy, phases and Move Quality stay visible in Game Summary; the evaluation timeline in that same card is collapsed until opened. Before full-game analysis, its Analyze action precedes position candidates. Engine Lab remains a separate advanced route.
+The primary review navigation contains Review, Moves, Study and Analysis — the Engine Lab route under the name that says what it is for. Notebook, History, Training and Settings sit under More. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with one key-moment action when one exists (or a walk-through line when none does), the current-move line, a single practice text action and a compact nearby-move list. Side and filter controls stay behind Options unless the visitor must pick a side. Engine lines and Game Summary stay collapsed until opened, and both say how they open. Before full-game analysis, its Analyze action precedes position candidates. Engine Lab remains a separate advanced route; its MultiPV rows are the same selectable rows Review shows, in raw UCI form, and the panel's Score and rows always describe the position the board is actually on.
 
 Quality icons come from `packages/ui` and use Move Quality Annotation System V3 across the move list, destination-square overlay, charts, summary and PNG exports. Diamonds identify elite/special moves, circles positive and ring states, rounded squares informational/warning states, and octagons severe errors. The schema classification `great` is presented to users as **Critical**, matching its only-good-move meaning without changing the persisted classification key or algorithm. Silhouette and glyph remain readable at 20–28px without relying on color. The destination-square badge always remains the canonical Stockfish Move Quality icon in Stockfish, Maia and Compare modes; changing analysis source never relabels the played move. Human Find Difficulty keeps its quieter, separate mark family in the evidence panel. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board is warm paper `--board-square-light` `#eee8d9` with celadon/mist `--board-square-dark` `#b1c6c2`, notation `#516a75`/`#38525e`, a 6px radius, one fine outline and the shared board shadow; the flip control sits outside the board.
 
@@ -76,7 +116,18 @@ The board is the primary interaction surface. The refined desktop composition
 uses one visual column for player strips, board and board-width transport; the
 adjacent contextual column contains current-position evidence and, on Review,
 Game Summary with the Evaluation Timeline. A modest amount of panel/document
-scrolling is expected; no persistent control may cover a piece.
+scrolling is expected; no persistent control may cover a piece. The floating
+surfaces — Board settings, More, Export, the practice Options menu, the Maia
+quick settings and the Why? evidence panel — dismiss with a pointer outside or
+with Escape, which closes the open one before it leaves a variation. Inline
+disclosures in the contextual panel — Engine lines, Game Summary, the evaluation
+timeline and the move evidence list — are content rather than floating panels:
+they stay open while the visitor steps the game. Every trigger of a floating
+surface says that it opens: the labelled chips and text triggers (More, Export,
+the practice Options and Maia settings) carry one small chevron that turns while
+the panel is open, the Board settings trigger keeps its icon, and the Why?
+summary keeps the disclosure marker it draws. No trigger relies on a hidden
+marker alone.
 
 Board transport follows First, Previous, Play/Pause, Next and Last. Autoplay
 stops at the canonical game end and pauses before entering or while exploring a
@@ -88,8 +139,8 @@ Board ergonomics are user-controlled on desktop. `lib/review-shortcuts.ts` is th
 single shortcut table: the key handler, the `?` overlay and the Help page all read
 it, so a shortcut cannot be documented without existing. The current map is
 `←`/`J` previous, `→`/`K` next, `↑` first, `↓` last, `Space` play/pause, `Esc`
-leave a variation or exit Focus board, `F` flip, `Z` Focus board, `?` the
-overlay. Shortcuts never fire from a form control, a link, a button or a slider,
+leave a variation or exit Focus board, `F` flip, `Z` Focus board, `/` type a
+move, `?` the overlay. Shortcuts never fire from a form control, a link, a button or a slider,
 and the whole map is suspended while the promotion chooser or the overlay owns
 the keyboard. The board-size preference is stored in settings and applied as
 `--review-board-preference` on the workspace; the CSS clamp `--review-board-max`
@@ -98,8 +149,8 @@ default applies below 901px, where the size control is hidden. The control
 displays the width the board actually rendered at, not the requested value, and
 writes only when the interaction ends. Focus board is one session-only mode:
 one column, no context panel, board bounded by the viewport, player strips, eval
-bar and transport kept, and an `Exit focus board` control that reports its state.
-Focus is never persisted.
+bar and transport kept, and an Exit focus board control in Board settings that
+reports its state. Focus is never persisted.
 
 Board feedback preferences live in Settings under *Board and display* and are
 applied by `useBoardDisplaySettings()`, which subscribes to the settings event
@@ -193,10 +244,27 @@ frequency, and the recognised opening name when the database supplies one. The
 visitor can switch between *All players* (club-strength human games, 1600+) and
 *Masters*; selecting a move explores it on the board as a variation. Frequencies
 are other players' games, never an evaluation — Stockfish still decides what is
-best, and the panel says so.
+best, and the panel says so. The numbers always carry their context: which
+database, which population it covers and the exact position (the board's FEN) they
+describe, so "these are human frequencies", "this is a position nobody has
+played" and "this lookup failed" cannot be confused. Frequency data never replaces
+a Maia probability or a Stockfish evaluation.
+
+The panel's state is explicit and its own: **loading**, **fresh**, **stale**
+(an expired cached answer whose refresh failed, labelled with its age),
+**empty** (the database carries no game that reached this position),
+**unreachable/offline**, **rate-limited** (HTTP 429) and **failed**. Each
+non-loading failure state offers **Retry explorer**, which re-issues this panel's
+request alone — it never reloads the route, re-runs the game review or disturbs
+the board or the loaded analysis. A late answer for a position the visitor has
+left is discarded, so the numbers on screen always belong to the position named
+beside them.
 
 The data is third-party reference data from the public lichess.org opening
-explorer. The browser never calls lichess.org directly: `GET /api/explorer`
+explorer, which has required an API token on every request since March 2026. The token
+is deployment configuration (`LICHESS_EXPLORER_TOKEN`) held only on the server; without
+it the panel says the lookup is unconfigured rather than showing an upstream 401 as a
+broken site. The browser never calls lichess.org directly: `GET /api/explorer`
 validates the request, forwards only the position identity (EPD) and the chosen
 database, validates the upstream payload, and returns the normalized structure
 defined in `packages/openings/src/explorer.ts`. An unusable upstream payload is
@@ -206,6 +274,15 @@ table would show missing games as zero games. Answers are cached in the
 refresh fails, and it is then labelled with its age. The panel and the Help page
 both state that the position is sent to lichess.org — this product does not
 introduce a network call silently.
+
+The population is chosen in the panel: a rating floor (1200+, 1600+, 2000+, 2200+ or
+every rating) and a speed set (blitz/rapid/classical, one speed, or every speed). The
+numbers name the population they count beside them ("All players database · rated
+2000+ · rapid"), the choice is part of the cache identity so two populations can never
+answer for each other, and the request carries the position, the database and the
+population — never a game, account or identifier from the local library. The masters
+cohort has no rating buckets, so that control is not offered for it and no rating floor
+is sent to it.
 
 ## Service states
 
@@ -273,12 +350,42 @@ Advanced filters are kept in one shared population scope disclosure
 changing the report population. While analysis is running, a quiet status line
 (`47 / 95 games analyzed · analysis running`) stays visible above the journal.
 
+The report itself needs a population to answer for. It renders once the selected
+player has at least five games, or once a training task is queued; below that,
+Training shows today's task and the run journal instead of a statistics wall built
+from one or two games. The decision follows the player's own population, not the
+active filter, so narrowing a filter to an empty scope leaves the report standing
+and says the scope is empty. The run journal does not depend on that decision: a
+queued, running, paused or failed run keeps its own controls (Resume, Cancel,
+Remove) wherever its status is reported, because the status line alone would
+otherwise announce work with no way to continue it.
+
+Coverage answers for the report's own filtered population and names its state: an
+empty scope says there is nothing to cover, a partial one says the report is partial,
+and only a complete one claims complete current analysis coverage.
+
+The player list includes every linked account that has imported games, counted by
+its imported population, whether or not those games have been analyzed yet: an
+account is a population before it is a report. When the selected account's imported
+games have no analysis yet, the folded page shows the analysis start control
+(*Analyse imported games*, freshness, start) scoped to that account, because that is
+the work the state is asking for.
+
 Whole-history run history is secondary to the resulting data. Active/error runs
 and the latest useful terminal run remain visible; older terminal runs sit under
 `Past analysis runs`, and successful item lists start collapsed. `Remove from
 history` and `Clear finished runs` delete only batch-job records. They never delete
 synced games, review records, objective cache or Training data, and an active run
 must be cancelled before removal.
+
+A training review carries what it was worth — produced unaided, reached with help, or
+read with the evidence on screen — and only unaided reviews advance mastery
+(`learning → review → mastered`) on a fixed 1/3/7/21-day ladder, and only when the position
+had come due: an early review is recorded and earns nothing. A position that is not due again
+says so (`This position is not due again until <date>`), and the review actions appear only for
+work that is ready. Training states `N due
+now` or the next due date, and a task's row states `mastered/reviewed`, so the interface
+never presents "reviewed" as mastery.
 
 No weakness is presented as recurring until the deterministic signal occurs in
 at least two distinct games. Move-quality icons and labels reuse the shared V3

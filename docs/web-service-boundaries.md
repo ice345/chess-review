@@ -66,6 +66,17 @@ shared rate enforcement and a coordinated provider queue before launch. R5 must
 verify the actual hosting topology; these limits are not a distributed-service
 claim.
 
+## Opening Explorer egress
+
+`GET /api/explorer` is the only code that talks to `explorer.lichess.ovh`. It forwards
+the position identity (EPD), the database and the population that was requested, and
+nothing from the local library. Lichess requires a token on every explorer request
+since March 2026, so the route sends `Authorization: Bearer $LICHESS_EXPLORER_TOKEN`;
+without that configuration it answers `503` with `unconfigured: true` rather than
+letting the upstream 401 read as a broken site. The token is server-only and never
+appears in a response, a cache entry or the browser. Answers are cached per
+`database + population + position` in the `remote-positions` store.
+
 ## Lichess authorization
 
 Configure private `LICHESS_SESSION_SECRET` (at least 24 characters), unique public

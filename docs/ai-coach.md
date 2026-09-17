@@ -37,21 +37,66 @@ Selecting Ollama keeps facts local. Selecting the OpenAI-compatible provider is 
 
 For development, `pnpm dev` probes and reuses an existing Ollama API or starts the installed executable with `ollama serve`. It also reuses or owns the optional FastAPI service and Next.js application, and shuts down only processes it created. `pnpm dev:local-ai` is the service-only companion for an already-running web app. `pnpm dev:web` starts Browser Core without managed local services. Review's Maia selection and Study generation retry offline health automatically; provider/model/language defaults live in Settings instead of dominating the Study route.
 
+## Deterministic whole-game summary
+
+When no provider answers, `buildDeterministicGameCoach()` writes the summary from
+canonical facts only. Its counting and wording rules are part of the contract:
+
+- **Two layers stay apart.** Quality claims consume `qualityCounts`; special
+  semantics consume `annotationCounts`. Book and Forced are annotations, never
+  quality bands, so they cannot inflate a claim about the engine's first choice.
+  `CoachGameFacts.players` carries both layers explicitly, which is the shape the
+  local-ai schema already expected. A V1 record has neither, so the compatibility
+  projection is used as the documented fallback — including Critical being
+  projected as `great` and Sacrifice having no projection at all.
+- **The wording names exactly the counted set.** The summary counts moves that
+  matched the engine's first choice (`best`) and mentions Excellent separately as
+  "within two win-percentage points". It never says "Best or better".
+- **Key moments are explained from their own evidence.** A Brilliant, Critical,
+  missed win or missed mate annotation produces its own sentence; otherwise the
+  sentence states the recorded loss. A zero-loss annotated moment is never
+  described as a "0.0-point swing".
+- **No invented causes.** A Blunder proves a large loss, never which tactic was
+  missed. The error recommendation is titled "Error review" and its advice is a
+  generic check of forcing moves, captures and threats. This build detects one
+  tactical motif (`sacrifice`), and the summary claims nothing beyond it.
+- **Confidence describes the record, not the prose.** It is `high` when selective
+  verification re-searched every move, `medium` when it re-searched some, and
+  `low` when the summary rests on the baseline search. `CoachGameFacts.moves[].verified`
+  carries that fact. The Study main layer never prints `deterministic`,
+  `canonical-facts` or a bare confidence token. It says the summary was written
+  from this game's analysis and labels confidence by what it measures (every
+  position re-checked, some re-checked, or the original search). Provider, model,
+  facts version, validated-line counts and fallback reason stay inside
+  **Why this explanation?**.
+
+Bumping these semantics bumps `COACH_PROMPT_VERSION` (`coach-v4`), which
+invalidates cached deterministic and provider text alike.
+
 ## Validation and grounding
 
 Public production defaults to Browser Core. It never probes localhost AI and
 Study builds matching-language summaries from the existing canonical facts on
 request. Provider/model controls are shown only in Enhanced Local on a loopback
-hostname. The interface is English; Coach output is a separate English/Chinese
-preference (new default English, existing preferences preserved). Full capability,
-timeout and data-disclosure rules are in [web-service-boundaries.md](web-service-boundaries.md).
+hostname. Outer review navigation stays English. On the Study/coach surface,
+headings, buttons, empty states and fallback text follow the coach language
+preference, so a `zh-CN` lesson is not wrapped in English teaching chrome.
+Full capability, timeout and data-disclosure rules are in [web-service-boundaries.md](web-service-boundaries.md).
 
-Provider output must first match the strict Pydantic schema. Coach v3 requires the six nullable teaching keys `notice`, `moveIdea`, `problem`, `consequence`, `practicalAlternative` and `takeaway`; a provider that silently returns the old shape fails validation. Both move explanations and whole-game summaries are validated against the requested language. A Chinese request that contains no meaningful Chinese output fails closed to deterministic Chinese copy. The UI presents the available values in that order and keeps source cards and validated lines separate from the teaching prose.
+Provider output must first match the strict Pydantic schema. Coach v4 keeps the v3 response contract: the six nullable teaching keys `notice`, `moveIdea`, `problem`, `consequence`, `practicalAlternative` and `takeaway` are required, and a provider that silently returns the old shape fails validation. What v4 changes is the deterministic text and its counting rules (above), so cached prose from either provider is invalidated with it. Both move explanations and whole-game summaries are validated against the requested language. A Chinese request that contains no meaningful Chinese output fails closed to deterministic Chinese copy. The UI presents the available values in that order and keeps source cards and validated lines separate from the teaching prose.
 
 Every returned line must be an exact prefix of a supplied engine PV and is replayed move by move with `python-chess`; the service emits validated UCI and SAN rather than trusting model notation. Legal but unsupplied variations and ungrounded move mentions are removed. `humanPerspective` is removed without Maia facts, `tacticalIdea` is removed without motif or sacrifice evidence, `consequence` is removed without `futureConsequence`, and `practicalAlternative` is removed without the deterministic Stockfish/Maia comparison. Empty or string-valued `null` fields are normalized to absent. Removed claims lower confidence and appear in the grounding report.
 
-The response records provider, model, requested language, `coach-v3` prompt version, generation time, validated-line count and grounding removals. Cached text from another language is hidden instead of being shown under the current language setting. If the provider is offline, unconfigured, times out, exhausts its budget, emits malformed JSON or fails validation, the web app immediately renders matching-language deterministic copy from canonical facts. The failure never blocks objective review.
+The response records provider, model, requested language, `coach-v4` prompt version, generation time, validated-line count and grounding removals. Cached text from another language is hidden instead of being shown under the current language setting. If the provider is offline, unconfigured, times out, exhausts its budget, emits malformed JSON or fails validation, the web app immediately renders matching-language deterministic copy from canonical facts. The failure never blocks objective review.
 
 Generated move explanations and game summaries are written back to the existing IndexedDB analysis record. The active request is owned by the persistent review runtime rather than the Study route component, so moving among Review, Moves and Study does not cancel generation; the Study navigation item exposes its background-running state and the result is visible when the user returns. Cached coach text is retained only when its `promptVersion` and requested language match the current contract. Replacing or invalidating a move's Maia model/Elo enrichment also removes that move's Coach response and the whole-game Coach summary, because either may have incorporated the previous human assumptions. Objective analysis remains reusable while stale prose is discarded.
 
-The visible product surface is Study, while the stable URL and stored schema keep the existing `coach` name. Study prioritizes the whole-game lesson, then contextual move teaching. Review owns detailed Stockfish/Maia facts; Study presents a single provenance line and hides the validation counts, removed claims and accepted PV lines behind “Why this explanation?”. Rapid generation is guarded by one active abortable request. The request remains attached to the exact move/game fact snapshot even if the canonical cursor changes; completion is persisted only when rebuilding those facts still produces the same snapshot. Leaving the review workspace aborts owned work, while ordinary nested-route navigation does not.
+The visible product surface is Study, while the stable URL and stored schema keep the existing `coach` name.
+
+Study's first screen is action, then lesson, then provenance:
+
+1. **One learning action.** The primary button is **Build whole-game study** (zh-CN: **生成本局总结**), including Browser Core and when the local service is missing. A missing provider is a state, not a failure page: the screen says a summary can still be built from this game's own analysis and keeps that button enabled. Generation stays lazy, on demand and abortable.
+2. **The lesson.** Whole-game study first, then the selected move. Move references use `formatMoveNotation` (`10. Nxb5`), never `Ply N`. When facts cannot support personalised depth — no key moments, no Maia facts, no re-checked lines — Study states that the summary is a numerical overview and offers a concrete check (walk the game and compare with the engine's first choice) instead of presenting the generic template as individual guidance.
+3. **Provenance last.** Service, provider, language and configuration sit below the lesson. A working facts fallback is not shown with error styling.
+
+Review owns detailed Stockfish/Maia facts. Rapid generation is guarded by one active abortable request. The request remains attached to the exact move/game fact snapshot even if the canonical cursor changes; completion is persisted only when rebuilding those facts still produces the same snapshot. Leaving the review workspace aborts owned work, while ordinary nested-route navigation does not.

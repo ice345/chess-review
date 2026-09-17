@@ -56,6 +56,84 @@ hidden-lines message.
 recognition; a separate explorer package would have split one boundary for no
 gain. This is the documented choice the audit allowed.
 
+## Population filters (audit P01, stage 2)
+
+The panel used to send one fixed population (blitz/rapid/classical, 1600+) with no
+way to see a different census, and the coverage line said "human club games rated
+1600+" for every answer. The population is now a choice, and it is part of the
+answer's identity:
+
+- `ExplorerPopulationV1 { ratingFloor, speeds }` lives in `packages/openings`, with
+  the rating buckets, the speed allowlist, the canonical key, the label and the query
+  encoding beside it. A value the contract does not define is rejected (`parseExplorerPopulation`
+  returns null and the route answers 400) instead of being silently rounded to a
+  population nobody asked for.
+- The cache key is `database + population + position` (`explorerCacheKey`), so an
+  answer for "rapid among 2000+" can never be served as "all speeds at every rating".
+- `lib/server/explorer-upstream.ts` is the only place that builds the lichess.org
+  request, and it omits a bound rather than sending an empty one. The masters cohort
+  is one elite database with no rating buckets: it takes the speeds and never a
+  rating floor.
+- The panel shows a rating select for the players database and a speed preset for
+  both, and repeats the population in the line above the numbers.
+
+Verification: `packages/openings/src/explorer.test.ts` (buckets, order-insensitive
+key, label, parsing round-trip), `apps/web/src/lib/server/explorer-upstream.test.ts`
+(defaults, omitted bounds, masters never rated) and `e2e/opening-explorer.spec.ts`
+(the controls change the request and the line above the numbers, and the rating
+control disappears with the masters database).
+
+## Upstream authentication (2026-09-16)
+
+Since 2026-03-03 the Lichess opening explorer answers anonymous requests with
+`401 Authorization Required` (point 2.6 read: the DDoS protection moved rate limiting
+to the account layer; the service stays free at about 25 requests per minute).
+This deployment sent no token, so every lookup failed.
+
+- `LICHESS_EXPLORER_TOKEN` is deployment configuration; `explorerRequestHeaders()` is
+  the only place the token is put on a request, and it never reaches the browser or a
+  response body.
+- Without a token the route answers `503` with `unconfigured: true` instead of letting
+  the upstream 401 through, and the panel reports **"This deployment has no Lichess
+  explorer token, so the lookup cannot run."** — a configuration state, not a rate
+  limit and not "this position has no games".
+- The panel's other states are unchanged, and a cached answer still stands in when a
+  lookup fails.
+
+Verification: `apps/web/src/lib/server/explorer-upstream.test.ts` (the bearer header on
+every request) and `e2e/opening-explorer.spec.ts` (the unconfigured state is its own
+message). The authenticated upstream call itself needs a token in the environment and
+was not exercised here.
+
+## Recovery and state (audit P01, stage 1)
+
+The panel's state is named rather than inferred: `loading`, `fresh`, `stale`
+(cached, refresh failed, age shown), `empty`, `offline`, `rate-limited` and
+`failed`. A client lookup that produces no answer throws
+`ExplorerRequestError` with a `kind`, so the panel can tell unreachable,
+rate-limited and generic failures apart without matching message text.
+
+**The retry is the panel's own.** Each failure, the empty position and the stale
+answer offer **Retry explorer**, which re-issues only this panel's request — and,
+because the visitor asked again, asks the endpoint rather than reusing a
+still-fresh cached census. Nothing reloads the route, re-runs the game review or
+touches the board or the stored analysis. That is what keeps a third-party lookup
+from degrading Review.
+
+**A late answer is never relabelled.** Each lookup is keyed by the position and
+the database, and a monotonic run id decides which lookup may write. A superseded
+answer is dropped and the panel returns to `loading`, so the numbers on screen
+always describe the position named beside them.
+
+**The numbers state their context.** The panel names the database, the population
+it covers (the chosen population, e.g. "rated 1600+ · blitz, rapid, classical", or
+"human master games"), the sample size
+and the board's FEN. Database frequency is never presented as best-move advice,
+and it does not replace Maia probabilities or Stockfish evaluations.
+
+Rating and time-control filters are stage 2 and are deliberately absent; the
+request still carries only the position identity (EPD) and the database.
+
 ## Verification
 
 - `packages/openings/src/explorer.test.ts` covers normalization: counts,
@@ -70,7 +148,11 @@ gain. This is the documented choice the audit allowed.
   caught a real defect — the out-of-line key was not passed to `put`, so nothing
   was ever cached.
 - `e2e/opening-explorer.spec.ts` drives the real panel with a mocked endpoint:
-  counts, split, opening name, fetch age, the privacy note, frequency order, the
-  exact query parameters (only `fen` and `source`), playing a move into a
-  variation, switching database, the empty-position copy, a rate-limit error
-  instead of an empty table, and the panel being absent during practice.
+  counts, split, opening name, fetch age, the database/population/position context,
+  the privacy note, frequency order, the exact query parameters (only `fen` and
+  `source`), playing a move into a variation, switching database, the empty-position
+  copy, a rate-limit error instead of an empty table, failure-then-retry and
+  offline-then-retry in place (the document is never reloaded and the cached
+  analysis is still loaded), a previous position's answer being dropped when the
+  visitor moves on, and the panel being absent during practice. The
+  previous-position case was checked to fail when the discard guard is removed.
