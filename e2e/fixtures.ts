@@ -160,15 +160,44 @@ export async function openReviewMore(page: Page): Promise<void> {
   }
 }
 
-export async function goToReviewMoreSection(page: Page, name: "Engine" | "Notebook"): Promise<void> {
+/** Analysis is a primary review section; the remaining tool surfaces sit under More. */
+export async function goToReviewSection(page: Page, name: "Analysis" | "Notebook"): Promise<void> {
+  if (name === "Analysis") {
+    await page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name, exact: true }).click();
+    return;
+  }
   await openReviewMore(page);
   await page.locator("details.review-more .action-menu").getByRole("link", { name, exact: true }).click();
 }
 
+/** A folded block in the contextual panel is opened by its own summary. */
+async function openReviewDisclosure(page: Page, selector: string): Promise<void> {
+  const details = page.locator(selector);
+  if ((await details.getAttribute("open")) === null) {
+    await details.locator("summary").first().click();
+  }
+}
+
+/** Review folds the engine candidate list away until it is asked for. */
+export async function openReviewEngineLines(page: Page): Promise<void> {
+  await openReviewDisclosure(page, "details.review-engine-lines");
+}
+
+/** The whole-game report is folded the same way. */
+export async function openReviewGameSummary(page: Page): Promise<void> {
+  await openReviewDisclosure(page, "details.game-summary-section");
+}
+
 export async function openReviewTimeline(page: Page): Promise<void> {
+  // The evaluation timeline sits inside the folded Game Summary, so it is not
+  // clickable until that summary is open.
+  const section = page.locator("details.game-summary-section");
+  if ((await section.getAttribute("open")) === null) {
+    await page.locator(".game-summary-section > summary").click();
+  }
   const panel = page.locator(".timeline-panel");
   if ((await panel.getAttribute("open")) === null) {
-    await panel.locator("summary").click();
+    await panel.locator("summary").first().click();
   }
 }
 
@@ -202,11 +231,20 @@ export async function seedHistoricalReviewWithPgnDrift(page: Page) {
   return { record, analysis, cacheKey, storedPgn: storedGame.pgn, reviewPgn: record.input };
 }
 
-export async function seedAdvancedStudy(page: Page) {
+export async function seedAdvancedStudy(page: Page, options: { reportPopulation?: boolean } = {}) {
+  // Three games by default. `reportPopulation` adds two more so the population can
+  // carry the Training report, which needs five games or a queued task; the second
+  // opening keeps a five-game minimum sample meaningless, which is what the
+  // report's own filter test pins. Specs that only need study evidence keep the
+  // three-game population and its smaller record counts.
   const pgns = [
     `[Event "Phase 7 study one"]\n[Date "2026.08.01"]\n[White "Ada"]\n[Black "Mikhail"]\n[Result "0-1"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 *`,
     `[Event "Phase 7 study two"]\n[Date "2026.08.02"]\n[White "Ada"]\n[Black "Grace"]\n[Result "1/2-1/2"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 *`,
     `[Event "Phase 7 study three"]\n[Date "2026.08.03"]\n[White "Ada"]\n[Black "Katherine"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 *`,
+    ...(options.reportPopulation ? [
+      `[Event "Phase 7 study four"]\n[Date "2026.08.04"]\n[White "Ada"]\n[Black "Ruth"]\n[Result "1-0"]\n\n1. e4 c5 2. Nf3 d6 3. d4 cxd4 *`,
+      `[Event "Phase 7 study five"]\n[Date "2026.08.05"]\n[White "Ada"]\n[Black "Vera"]\n[Result "0-1"]\n\n1. e4 c5 2. Nf3 e6 3. d4 cxd4 *`,
+    ] : []),
   ];
   const values: Record<string, Array<[IDBValidKey, unknown]>> = {
     "review-records": [],
@@ -221,24 +259,26 @@ export async function seedAdvancedStudy(page: Page) {
       game,
       positionAnalyses: fens.map((fen, positionIndex) => positionResult(fen, game.plies[positionIndex]?.uci, positionIndex)),
       division: divideGame(game),
-      opening: { eco: "C50", name: "Italian Game", variation: "Giuoco Piano", matchedPly: 5, theoryUntilPly: 6 },
+      opening: index < 3
+        ? { eco: "C50", name: "Italian Game", variation: "Giuoco Piano", matchedPly: 5, theoryUntilPly: 6 }
+        : { eco: "B50", name: "Sicilian Defense", variation: "Open", matchedPly: 4, theoryUntilPly: 6 },
       stockfishVersion: STOCKFISH_VERSION,
       depth: DEPTH,
       multiPv: MULTI_PV,
       createdAt: `2026-08-0${index + 1}T12:00:00.000Z`,
     });
     const openingError = analysis.moves[0]!;
-    openingError.classification = index === 2 ? "blunder" : "mistake";
-    openingError.quality = index === 2 ? "blunder" : "mistake";
-    openingError.accuracy = index === 2 ? 35 : 55 + index * 5;
+    openingError.classification = index >= 2 ? "blunder" : "mistake";
+    openingError.quality = index >= 2 ? "blunder" : "mistake";
+    openingError.accuracy = index >= 2 ? 35 : 55 + index * 5;
     openingError.classificationReason = {
       ...openingError.classificationReason,
       precedenceRule: "phase-7-opening-fixture",
       isEngineBest: false,
       engineRank: 3,
-      centipawnLoss: index === 2 ? 240 : 150,
+      centipawnLoss: index >= 2 ? 240 : 150,
       winPercentAfter: 30 + index * 4,
-      winPercentLoss: index === 2 ? 31 : 20 + index * 3,
+      winPercentLoss: index >= 2 ? 31 : 20 + index * 3,
     };
     const missedChance = analysis.moves[2]!;
     if (index < 2) {
@@ -277,14 +317,16 @@ export async function seedAdvancedStudy(page: Page) {
       ...analysis.white.classificationCounts,
       best: Math.max(0, (analysis.white.classificationCounts.best ?? 0) - (index < 2 ? 2 : 1)),
       mistake: index < 2 ? 1 : 0,
-      blunder: index === 2 ? 1 : 0,
+      blunder: index >= 2 ? 1 : 0,
       ...(index < 2 ? { missed_win: 1 } : {}),
     };
     analysis.white.qualityCounts = {
       ...analysis.white.qualityCounts,
       best: Math.max(0, analysis.white.qualityCounts.best - (index < 2 ? 2 : 1)),
       mistake: index < 2 ? 1 : 0,
-      blunder: index === 2 ? 1 : index < 2 ? 1 : 0,
+      // Every fixture game blunders once: move 1 for the blunder games, the
+      // missed win's quality for the first two.
+      blunder: 1,
     };
     analysis.white.annotationCounts = {
       ...analysis.white.annotationCounts,
@@ -321,7 +363,7 @@ export async function seedUnanalyzedReview(page: Page, pgn = SHORT_ANALYSIS_PGN)
   return record;
 }
 
-export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<{ account: PlatformAccount; games: SyncedGame[] }> {
+export async function seedConnectedLibrary(page: Page, gameCount = 84, options: { pgn?: string } = {}): Promise<{ account: PlatformAccount; games: SyncedGame[] }> {
   const account: PlatformAccount = {
     id: "chesscom:hikaru",
     provider: "chesscom",
@@ -355,7 +397,10 @@ export async function seedConnectedLibrary(page: Page, gameCount = 84): Promise<
       url: `https://www.chess.com/game/live/${index}`,
       importedAt: "2026-08-23T00:00:00.000Z",
     },
-    pgn: SAMPLE_PGN,
+    // `options.pgn` lets a spec keep the imported games distinct from the manual
+    // review's PGN: the same PGN is the same game, so the legacy cache repair would
+    // mark the imported copies analyzed from the manual review's own analysis.
+    pgn: options.pgn ?? SAMPLE_PGN,
     playedAt: new Date(Date.UTC(2026, 7, 23, 0, 0, -index)).toISOString(),
     timeClass: index % 2 === 0 ? "blitz" : "rapid",
     timeControl: index % 2 === 0 ? "180+2" : "600",

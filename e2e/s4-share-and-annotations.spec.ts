@@ -29,7 +29,7 @@ test("a share link imports the game into a fresh browser", async ({ page, browse
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(SHARED);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 120_000 });
 
   const shareUrl = await shareLinkFromMenu(page);
   console.log(JSON.stringify({ shareUrlLength: shareUrl.length }));
@@ -42,7 +42,7 @@ test("a share link imports the game into a fresh browser", async ({ page, browse
     const tab = await recipient.newPage();
     await tab.goto(shareUrl);
     await expect(tab).toHaveURL(/\/review\/[a-f0-9]+$/, { timeout: 60_000 });
-    await expect(tab.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 120_000 });
+    await expect(tab.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 120_000 });
     const titlebar = (await tab.locator(".review-titlebar").innerText()).replace(/\s+/g, " ");
     console.log(JSON.stringify({ recipientUrl: new URL(tab.url()).pathname, titlebar }));
     // Non-ASCII player names survived the link. The event subtitle is not
@@ -66,7 +66,7 @@ test("shows imported comments, glyphs and variations", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(ANNOTATED);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 120_000 });
 
   await page.getByRole("link", { name: "Moves", exact: true }).click();
   const rows = page.locator(".review-move-list > button");
@@ -98,7 +98,7 @@ test("exports an annotated PGN that keeps the imported annotations", async ({ pa
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(ANNOTATED);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 120_000 });
 
   await page.getByText("Export", { exact: true }).click();
   const download = page.waitForEvent("download");
@@ -119,7 +119,7 @@ test("exports an annotated PGN that keeps the imported annotations", async ({ pa
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(pgn);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 120_000 });
   await page.getByRole("link", { name: "Moves", exact: true }).click();
   await expect(page.locator(".move-imported-comment").first()).toContainText("Best by test");
   await expect(page.locator(".move-imported-variation").first()).toContainText("1. d4 d5");

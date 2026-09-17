@@ -25,7 +25,7 @@ async function review(page: Page, pgn: string): Promise<string> {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(pgn);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
   return page.url();
 }
 
@@ -100,9 +100,9 @@ test("a returning visitor keeps the engine and can reopen reviewed games offline
 
   // Both reviewed games still render with no network at all.
   await page.goto(firstReview);
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
   await page.goto(secondReview);
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
 
   // An address that was never opened falls back to a page that explains itself.
   await page.goto("/training");

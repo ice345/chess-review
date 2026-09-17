@@ -30,9 +30,9 @@ test("cancel and retry remain usable with constrained browser resources", async 
   await expect(page.locator('.history-list')).toContainText('Cancelled');
   await page.goto(`/review/${record.id}`);
   await page.getByRole('button', { name: 'Analyze game', exact: true }).click();
-  await expect(page.getByText('MOVE QUALITY', { exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText('GAME SUMMARY', { exact: true })).toBeVisible({ timeout: 90_000 });
   await page.reload();
-  await expect(page.getByText('MOVE QUALITY', { exact: true })).toBeVisible();
+  await expect(page.getByText('GAME SUMMARY', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

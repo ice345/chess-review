@@ -28,6 +28,7 @@ async function openGuidedReview(page: import("@playwright/test").Page) {
   // lesson needs a divider that actually split the game to have anything to say.
   fixture.analysis.division = { totalPlies: fixture.analysis.division.totalPlies, middlePly: 11 };
   fixture.analysis.white.phaseAccuracy = { opening: 92, middlegame: 60 };
+  fixture.analysis.black.phaseAccuracy = { opening: 95, middlegame: 88 };
   await writeStores(page, { "objective-analyses": [[fixture.cacheKey, fixture.analysis]] });
 
   await page.goto(`/review/${fixture.record.id}`);
@@ -66,10 +67,17 @@ test("practises a key moment with a hint before the answer", async ({ page }) =>
   await openGuidedReview(page);
   await page.getByRole("button", { name: "Next key moment →" }).click();
 
+  // Guided navigation offers the moment blind: the answer stays withheld until the
+  // visitor chooses to solve it or to reveal it.
   const action = page.locator(".key-moment-action");
-  await expect(action).toContainText("1… e5");
-  await expect(action).toContainText("Blunder");
-  await action.getByRole("button", { name: "Try again" }).click();
+  await expect(action).toContainText("Solve this position before seeing what the engine says about it.");
+  await expect(action).not.toContainText("Blunder");
+  await expect(page.locator(".objective-route > .dual-verdict")).toHaveCount(0);
+  await expect(page.locator(".objective-route > .position-analysis")).toHaveCount(0);
+
+  await action.getByRole("button", { name: "Try it" }).click();
+  // Concealed, not exposed: a solve here is a first-time find.
+  await expect(page.locator(".retro-practice")).not.toContainText("Review practice");
 
   const practice = page.getByRole("region", { name: "Learn from your mistakes" });
   await expect(practice).toContainText("1 / 1");
@@ -97,6 +105,104 @@ test("practises a key moment with a hint before the answer", async ({ page }) =>
   const completion = page.getByRole("region", { name: "Review complete" });
   await expect(completion).toContainText("Solved 0, hinted 1.");
   await expect(completion).toContainText("A hinted position is not counted as solved.");
+  // A blind attempt is not a review of an answer that was already on screen.
+  await expect(completion).not.toContainText("followed a position whose analysis you had already seen");
+});
+
+test("keeps guided progress across routes and a refresh", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openGuidedReview(page);
+  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await expect(page.locator(".key-moment-progress")).toHaveText("Moment 1 of 1");
+
+  // Step off the moment, so a session that reset would be visible.
+  await page.getByRole("button", { name: "Next move" }).click();
+  await expect(page.locator(".key-moment-progress")).toHaveText("1 key moment · 1 seen");
+
+  await page.getByRole("link", { name: "Study", exact: true }).click();
+  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await expect(page.locator(".key-moment-progress")).toHaveText("1 key moment · 1 seen");
+
+  await page.reload();
+  await expect(page.locator(".key-moment-progress")).toHaveText("1 key moment · 1 seen");
+});
+
+test("marks practice that follows an answer the visitor already saw", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openGuidedReview(page);
+
+  await page.getByRole("button", { name: "Next key moment →" }).click();
+  const action = page.locator(".key-moment-action");
+  // Choosing to look retires the blind offer and shows the analysis.
+  await action.getByRole("button", { name: "Show the analysis" }).click();
+  await expect(page.locator(".objective-route > .dual-verdict")).toBeVisible();
+  await expect(action).toContainText("Blunder");
+
+  await action.getByRole("button", { name: "Try again" }).click();
+  const practice = page.getByRole("region", { name: "Learn from your mistakes" });
+  await expect(practice).toContainText("Review practice");
+  await expect(practice).toContainText("already seen this position");
+  await expect(practice).not.toContainText(/Best was/);
+
+  // The analysis exports contain the answer, so they wait for the attempt.
+  await page.getByText("Export", { exact: true }).click();
+  const canonicalJson = page.getByRole("button", { name: "Canonical JSON" });
+  await expect(canonicalJson).toBeDisabled();
+  await expect(page.getByText("Analysis exports are withheld while you solve this position.")).toBeVisible();
+  await page.getByText("Export", { exact: true }).click();
+
+  await practice.getByRole("button", { name: "View the solution" }).click();
+  await practice.getByRole("button", { name: "Exit" }).click();
+  await page.getByText("Export", { exact: true }).click();
+  await expect(canonicalJson).toBeEnabled();
+  await page.getByText("Export", { exact: true }).click();
+
+  await page.locator(".key-moment-finish").getByRole("button", { name: /Finish review/ }).click();
+  const completion = page.getByRole("region", { name: "Review complete" });
+  await expect(completion).toContainText("1 of them followed a position whose analysis you had already seen");
+});
+
+test("adds this game's positions to Training from the end of the review", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openGuidedReview(page);
+  await page.locator(".key-moment-finish").getByRole("button", { name: /Finish review/ }).click();
+  const completion = page.getByRole("region", { name: "Review complete" });
+
+  // The manual import has no learner, so the visitor names the side; the offer
+  // starts on the side that actually recorded a trainable position.
+  await expect(completion.getByRole("button", { name: "Black" })).toHaveAttribute("aria-pressed", "true");
+  await expect(completion).toContainText("1 position will join 1 training task");
+  await completion.getByRole("button", { name: "Add this position to Training" }).click();
+
+  await expect(completion).toContainText("Added 1 position to 1 task");
+  await expect(completion).toContainText("1 position from this game is already in Training across 1 task");
+  await expect(completion.getByRole("link", { name: "Open the task →" })).toHaveAttribute("href", /^\/training\?player=manual%3A/);
+  await expect(completion.getByRole("button", { name: /Add .* to Training/ })).toHaveCount(0);
+});
+
+test("counts what was actually viewed when the review ends early", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openGuidedReview(page);
+  // The board starts before the only moment, so nothing has been viewed yet.
+  await page.locator(".key-moment-finish").getByRole("button", { name: "Finish review early" }).click();
+
+  const completion = page.getByRole("region", { name: "Review complete" });
+  await expect(completion).toContainText("0 of 1 key moment viewed");
+  await expect(completion).toContainText("1 moment is still unseen");
+  await expect(completion).not.toContainText(/reviewed/);
+
+  // The state is not a trap: continuing returns to the same place in the tour.
+  await completion.getByRole("button", { name: "Back to key moments" }).click();
+  await expect(page.locator(".key-moment-progress")).toHaveText("1 key moment · 0 seen");
+});
+
+test("names a key-moment icon by the move's own label", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openGuidedReview(page);
+  await page.locator(".game-summary-section > summary").click();
+  // The only key moment is a blunder, so its icon must not read as "Critical".
+  const icon = page.locator(".critical-list button").first().getByRole("img");
+  await expect(icon).toHaveAccessibleName("Blunder");
 });
 
 test("ends the review with canonical facts and a next step", async ({ page }) => {
@@ -110,11 +216,14 @@ test("ends the review with canonical facts and a next step", async ({ page }) =>
   await finish.getByRole("button", { name: "Finish review" }).click();
 
   const completion = page.getByRole("region", { name: "Review complete" });
-  await expect(completion).toContainText("1 key moment reviewed");
+  await expect(completion).toContainText("The only key moment was viewed");
+  // The record is a manual import, so the summary covers both sides and states
+  // the mover instead of pretending one of them is the visitor.
   await expect(completion).toContainText("Most important mistake");
+  await expect(completion).toContainText("1… e5");
   await expect(completion).toContainText("gave up 28.0% win probability");
-  await expect(completion).toContainText("Best moment");
-  await expect(completion).toContainText("Middlegame was the lowest-scoring phase: White Accuracy 60.0.");
+  await expect(completion).toContainText("Worth another look");
+  await expect(completion).toContainText("White's middlegame was the lowest-scoring phase in this game: Accuracy 60.0.");
   await expect(completion).toContainText("No position from this game is in Training yet.");
   await expect(completion.getByRole("link", { name: "Open Training" })).toHaveAttribute("href", "/training");
   await expect(completion.getByRole("link", { name: "Study this game" })).toBeVisible();

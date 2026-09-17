@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { seedReview } from "./fixtures";
+import type { Page } from "@playwright/test";
+import { mockLocalAi, openReviewEngineLines, openReviewGameSummary, seedReview } from "./fixtures";
 import { REVIEW_SHORTCUTS } from "../apps/web/src/lib/review-shortcuts";
 
 /* Board ergonomics: keyboard shortcuts, the persisted desktop board size and
    Focus board. These are the interaction contracts of the review workspace, so
    they are asserted on the real board rather than through unit tests. */
 
-async function openReview(page: import("@playwright/test").Page) {
+async function openReview(page: Page) {
   const fixture = await seedReview(page);
   await page.goto(`/review/${fixture.record.id}`);
   await expect(page.getByRole("region", { name: "Persistent board workspace" })).toBeVisible();
@@ -14,7 +15,7 @@ async function openReview(page: import("@playwright/test").Page) {
   return fixture;
 }
 
-async function boardWidth(page: import("@playwright/test").Page): Promise<number> {
+async function boardWidth(page: Page): Promise<number> {
   const box = await page.locator(".board-wrap").boundingBox();
   if (!box) throw new Error("The board is not visible.");
   return Math.round(box.width);
@@ -69,9 +70,7 @@ test("drives the review from the keyboard", async ({ page }) => {
   await page.locator(".board-controls > summary").click();
   const slider = page.getByRole("slider", { name: "Board size" });
   await slider.focus();
-  const sliderValue = await slider.inputValue();
-  await page.keyboard.press("ArrowRight");
-  await expect(slider).not.toHaveValue(sliderValue);
+  await slider.press("ArrowRight");
   await expect(status).toContainText("Starting position");
   await page.keyboard.press("Escape");
 
@@ -79,6 +78,8 @@ test("drives the review from the keyboard", async ({ page }) => {
   await page.locator('[data-square="d2"]').click();
   await page.locator('[data-square="d4"]').click();
   await expect(page.getByText(/Analysis variation · d4/)).toBeVisible();
+  // A new branch opens its engine lines, but only the menus that paint over the
+  // board consume the first Escape; leaving the variation is one press.
   await page.keyboard.press("Escape");
   await expect(page.getByText(/Analysis variation/)).toHaveCount(0);
 });
@@ -91,13 +92,15 @@ test("keeps the desktop board size under the visitor's control", async ({ page }
 
   await page.locator(".board-controls > summary").click();
   const slider = page.getByRole("slider", { name: "Board size" });
-  // The control reports what the layout granted, not what was requested.
-  await expect(slider).toHaveValue(String(automatic));
+  // The control reports what the layout granted, not what was requested: the
+  // label carries the rendered width, while the range input can only hold a
+  // multiple of its step (min 320 + k*20), so it holds the nearest one.
   await expect(page.locator(".board-size-row small")).toContainText(`Automatic · ${automatic} px`);
+  expect(Math.abs(Number(await slider.inputValue()) - automatic)).toBeLessThanOrEqual(10);
 
   await slider.focus();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
+  await slider.press("ArrowRight");
+  await slider.press("ArrowRight");
   await expect(workspace).toHaveAttribute("style", /--review-board-preference: \d+px/);
   await expect.poll(() => boardWidth(page)).toBeGreaterThan(automatic);
   const grown = await boardWidth(page);
@@ -120,8 +123,77 @@ test("keeps the desktop board size under the visitor's control", async ({ page }
 
   // Narrow layouts stay responsive and hide a control that could not apply.
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator(".board-controls")).toBeHidden();
+  await expect(page.locator(".board-size-row")).toBeHidden();
+  await expect(page.locator(".board-controls")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("board settings sit above move arrows and dismiss with Escape", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openReview(page);
+  await page.getByRole("button", { name: "Next move" }).click();
+  await page.locator(".board-controls > summary").click();
+  const menu = page.locator(".board-controls-menu");
+  await expect(menu).toBeVisible();
+  const hitIsMenu = await menu.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return Boolean(hit && node.contains(hit));
+  });
+  expect(hitIsMenu, "chessboard arrows must not paint through the settings menu").toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(page.locator(".move-status")).toContainText("1. e4");
+});
+
+/** One floating surface: opens by its own summary, closes on Escape, and closes
+ *  again on a pointer outside it. The titlebar text has no handler, so that click
+ *  cannot move the board or the current ply. */
+async function expectFloatingDismissal(page: Page, name: string, selector: string) {
+  const details = page.locator(selector);
+  const summary = details.locator("summary").first();
+  await summary.click();
+  await expect(details, `${name} opens`).toHaveAttribute("open", "");
+  await page.keyboard.press("Escape");
+  await expect(details, `${name} closes on Escape`).not.toHaveAttribute("open", "");
+  await summary.click();
+  await expect(details, `${name} reopens`).toHaveAttribute("open", "");
+  await page.locator(".review-title strong").click();
+  await expect(details, `${name} closes on an outside pointer`).not.toHaveAttribute("open", "");
+}
+
+test("floating review surfaces dismiss; the report behind them does not", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockLocalAi(page, "available");
+  await openReview(page);
+
+  // Content disclosures are not floating surfaces: the Game Summary and the engine
+  // lines stay open while the visitor steps the game, because clicking Next move
+  // must not close the report being read.
+  await openReviewGameSummary(page);
+  await openReviewEngineLines(page);
+  await page.getByRole("button", { name: "Next move" }).click();
+  await expect(page.locator("details.game-summary-section")).toHaveAttribute("open", "");
+  await expect(page.locator("details.review-engine-lines")).toHaveAttribute("open", "");
+
+  // Every floating surface the dismissal hook owns, in the Stockfish lens.
+  for (const [name, selector] of [
+    ["More", "details.review-more"],
+    ["Export", ".review-actions details:not(.review-more)"],
+    ["Options", "details.practice-options"],
+    ["Why?", "details.move-verdict-why"],
+  ] as const) {
+    await expectFloatingDismissal(page, name, selector);
+  }
+
+  // The Maia lens swaps the objective verdict for the dual verdict and mounts the
+  // quick-settings chip, which is a floating surface on the same rule.
+  await page.locator(".lens-switch").getByRole("button", { name: /Maia/ }).click();
+  await expect(page.locator("details.human-quick-settings")).toBeVisible();
+  await expectFloatingDismissal(page, "Maia settings", "details.human-quick-settings");
+
+  // Dismissing the panels left the report that was open before them still open.
+  await expect(page.locator("details.game-summary-section")).toHaveAttribute("open", "");
 });
 
 test("publishes the same shortcut list on Help", async ({ page }) => {
@@ -157,11 +229,60 @@ test("focus board maximizes the board and keeps an obvious exit", async ({ page 
   await expect(panel).toBeVisible();
   await expect.poll(() => boardWidth(page)).toBe(normal);
 
-  await page.getByRole("button", { name: "Focus board" }).click();
+  await page.locator(".board-controls > summary").click();
+  await page.getByRole("button", { name: "Focus board (Z)" }).click();
   await expect(workspace).toHaveClass(/focus-board/);
   // Focus is session state: a reload returns to the normal workspace.
   await page.reload();
   await expect(page.getByRole("region", { name: "Persistent board workspace" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Focus board" })).toBeVisible();
+  await expect(page.locator(".board-controls > summary")).toBeVisible();
   await expect(workspace).not.toHaveClass(/focus-board/);
+});
+
+test("plays a move from the keyboard without dragging a piece", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { record } = await seedReview(page);
+  await page.goto(`/review/${record.id}`);
+  await expect(page.getByRole("region", { name: "Persistent board workspace" })).toBeVisible();
+
+  // Pieces and squares are named for assistive technology, and the draggable
+  // piece element stays exposed: the square wrapper is a group, not an image.
+  const g1 = page.locator('[data-square="g1"]');
+  await expect(g1.locator('[role="group"]')).toHaveAttribute("aria-label", "Square g1");
+  await expect(g1.getByRole("button", { name: "White knight on g1" })).toBeAttached();
+
+  await page.locator(".board-controls > summary").click();
+  const entry = page.getByLabel("Play a move");
+  await entry.fill("Nf3");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Played Nf3." })).toBeVisible();
+  await expect(page.locator(".move-status")).toContainText("Nf3");
+  await expect(page.locator(".variation-banner")).toContainText("Analysis branch");
+
+  // The workspace states the position for a screen reader: FEN on demand, and a
+  // polite announcement of what just happened.
+  await expect(page.locator(".sr-only").filter({ hasText: "Board position:" })).toContainText("5N2");
+  await expect(page.locator(".sr-only").filter({ hasText: "Board position:" })).toContainText(" b ");
+  await expect(page.locator('.sr-only[aria-live="polite"]')).toContainText("Analysis variation, Nf3.");
+  await page.locator(".position-workspace .return-to-game").click();
+  await page.getByRole("button", { name: "Next move" }).click();
+  await expect(page.locator('.sr-only[aria-live="polite"]')).toContainText("1. e4. Black to move.");
+
+  // UCI works too: black's move continues the mainline, and an illegal move is
+  // refused with its reason instead of being ignored. Clicking the board closed
+  // the settings menu, so typed entry has to be opened again.
+  await page.locator(".board-controls > summary").click();
+  await entry.fill("e7e5");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".move-status")).toContainText("e5");
+
+  await entry.fill("Nf6");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".move-entry-error")).toContainText("is not a legal move");
+  await expect(page.locator(".move-status")).toContainText("e5");
+
+  // A promotion must name its piece, exactly as the board's chooser requires.
+  await entry.fill("e7e8");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".move-entry-error")).toContainText("is not a legal move");
 });

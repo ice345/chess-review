@@ -27,6 +27,85 @@ async function chooseBackup(page: Page, buffer: Buffer) {
   await page.getByLabel("Choose library backup").setInputFiles({ name: "library.json", mimeType: "application/json", buffer });
 }
 
+test("Training leads with today's task and opens it without hunting the report", async ({ page }) => {
+  const { games, task } = await seedTask(page);
+  const today = page.getByRole("region", { name: "Today's training" });
+  // The task is the first thing on the page, above the report and the queue.
+  await expect(today).toBeVisible();
+  await expect(today.getByRole("heading", { name: "Opening decisions" })).toBeVisible();
+  await expect(today).toContainText("0 / 3 positions reviewed");
+  await expect(today).toContainText("Reviewed means looked at, not mastered.");
+  const queueTop = await page.locator(".training-queue-panel").boundingBox();
+  const todayBox = await today.boundingBox();
+  expect(todayBox!.y).toBeLessThan(queueTop!.y);
+
+  // One action, and it lands on the task's own first position.
+  await today.getByRole("button", { name: "Start today's review" }).click();
+  const session = page.getByRole("region", { name: "Position review task" });
+  await expect(session).toContainText("0 / 3 positions reviewed");
+  await expect(page.locator(".move-status")).toContainText(games[0]!.analysis.moves[0]!.san);
+
+  // Review a position, then arrive through the handoff link: the page names the
+  // task the visitor came from and reports the progress the session just made.
+  await session.getByRole("button", { name: "Mark position reviewed" }).click();
+  await expect(session).toContainText("1 / 3 positions reviewed");
+  await page.goto(`/training?player=${encodeURIComponent(task.playerKey)}&task=${encodeURIComponent(task.id)}`);
+  await expect(today).toContainText("This is the task you came from.");
+  await expect(today).toContainText("1 / 3 positions reviewed");
+});
+
+test("Training with no games says there is nothing to train, not that it is loading", async ({ page }) => {
+  await mockLocalAi(page, "offline");
+  await page.goto("/training");
+  const today = page.getByRole("region", { name: "Today's training" });
+  await expect(today.getByRole("heading", { name: "Nothing to train yet" })).toBeVisible();
+  await expect(today).toContainText("Analyse more games in this population");
+});
+
+test("Training says it is still reading the queue instead of claiming emptiness", async ({ page }) => {
+  await mockLocalAi(page, "offline");
+  // Hold an older database open so the app's own open request waits (blocked),
+  // which is a real loading state rather than a race the test has to time.
+  await page.route("**/r3-storage-fixture", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Storage fixture</title>" }));
+  await page.goto("/r3-storage-fixture");
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    const request = indexedDB.open("open-chess-review", 6);
+    request.onupgradeneeded = () => request.result.createObjectStore("review-records");
+    request.onsuccess = () => { (window as unknown as { heldDb: IDBDatabase }).heldDb = request.result; resolve(); };
+  }));
+  await page.goto("/training");
+  const today = page.getByRole("region", { name: "Today's training" });
+  await expect(today.getByRole("heading", { name: "Checking today's task…" })).toBeVisible();
+  await expect(today).not.toContainText("Nothing to train yet");
+});
+
+test("Training never reports an unreadable queue as an empty one, and recovers when retried", async ({ page }) => {
+  await mockLocalAi(page, "offline");
+  // The first storage access fails, exactly as an unavailable IndexedDB would;
+  // later accesses work. The page must then say it could not read the data rather
+  // than offer "nothing to train yet", and its own retry must actually re-read.
+  await page.addInitScript(() => {
+    const real = window.indexedDB;
+    Object.defineProperty(window, "indexedDB", {
+      configurable: true,
+      get: () => {
+        if (!(window as unknown as { storageRecovered?: boolean }).storageRecovered) throw new Error("IndexedDB is unavailable");
+        return real;
+      },
+    });
+  });
+  await page.goto("/training");
+  const today = page.getByRole("region", { name: "Today's training" });
+  await expect(today.getByRole("heading", { name: "Today's task could not be read" })).toBeVisible();
+  await expect(today).not.toContainText("Nothing to train yet");
+  await expect(page.locator(".study-notice")).toBeVisible();
+
+  // The block retries its own read, and a successful retry replaces the failure.
+  await page.evaluate(() => { (window as unknown as { storageRecovered: boolean }).storageRecovered = true; });
+  await today.getByRole("button", { name: "Try again" }).click();
+  await expect(today.getByRole("heading", { name: "Nothing to train yet" })).toBeVisible();
+});
+
 test("reviews exact positions, pauses, continues across games and never counts revisits twice", async ({ page }) => {
   const { games } = await seedTask(page);
   await page.getByRole("button", { name: "Start review" }).click();
@@ -53,9 +132,15 @@ test("reviews exact positions, pauses, continues across games and never counts r
   await expect(page).toHaveURL(new RegExp(`/review/${games[1]!.record.id}/moves`));
   await expect(page.locator(".move-status")).toContainText("1. e4");
   await session(page).getByRole("button", { name: "Mark position reviewed" }).click();
-  await expect(session(page)).toContainText("3 / 3 positions reviewed · Review complete");
-  await session(page).getByRole("link", { name: "Back to Training" }).click();
-  await page.getByRole("button", { name: "Revisit positions" }).click();
+  await expect(session(page)).toContainText("3 / 3 positions reviewed · Learning · next review");
+  // Reviewed once is not mastered, and nothing is due the moment it was reviewed: the
+  // task stays open and says when to come back instead of declaring itself finished.
+  await expect(session(page)).toContainText("This position is not due again until");
+  await session(page).getByRole("link", { name: "Pause and return" }).click();
+  await expect(page.locator(".training-list")).toContainText("in progress");
+  await expect(page.locator(".training-list")).toContainText("0 mastered");
+  // Continuing an open task is an explicit choice, so it opens the first position.
+  await page.getByRole("button", { name: "Continue review" }).click();
   await expect(session(page)).toContainText("3 / 3 positions reviewed");
 });
 

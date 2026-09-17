@@ -61,7 +61,7 @@ test("a storage failure is recoverable and is never shown as an empty library", 
 test("cleanup in another tab requests reload instead of allowing stale data to be saved", async ({ page, context }) => {
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
   const settings = await context.newPage();
   await settings.goto("/settings");
   settings.once("dialog", (dialog) => dialog.accept());

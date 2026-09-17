@@ -22,7 +22,7 @@ test("import actions and board navigation fit the first screen across six sizes"
     }
     await page.screenshot({ path: `${directory}/home-${width}.png`, fullPage: true });
     await page.goto(`/review/${record.id}`);
-    await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+    await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
     await page.screenshot({ path: `${directory}/review-${width}.png` });
     const review = await page.evaluate(() => {
       const bounds = (selector: string) => {
@@ -34,7 +34,7 @@ test("import actions and board navigation fit the first screen across six sizes"
     expect(review.horizontalOverflow).toBe(false);
     expect(review.controls.bottom).toBeLessThanOrEqual(height);
     if (width >= 1280) {
-      expect(review.board.width).toBeGreaterThanOrEqual(width >= 1440 ? 500 : 420);
+      expect(review.board.width).toBeGreaterThanOrEqual(width >= 1440 ? 540 : 480);
       expect(review.panel.width / review.board.width).toBeLessThan(1.3);
     }
     expect((await page.getByRole("button", { name: "Next move" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);

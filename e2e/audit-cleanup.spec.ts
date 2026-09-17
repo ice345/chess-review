@@ -68,8 +68,8 @@ test("F8: an empty practice set explains itself instead of leaving a dead CTA", 
 
   const panel = page.locator(".retro-practice");
   await page.goto(`/review/${fixture.record.id}`);
-  await expect(panel.locator(".utility-empty")).toContainText("No mistakes were recorded");
-  await expect(panel.locator(".retro-idle-row > .primary")).toHaveCount(0);
+  await expect(panel.locator(".utility-note")).toContainText("No mistakes were recorded");
+  await expect(panel.locator(".retro-idle-start")).toHaveCount(0);
 
   // With something to practise the action is back in the row, which is the state
   // the empty layout must not break.
@@ -86,9 +86,9 @@ test("F8: an empty practice set explains itself instead of leaving a dead CTA", 
   };
   await writeStores(page, { "objective-analyses": [[fixture.cacheKey, ready]] });
   await page.goto(`/review/${fixture.record.id}`);
-  // The known side is White, which has nothing to practise; Black now has one.
-  await page.getByRole("group", { name: "Which side to practise" }).getByRole("button", { name: "Black" }).click();
-  const action = panel.locator(".retro-idle-row > .primary");
+  // White has nothing to practise; the quiet start names Black, who now has one.
+  const action = panel.locator(".retro-idle-start");
   await expect(action).toHaveCount(1);
+  await expect(action).toHaveText(/Black/);
   await expect(action).toBeEnabled();
 });

@@ -34,7 +34,7 @@ export async function openReviewedGame(page: Page, pgn = PGN): Promise<void> {
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(pgn);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 120_000 });
 }
 
 export async function drawArrow(page: Page, from: string, to: string): Promise<void> {

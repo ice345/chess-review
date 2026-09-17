@@ -35,7 +35,7 @@ test("records the fault's human facts in a real Enhanced Local run", async ({ pa
   page.on("request", (request) => { if (request.url().includes("/maia/move-review")) moveReviews.push(request.url()); });
 
   await page.getByRole("button", { name: "Maia · " }).first().click();
-  await page.getByRole("button", { name: /Review (White|Black)'s \d+ positions?/ }).click();
+  await page.getByRole("button", { name: /Practice (White|Black)'s \d+ positions?/ }).click();
   await expect(page.locator(".retro-practice")).toContainText("Find a better move");
 
   // The fault's own review must be requested once practice holds its position; at

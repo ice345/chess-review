@@ -60,17 +60,20 @@ test("the complete example gets real Stockfish evidence and a working learning e
   await mockLocalAi(page, "offline");
   await page.goto("/");
   await page.getByRole("button", { name: "Load example game" }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 70_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 70_000 });
   await expect(page.getByRole("region", { name: "Review next step" })).toContainText("Start with a key moment");
-  const study = await page.getByRole("link", { name: "Study this move →", exact: true }).getAttribute("href");
+  const study = await page.getByRole("link", { name: "Open in Study →", exact: true }).getAttribute("href");
   expect(study).toMatch(/\/coach\?ply=\d+$/);
-  await page.getByRole("button", { name: "Review key moment →" }).click();
+  await page.getByRole("button", { name: "Next key moment →" }).click();
   await expect(page.locator(".dual-verdict")).toBeVisible();
   await page.getByRole("button", { name: "Last position" }).click();
   await expect(page.locator(".move-status")).toContainText("33 / 33 ply");
+  await page.locator(".review-engine-lines > summary").click();
   await expect(page.getByText("Checkmate · no legal continuation.", { exact: true })).toBeVisible();
   await page.goto(study!);
-  await expect(page.locator(".coach-move-facts")).toBeVisible();
+  await page.getByRole("button", { name: /Explain |Review .* from facts/ }).click();
+  // Grounded in this game's own analysis, from facts or from the model.
+  await expect(page.locator(".coach-result")).toContainText(/written from this game's analysis|written with/i);
 });
 
 test("temporary variations are labelled and returning preserves the original game", async ({ page }) => {

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { arrowCount, faultArrowCount } from "./arrow-helpers";
-import { goToReviewMoreSection, mockLocalAi, seedReview, writeStores } from "./fixtures";
+import { goToReviewSection, mockLocalAi, seedReview, writeStores } from "./fixtures";
 
 test.use({ serviceWorkers: "block" });
 
@@ -59,7 +59,7 @@ async function enter(page: Page, {
 }
 
 const panel = (page: Page) => page.locator(".retro-practice");
-const startButton = (page: Page) => page.getByRole("button", { name: /Review (White|Black)'s \d+ positions?/ });
+const startButton = (page: Page) => page.getByRole("button", { name: /Practice (White|Black)'s \d+ positions?/ });
 const continueButton = (page: Page) => panel(page).getByRole("button", { name: /^(Next|View this session)$/ });
 async function play(page: Page, from: string, to: string) {
   await page.locator(`.board-wrap [data-square="${from}"]`).first().click();
@@ -78,7 +78,7 @@ test("solves in place on the review board with the answer hidden", async ({ page
   expect(await arrowCount(page)).toBe(1);
   expect(await faultArrowCount(page)).toBe(1);
   await page.getByRole("button", { name: "Flip board" }).click();
-  await goToReviewMoreSection(page, "Engine");
+  await goToReviewSection(page, "Analysis");
   await expect(page.getByText("Engine lines are hidden while you solve this position.")).toBeVisible();
   await expect(page.locator(".candidate-list .candidate")).toHaveCount(0);
   await page.getByRole("link", { name: "Moves", exact: true }).click();
@@ -196,14 +196,14 @@ test("withholds the Study explanation while an answer is owed, and restores it a
   await expect(page.locator(".coach-result")).toHaveCount(0);
 
   // Engine evidence is withheld on its tab too.
-  await goToReviewMoreSection(page, "Engine");
+  await goToReviewSection(page, "Analysis");
   await expect(page.getByText("Engine lines are hidden while you solve this position.")).toBeVisible();
 
   // Solving restores every surface: the gate must be a pause, not an amputation.
   await page.getByRole("link", { name: "Review", exact: true }).click();
   await play(page, "d2", "d4");
   await expect(panel(page)).toContainText("That move keeps the position");
-  await goToReviewMoreSection(page, "Engine");
+  await goToReviewSection(page, "Analysis");
   await expect(page.getByText("Engine lines are hidden while you solve this position.")).toHaveCount(0);
 });
 
@@ -260,7 +260,7 @@ test("the side selector and the theory exclusion decide what Start offers", asyn
   const fixture = await enter(page, { start: false, bookFault: true, knownSide: false });
   const reviewUrl = page.url();
   const start = startButton(page);
-  const empty = page.locator(".utility-empty");
+  const empty = page.locator(".retro-practice .utility-note");
 
   // With nothing to practise the panel shows why, and offers no dead action.
   await expect(start).toHaveCount(0);
@@ -290,7 +290,7 @@ test("a linked account with nothing to practise can still switch side", async ({
   await enter(page, { start: false, bookFault: true });
   await expect(page.getByRole("group", { name: "Which side to practise" })).toBeVisible();
   await page.getByRole("button", { name: "Black", exact: true }).click();
-  await expect(page.locator(".utility-empty")).toContainText("Black");
+  await expect(page.locator(".retro-practice .utility-note")).toContainText("Black");
 });
 
 
@@ -308,7 +308,7 @@ test("an inaccuracy only becomes available when it is included", async ({ page }
 
   const start = startButton(page);
   await expect(start).toHaveCount(0);
-  await page.locator(".practice-filters summary").click();
+  await page.locator(".practice-options summary").click();
   await page.getByRole("checkbox", { name: "Include inaccuracies" }).check();
   await expect(start).toBeEnabled();
 });

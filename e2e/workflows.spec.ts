@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { SAMPLE_PGN, mockLocalAi, openReviewMore, openReviewTimeline, seedAdvancedStudy, seedConnectedLibrary, seedHistoricalReviewWithPgnDrift, seedPartialHistoryJob, seedPausedHistoryJob, seedReview, seedUnanalyzedReview } from "./fixtures";
+import { SAMPLE_PGN, mockLocalAi, openReviewEngineLines, openReviewGameSummary, openReviewMore, openReviewTimeline, seedAdvancedStudy, seedConnectedLibrary, seedHistoricalReviewWithPgnDrift, seedPartialHistoryJob, seedPausedHistoryJob, seedReview, seedUnanalyzedReview, writeStores } from "./fixtures";
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -11,14 +11,14 @@ test("imports a PGN from Home and enters the review workspace", async ({ page })
   await page.getByRole("button", { name: "Analyze game →" }).click();
   await expect(page).toHaveURL(/\/review\/[a-f0-9]{20}$/);
   await expect(page.getByText("Ada vs Mikhail", { exact: true })).toBeVisible();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 40_000 });
   await expect(page.getByRole("button", { name: "Analyze game" })).toHaveCount(0);
 });
 
 test("restores historical analysis in Review, Moves, Study and Engine after PGN drift", async ({ page }) => {
   const { record } = await seedHistoricalReviewWithPgnDrift(page);
   await page.goto(`/review/${record.id}`);
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Analyze game" })).toHaveCount(0);
 
   await page.goto(`/review/${record.id}/moves`);
@@ -29,7 +29,7 @@ test("restores historical analysis in Review, Moves, Study and Engine after PGN 
   await page.goto(`/review/${record.id}/coach`);
   await expect(page.getByText("Run the objective review first")).toHaveCount(0);
   await expect(page.locator(".coach-actions")).toBeVisible();
-  await expect(page.locator(".coach-provenance")).toContainText(/(?:depth|深度)\s*10/);
+  await expect(page.locator(".coach-engine-line")).toContainText(/(?:depth|深度)\s*10/);
 
   await page.goto(`/review/${record.id}/engine`);
   await expect(page.getByText("Loaded from IndexedDB", { exact: true })).toBeVisible();
@@ -42,8 +42,23 @@ test("runs a real uncached Stockfish game review from Analyze game", async ({ pa
   const analyze = page.getByRole("button", { name: "Analyze game" });
   await expect(analyze).toBeVisible();
   await analyze.click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 40_000 });
   await expect(analyze).toHaveCount(0);
+});
+
+test("updates the Moves panel when the analysis arrives after it mounted", async ({ page }) => {
+  const record = await seedUnanalyzedReview(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  // The panel mounts without an analysis, then gains one. A hook after the gate's
+  // early return would change the hook count here and throw.
+  await page.goto(`/review/${record.id}/moves`);
+  await expect(page.getByText("Run the objective review first")).toBeVisible();
+  await page.getByRole("button", { name: "Analyze game" }).click();
+  await expect(page.locator(".review-move-list")).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator(".review-move-list .move-number").first()).toContainText("1.");
+  expect(errors).toEqual([]);
 });
 
 test("completes a real Stockfish review when the PGN ends in checkmate", async ({ page }) => {
@@ -55,9 +70,10 @@ test("completes a real Stockfish review when the PGN ends in checkmate", async (
 1. f3 e5 2. g4 Qh4# 0-1`);
   await page.goto(`/review/${record.id}`);
   await page.getByRole("button", { name: "Analyze game" }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 40_000 });
   await expect(page.getByRole("button", { name: "Analyze game" })).toHaveCount(0);
   await page.getByRole("button", { name: "Last position" }).click();
+  await openReviewEngineLines(page);
   await expect(page.getByText("Checkmate · no legal continuation.", { exact: true })).toBeVisible();
   await expect(page.locator(".continuation-list + .error")).toHaveCount(0);
 });
@@ -73,9 +89,10 @@ test("completes a real Stockfish review when the PGN ends in stalemate", async (
 1. Qf7 1/2-1/2`);
   await page.goto(`/review/${record.id}`);
   await page.getByRole("button", { name: "Analyze game" }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 40_000 });
   await expect(page.getByRole("button", { name: "Analyze game" })).toHaveCount(0);
   await page.getByRole("button", { name: "Last position" }).click();
+  await openReviewEngineLines(page);
   await expect(page.getByText("Stalemate · no legal continuation.", { exact: true })).toBeVisible();
   await expect(page.locator(".continuation-list + .error")).toHaveCount(0);
 });
@@ -138,6 +155,7 @@ test("invalid PGN shows a short import error", async ({ page }) => {
 test("opening-only Review shows Opening Accuracy and Training omits strongest-phase", async ({ page }) => {
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
+  await openReviewGameSummary(page);
   await expect(page.getByText("Opening Accuracy matches overall Accuracy")).toBeVisible();
   await expect(page.locator(".accuracy-table")).toContainText("Opening");
   await page.goto("/training");
@@ -179,11 +197,11 @@ test("promotion chooser offers four pieces and cancel", async ({ page }) => {
   ).toBe(true);
   await chooser.getByRole("button", { name: "Cancel" }).click();
   await expect(chooser).toHaveCount(0);
-  await expect(page.getByText("Starting position")).toBeVisible();
+  await expect(page.locator(".move-status")).toContainText("Starting position");
   await page.locator('[data-square="a7"]').click();
   await page.locator('[data-square="a8"]').click();
   await page.getByRole("button", { name: "Queen" }).click();
-  await expect(page.getByText(/a8=Q/)).toBeVisible();
+  await expect(page.locator(".move-status")).toContainText("a8=Q");
 });
 
 test("History summary counts the filtered merged library", async ({ page }) => {
@@ -201,10 +219,15 @@ test("keeps Review desk priorities and fits Moves to the board workspace", async
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
 
-  await expect(page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Review", exact: true })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Engine", exact: true })).toHaveCount(0);
+  const nav = page.getByRole("navigation", { name: "Review sections" });
+  await expect(nav.getByRole("link", { name: "Review", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Analysis", exact: true })).toBeVisible();
   await openReviewMore(page);
-  await expect(page.getByRole("link", { name: "Engine", exact: true })).toBeVisible();
+  const more = page.locator("details.review-more .action-menu");
+  for (const name of ["Notebook", "History", "Training", "Settings"]) {
+    await expect(more.getByRole("link", { name, exact: true })).toBeVisible();
+  }
+  await expect(more.getByRole("link", { name: "Engine", exact: true })).toHaveCount(0);
   await expect(page.locator(".game-summary-section")).toBeVisible();
   await expect(page.locator(".game-summary-section .timeline-panel")).not.toHaveAttribute("open");
   await page.getByRole("button", { name: "Next move" }).click();
@@ -265,6 +288,7 @@ test("navigates, flips, explores a branch, and returns to canonical play", async
   await expect(page.getByText(/Analysis variation · d5/)).toBeVisible();
   await expect(page.locator('.board-quality-badge')).toHaveAttribute("aria-label", / on d5$/, { timeout: 30_000 });
   await expect(page.locator('.move-status small')).toContainText(/Accuracy/);
+  await openReviewEngineLines(page);
   await expect(page.locator('.continuation-list > button').first()).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Previous move" }).click();
   await expect(page.getByText(/Analysis variation · d4/)).toBeVisible();
@@ -364,12 +388,12 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
     return human ? `${human.version}:${human.model}:${human.targetElo}` : "missing";
   }, cacheKey)).toBe("human-v2:maia3-23m:1600");
 
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible();
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Explain this move: e5" }).click();
   await expect(page).toHaveURL(new RegExp(`/review/${record.id}/coach(?:\\?ply=\\d+)?$`));
   await expect(page.locator(".move-status")).toContainText("1… e5");
   await expect(page.getByRole("link", { name: "Study" })).toHaveAttribute("aria-current", "page");
-  await expect(page.locator(".coach-provenance")).toContainText("MAIA-3 23M @ 1600");
+  await expect(page.locator(".coach-engine-line")).toContainText("MAIA-3 23M @ 1600");
   await expect(page.locator(".coach-fact-boundaries")).toHaveCount(0);
 });
 
@@ -381,6 +405,7 @@ test("uses exact candidate identities for shared destinations and unbiased Compa
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
 
+  await openReviewEngineLines(page);
   await expect(page.locator('[data-candidate-uci="f2f3"]')).toBeVisible();
   await expect(page.locator('[data-candidate-uci="g1f3"]')).toBeVisible();
   await page.getByRole("button", { name: "Stockfish candidate #3 g1f3" }).click();
@@ -465,7 +490,9 @@ test("offers first-run whole-history analysis and persists bulk cancellation", a
   await page.goto("/training");
 
   await expect(page.getByRole("button", { name: "Analyze my history" })).toBeVisible();
-  await expect(page.getByText("2 synced games match this scope.")).toBeVisible();
+  // The account is listed as a population, so the imported games are named here
+  // rather than in a first-run empty state.
+  await expect(page.locator(".study-runs-only")).toContainText("2 of 2 imported games in this scope have no objective analysis yet");
   await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.locator(".history-job-list")).toContainText("cancelled");
@@ -484,9 +511,11 @@ test("removes only a finished run record and keeps synced data", async ({ page }
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Remove from history" }).click();
   await expect(page.getByText("Analysis runs", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("1 synced games match this scope.")).toBeVisible();
+  // The synced game itself survives the run removal, and the folded page still
+  // names it as unanalyzed work.
+  await expect(page.locator(".study-runs-only")).toContainText("1 of 1 imported games in this scope have no objective analysis yet");
   await page.reload();
-  await expect(page.getByText("1 synced games match this scope.")).toBeVisible();
+  await expect(page.locator(".study-runs-only")).toContainText("1 of 1 imported games in this scope have no objective analysis yet");
 
   const finishedJob = {
     ...job,
@@ -515,21 +544,39 @@ test("removes only a finished run record and keeps synced data", async ({ page }
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Clear finished runs" }).click();
   await expect(page.getByText("Analysis runs", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("1 synced games match this scope.")).toBeVisible();
+  await expect(page.locator(".study-runs-only")).toContainText("1 of 1 imported games in this scope have no objective analysis yet");
 });
 
 test("shows successful history items and the exact reason for failed items", async ({ page }) => {
   await seedPartialHistoryJob(page);
   await page.goto("/training");
 
-  await expect(page.locator(".study-overview")).toContainText("Games");
-  await expect(page.locator(".study-overview .study-ink-stats span").filter({ hasText: "Games" }).locator("strong")).toHaveText("1");
-  await page.getByRole("button", { name: "Coverage" }).click();
+  // The one game in scope cannot carry the statistics report, so the run itself is
+  // what Training shows here — and its controls have to be reachable at any population.
+  // The select counts the account's imported population; one of the two games has
+  // a cached analysis and one failed.
+  await expect(page.locator(".study-player-select")).toContainText("2 games");
+  await expect(page.locator(".history-run-heading")).toContainText("Analysis runs");
   await expect(page.locator(".history-job-list")).toContainText("1/2 complete · 0 analyzed · 1 cache reused");
   await page.getByText("Why 1 game failed", { exact: true }).click();
   await expect(page.locator(".history-job-details").first()).toContainText("Stockfish worker exited before returning a completed line.");
   await page.getByText("Successful analyses (1)", { exact: true }).click();
   await expect(page.locator(".history-job-details").last()).toContainText("Loaded from objective cache.");
+});
+
+test("lists a connected account before any of its games is analyzed", async ({ page }) => {
+  await seedReview(page);
+  await seedConnectedLibrary(page, 2, { pgn: '[Event "Imported"]\n[White "ice-345"]\n[Black "Rival"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 *' });
+  await page.goto("/training");
+
+  // An imported account is a population before it is a report. It is listed, and the
+  // folded page offers the work that would analyze it, instead of hiding the account
+  // behind the manual player that happens to have one analyzed game.
+  await expect(page.locator(".study-player-select select")).toHaveValue("account:chesscom:hikaru");
+  await expect(page.locator(".study-player-select")).toContainText("2 games");
+  await expect(page.locator(".study-nav")).toHaveCount(0);
+  await expect(page.locator(".study-runs-only")).toContainText("2 of 2 imported games in this scope have no objective analysis yet");
+  await expect(page.getByRole("button", { name: "Analyze my history" })).toBeEnabled();
 });
 
 test("starts objective analysis automatically after full-history import", async ({ page }) => {
@@ -556,7 +603,10 @@ test("starts objective analysis automatically after full-history import", async 
   await expect(page.getByRole("status")).toContainText("Background Stockfish analysis", { timeout: 10_000 });
   await page.goto("/training");
   await expect(page.locator(".study-player-select select")).toHaveValue("account:chesscom:hikaru", { timeout: 10_000 });
-  await expect(page.locator(".study-overview .study-ink-stats span").filter({ hasText: "Games" }).locator("strong")).toHaveText("1", { timeout: 10_000 });
+  // The imported population is small, so the report stays folded and Training
+  // reports the run the import started instead.
+  await expect(page.locator(".study-player-select")).toContainText("1 games", { timeout: 10_000 });
+  await expect(page.locator(".history-run-heading")).toContainText("Analysis runs", { timeout: 10_000 });
 });
 
 test("resumes a persisted whole-history job to completion", async ({ page }) => {
@@ -566,27 +616,33 @@ test("resumes a persisted whole-history job to completion", async ({ page }) => 
   await page.goto("/training");
   await expect(page.locator(".study-analysis-status")).toContainText("0 / 1 games analyzed · paused");
 
-  await page.getByRole("button", { name: "Coverage" }).click();
+  // The paused run is on the page itself, at this population too: without the
+  // report there would otherwise be no way to continue the work the status reports.
+  await expect(page.locator(".history-run-heading")).toContainText("Analysis runs");
   await page.getByRole("button", { name: "Resume" }).click();
   await expect(page.locator(".history-job-list")).toContainText("completed", { timeout: 45_000 });
   await expect(page.locator(".history-job-list")).toContainText("1/1 complete");
   await page.reload();
-  await page.getByRole("button", { name: "Coverage" }).click();
   await expect(page.locator(".history-job-list")).toContainText("completed");
 });
 
 test("builds advanced study evidence and persists an actionable training queue", async ({ page }) => {
-  const fixtures = await seedAdvancedStudy(page);
+  const fixtures = await seedAdvancedStudy(page, { reportPopulation: true });
   await page.goto("/training");
 
   await expect(page.getByRole("heading", { name: "Training" })).toBeVisible();
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
-  await expect(page.locator(".study-ink-stats")).toContainText("3");
+  await expect(page.locator(".study-ink-stats")).toContainText("5");
   await expect(page.getByText("No platform rating in this scope", { exact: true })).toBeVisible();
 
   await page.getByText("Change scope", { exact: true }).click();
   await page.getByLabel("Color").selectOption("black");
   await expect(page.locator(".study-overview .study-ink-stats span").filter({ hasText: "Games" }).locator("strong")).toHaveText("0");
+  // An empty scope is neither covered nor partial, and the Coverage view has to say so.
+  await page.getByRole("button", { name: "Coverage" }).click();
+  await expect(page.locator("#coverage")).toContainText("No imported games match this scope yet");
+  await expect(page.locator("#coverage")).not.toContainText("complete current analysis coverage");
+  await page.getByRole("button", { name: "Overview" }).click();
   await page.getByLabel("Color").selectOption("all");
 
   await page.getByRole("button", { name: "Openings" }).click();
@@ -603,7 +659,7 @@ test("builds advanced study evidence and persists an actionable training queue",
   await page.goto("/training");
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await page.getByRole("button", { name: "Highlights", exact: true }).click();
-  await page.getByRole("link", { name: "Ply 5 →" }).click();
+  await page.getByRole("link", { name: "Open in Review →" }).first().click();
   await expect(page).toHaveURL(new RegExp(`/review/${fixtures[0]!.record.id}/moves\\?ply=5$`));
 
   await page.goto("/training");
@@ -622,18 +678,31 @@ test("builds advanced study evidence and persists an actionable training queue",
   await expect(page.getByRole("region", { name: "Position review task" })).toContainText("0 / 2 positions reviewed");
   await page.getByRole("button", { name: "Mark position reviewed" }).click();
   await expect(page.getByRole("region", { name: "Position review task" })).toContainText("1 / 2 positions reviewed");
+  // A review with the evidence on screen says so, and claims no mastery.
+  await expect(page.getByRole("region", { name: "Position review task" })).toContainText("Learning · next review");
   await page.getByRole("link", { name: "Pause and return to Training" }).click();
   await expect(page).toHaveURL(/\/training$/);
   await page.reload();
   await page.locator(".training-list").getByRole("button", { name: "Continue review" }).click();
   await expect(page.locator(".move-status")).toContainText("2. Nf3");
   await expect(page.getByRole("button", { name: "Mark position reviewed" })).toBeEnabled();
+
+  // The second position reviewed unaided stays open, because reviewing every position
+  // is not mastery: Training's own list says what the two reviews were worth, one read
+  // with the evidence on screen and one produced unaided.
+  await page.getByRole("button", { name: "I knew this move" }).click();
+  await expect(page.getByRole("region", { name: "Position review task" })).toContainText("In review · next review");
+  await expect(page.getByRole("region", { name: "Position review task" })).toContainText("This position is not due again until");
+  await page.goto("/training");
+  await expect(page.locator(".training-list")).toContainText("in progress");
+  await expect(page.locator(".training-list")).toContainText("0 mastered");
 });
 
 test("ANNOTATIONS use quality icons and the played-move label follows Brilliant", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const { record } = await seedReview(page, { visualLabels: true });
   await page.goto(`/review/${record.id}`);
+  await openReviewGameSummary(page);
   await expect(page.getByText("ANNOTATIONS", { exact: true })).toBeVisible();
   await expect(page.locator(".annotation-count").filter({ hasText: "Brilliant" }).locator("svg")).toHaveCount(1);
   await expect(page.locator(".annotation-count").filter({ hasText: "Critical" }).locator("svg")).toHaveCount(1);
@@ -641,15 +710,24 @@ test("ANNOTATIONS use quality icons and the played-move label follows Brilliant"
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator(".objective-verdict strong")).toContainText("Brilliant");
   await expect(page.locator(".objective-route .review-move-list button.active .move-quality svg[aria-label='Sacrifice']")).toBeVisible();
-  await page.locator(".context-panel").evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  await expect(page.locator(".annotation-count").filter({ hasText: "Brilliant" })).toBeInViewport();
+  const brilliantAnnotations = page.locator(".annotation-count").filter({ hasText: "Brilliant" }).first();
+  // The counts live in the panel's own scroll area, so reaching them must not
+  // depend on the document scroll: move the panel and prove it lands inside.
+  expect(await brilliantAnnotations.evaluate((element) => {
+    const panel = element.closest(".context-panel") as HTMLElement | null;
+    if (!panel) return false;
+    panel.scrollTop += element.getBoundingClientRect().top - panel.getBoundingClientRect().top - 40;
+    const box = element.getBoundingClientRect();
+    const panelBox = panel.getBoundingClientRect();
+    return box.top >= panelBox.top - 1 && box.bottom <= panelBox.bottom + 1;
+  })).toBe(true);
 });
 
 test("Evaluation timeline stays inside the scroll-aligned Game Summary panel", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}`);
-  await page.locator(".timeline-panel > summary").click();
+  await openReviewTimeline(page);
   await expect(page.locator(".timeline-panel")).toBeVisible();
   const layout = await page.evaluate(() => {
     const board = document.querySelector(".position-workspace")!.getBoundingClientRect();
@@ -673,6 +751,56 @@ test("Evaluation timeline stays inside the scroll-aligned Game Summary panel", a
   expect(layout.timelineRight).toBeLessThanOrEqual(layout.panelRight + 1);
   expect(layout.timelineLeft).toBeGreaterThanOrEqual(layout.summaryLeft - 1);
   expect(layout.timelineWidth).toBeLessThanOrEqual(layout.panelWidth + 1);
+});
+
+test("shows what the last analysis run's engine actually did", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { record } = await seedReview(page);
+  // A run that stalled without engine traffic is the case this record exists for, so
+  // the timeline is seeded exactly as a stalled run leaves it: workers spawned, then
+  // nothing — while the progress counter cannot say that.
+  await writeStores(page, { "review-runs": [[record.id, {
+    version: 1,
+    reviewId: record.id,
+    runId: "fixture-run",
+    status: "running",
+    depth: 10,
+    updatedAt: "2026-08-23T00:00:00.000Z",
+    diagnostics: {
+      startedAt: "2026-08-23T00:00:00.000Z",
+      dropped: 2,
+      events: [
+        { at: 0, kind: "review-start", detail: { depth: 10, multiPositions: 21 } },
+        { at: 6, kind: "worker-spawn", worker: 0, detail: { url: "/engine/stockfish.js" } },
+        { at: 7, kind: "worker-spawn", worker: 1, detail: { url: "/engine/stockfish.js" } },
+      ],
+    },
+  }]] });
+  await page.goto(`/review/${record.id}/engine`);
+
+  const panel = page.locator(".run-diagnostics");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("0 searches · no completed search · 2 engines started");
+  await expect(panel).toContainText("2 earlier event(s) dropped");
+  await expect(panel).toContainText("worker-spawn · engine 0");
+  await expect(panel).toContainText("review-start");
+
+  // Copying is the point of the button: a refused clipboard must say so instead of
+  // looking like it worked, and a permitted one must confirm.
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.reject(new Error("denied")) } });
+  });
+  await page.getByRole("button", { name: "Copy diagnostics" }).click();
+  await expect(panel.getByRole("alert")).toContainText("Could not copy");
+  // The outcome is functional text, not decoration: it must not fall to the browser's
+  // default `small` size on a 12px parent.
+  const alertSize = await panel.getByRole("alert").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(alertSize).toBeGreaterThanOrEqual(11);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.resolve() } });
+  });
+  await page.getByRole("button", { name: "Copy diagnostics" }).click();
+  await expect(panel.getByRole("status")).toContainText("Diagnostics copied");
 });
 
 test("Chess.com PGN review loads both player avatars", async ({ page }) => {

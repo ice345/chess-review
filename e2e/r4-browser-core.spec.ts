@@ -19,9 +19,9 @@ test("fresh production visitor completes real Stockfish review and grounded stud
   await page.goto("/");
   await page.getByRole("textbox", { name: "Paste a complete PGN" }).fill(SHORT_ANALYSIS_PGN);
   await page.getByRole("button", { name: "Analyze game →", exact: true }).click();
-  await expect(page.getByText("MOVE QUALITY", { exact: true })).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 90_000 });
   await page.getByRole("link", { name: "Study", exact: true }).click();
-  await page.getByRole("button", { name: "Build grounded game summary" }).click();
+  await page.getByRole("button", { name: "Build whole-game study" }).click();
   await expect(page.locator(".game-coach-result")).toContainText("Training recommendations");
   await page.getByRole("button", { name: "Next move", exact: true }).click();
   await page.getByRole("button", { name: "Review e4 from facts", exact: true }).click();
@@ -34,6 +34,8 @@ test("fresh production visitor completes real Stockfish review and grounded stud
 test("public settings, study and metadata reflect only implemented capabilities", async ({ page, request }, info) => {
   const { record } = await seedReview(page);
   await page.goto(`/review/${record.id}/coach`);
+  await expect(page.getByRole("button", { name: "Build whole-game study", exact: true })).toBeVisible();
+  await expect(page.getByText("A summary can still be built from this game's own analysis.")).toBeVisible();
   await expect(page.locator(".service-message")).toContainText("not provided by this website");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
   await page.goto("/settings");

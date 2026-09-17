@@ -17,7 +17,10 @@ test("board display preferences apply to the review board and persist", async ({
 
   // Defaults: coordinates inside, arrows drawn, badge shown.
   await openReview(page, record.id);
-  await expect(page.locator('[data-square="a1"]')).toContainText("a");
+  // The square also holds the piece's visually hidden name, so the coordinate is
+  // asserted by its own span rather than by "the square has some text".
+  const coordinateLabel = page.locator('[data-square="a1"] span').filter({ hasText: /^a$/ });
+  await expect(coordinateLabel).toHaveCount(1);
   expect(await arrowCount(page)).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Next move" }).click();
   await page.getByRole("button", { name: "Next move" }).click();
@@ -29,7 +32,7 @@ test("board display preferences apply to the review board and persist", async ({
   await page.getByRole("checkbox", { name: "Move Quality badge on the board" }).uncheck();
 
   await openReview(page, record.id);
-  await expect(page.locator('[data-square="a1"]')).toBeEmpty();
+  await expect(coordinateLabel).toHaveCount(0);
   expect(await arrowCount(page)).toBe(0);
   await page.getByRole("button", { name: "Next move" }).click();
   await page.getByRole("button", { name: "Next move" }).click();
@@ -39,7 +42,7 @@ test("board display preferences apply to the review board and persist", async ({
   // The preferences survive a reload rather than only the current session.
   await page.reload();
   await expect(page.getByRole("region", { name: "Persistent board workspace" })).toBeVisible();
-  await expect(page.locator('[data-square="a1"]')).toBeEmpty();
+  await expect(coordinateLabel).toHaveCount(0);
   expect(await arrowCount(page)).toBe(0);
 
   // Turning them back on restores the default board.
@@ -55,26 +58,44 @@ test("board display preferences apply to the review board and persist", async ({
 test("move list emphasis calms non-key moves without hiding them", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const { record } = await seedReview(page, { visualLabels: true });
+  // The full list belongs to Moves; Review shows a window around the current ply.
+  const movesRoute = `/review/${record.id}/moves`;
 
   // The seeded fixture marks exactly one key moment (ply 2) out of 21 plies.
-  await openReview(page, record.id);
+  await page.goto(movesRoute);
   const rows = page.locator(".review-move-list button");
   await expect(rows).toHaveCount(21);
   await expect(page.locator('.review-move-list button[data-emphasis="quiet"]')).toHaveCount(20);
 
   await page.goto("/settings");
   await page.getByLabel("Move list emphasis").selectOption("all");
-  await openReview(page, record.id);
+  await page.goto(movesRoute);
   await expect(page.locator(".review-move-list button")).toHaveCount(21);
   await expect(page.locator('.review-move-list button[data-emphasis="quiet"]')).toHaveCount(0);
 
   // Every row keeps its Accuracy even when it is drawn quietly.
   await page.goto("/settings");
   await page.getByLabel("Move list emphasis").selectOption("key");
-  await openReview(page, record.id);
+  await page.goto(movesRoute);
   const quiet = page.locator('.review-move-list button[data-emphasis="quiet"]').first();
   await expect(quiet).toBeVisible();
   await expect(quiet.locator("small")).not.toBeEmpty();
+});
+
+test("Review keeps only a window of moves around the current ply", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { record } = await seedReview(page, { visualLabels: true });
+  await page.goto(`/review/${record.id}`);
+
+  // The current ply plus five either side; before the first move that is plies 1-6.
+  const rows = page.locator(".objective-route .review-move-list button");
+  await expect(rows).toHaveCount(6);
+  await expect(rows.first()).toContainText("1.");
+  await expect(page.locator(".review-context-moves")).toContainText("All 21 moves");
+
+  await page.getByRole("button", { name: "Last position" }).click();
+  await expect(rows).toHaveCount(6);
+  await expect(rows.last()).toContainText("11.");
 });
 
 test("the Moves filter names the key moments in the visitor's language", async ({ page }) => {

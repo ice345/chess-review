@@ -98,6 +98,6 @@ test("the promotion chooser stays reachable with a zoomed document", async ({ pa
     const chooser = page.getByRole("dialog", { name: "Choose promotion piece" });
     await expect(chooser).toBeVisible();
     await chooser.getByRole("button", { name: "Queen" }).click();
-    await expect(page.getByText(/a8=Q/)).toBeVisible();
+    await expect(page.locator(".move-status")).toContainText("a8=Q");
   }
 });

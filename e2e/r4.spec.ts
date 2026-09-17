@@ -22,9 +22,9 @@ test("output language is independent of interface language and offline facts sta
   await expect(page.getByLabel("Coach output language")).toHaveValue("en");
   await page.getByLabel("Coach output language").selectOption("zh-CN");
   await page.goto(`/review/${record.id}/coach?ply=1`);
-  await page.getByRole("button", { name: "Explain e4", exact: true }).click();
+  await page.getByRole("button", { name: "讲解 e4", exact: true }).click();
   await expect(page.locator(".coach-result")).toContainText("先看什么");
-  await expect(page.getByRole("button", { name: "Build whole-game study", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成本局总结", exact: true })).toBeVisible();
   await expect(page.locator(".coach-configuration-summary")).toContainText("简体中文");
   await page.reload();
   await expect(page.locator(".coach-result")).toContainText("先看什么");

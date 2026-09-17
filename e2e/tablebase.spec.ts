@@ -113,11 +113,12 @@ test("keeps the tablebase away while a practice answer is owed", async ({ page }
   };
   await writeStores(page, { "objective-analyses": [[fixture.cacheKey, fixture.analysis]] });
   await page.goto(`/review/${fixture.record.id}`);
-  await page.getByRole("group", { name: "Which side to practise" }).getByRole("button", { name: "Black" }).click();
-  await page.getByRole("button", { name: /Review Black's 1 position/ }).click();
+  // The side that recorded a fault is the default, so the launcher starts it
+  // directly; the side chooser only appears when a side has nothing to practise.
+  await page.getByRole("button", { name: /Practice Black's 1 position/ }).click();
   await expect(page.locator(".retro-practice")).toContainText("1 / 1");
 
   await page.locator("details.review-more summary").click();
-  await page.locator("details.review-more .action-menu").getByRole("link", { name: "Engine", exact: true }).click();
+  await page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Analysis", exact: true }).click();
   await expect(page.getByRole("tab", { name: "Tablebase" })).toHaveCount(0);
 });
