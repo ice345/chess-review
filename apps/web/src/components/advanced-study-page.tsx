@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildAdvancedStudyReportV2,
   listStudyOpeningFilterOptionsV2,
   OBJECTIVE_ALGORITHM_VERSION,
+  studyGameMatchesFilters,
   type RecurringWeakness,
   type StudyGameInputV2,
   type StudyReportFiltersV2,
@@ -21,6 +23,7 @@ import type {
 import { QUALITY_META, QualityIcon } from "@chess-review/ui";
 import { AppHeader } from "./app-header";
 import { TrainingQueuePanel } from "./training-queue-panel";
+import { TrainingToday } from "./training-today";
 import { subscribeLocalData } from "../lib/browser-storage";
 import {
   loadStudyPlayerLibrary,
@@ -44,12 +47,7 @@ import {
   runHistoryAnalysisJob,
 } from "../lib/history-analysis-jobs";
 import { listPlatformAccounts, listSyncedGames } from "../lib/platform-library";
-import {
-  createTrainingQueueItem,
-  listTrainingQueue,
-  saveTrainingQueueItem,
-  trainingQueueItemId,
-} from "../lib/training-queue";
+import { createTrainingQueueItem, listTrainingQueue, saveTrainingQueueItem, todaysTrainingTask, trainingQueueItemId } from "../lib/training-queue";
 
 type QueueItem = TrainingQueueItemV3;
 type StudyTab = "overview" | "ratings" | "openings" | "middlegame" | "endgame" | "mistakes" | "highlights" | "plan" | "coverage";
@@ -267,6 +265,25 @@ function historyJobPresentation(groups: Array<{ job: HistoryAnalysisJobV1; dupli
   };
 }
 
+/**
+ * Starts or extends objective analysis of the imported games in the current scope.
+ * Two surfaces own one of these: the first-run empty state, and the folded Training
+ * page of a connected account whose imported games have not been analyzed yet. The
+ * copy lives here so the two cannot describe the same action differently.
+ */
+function HistoryAnalysisControls({ freshness, jobWorking, onFreshness, onStart }: {
+  freshness: HistoryAnalysisScopeV1["freshness"];
+  jobWorking: boolean;
+  onFreshness: (value: HistoryAnalysisScopeV1["freshness"]) => void;
+  onStart: () => void;
+}) {
+  return <>
+    <label><span>Freshness</span><select value={freshness} onChange={(event) => onFreshness(event.target.value as HistoryAnalysisScopeV1["freshness"])}><option value="all">All matching (reuse cache)</option><option value="unanalyzed">Never analyzed</option><option value="stale">Stale only</option></select></label>
+    <button type="button" className="primary" disabled={jobWorking} onClick={() => void onStart()}>{jobWorking ? "Analyzing…" : "Analyze my history"}</button>
+    <small>Background analysis · up to {HISTORY_ANALYSIS_CONCURRENCY} games at once.</small>
+  </>;
+}
+
 function HistoryJobsPanel({
   groups,
   games,
@@ -294,6 +311,11 @@ function HistoryJobsPanel({
 
 export function AdvancedStudyPage() {
   const settings = useMemo(() => loadAppSettings(), []);
+  // The end-of-review handoff names the player scope and the task it created, so
+  // the visitor lands on the work rather than on the report it came from.
+  const searchParams = useSearchParams();
+  const scopedPlayerKey = searchParams.get("player") ?? "";
+  const focusedTaskId = searchParams.get("task") ?? "";
   const [summaries, setSummaries] = useState<StudyPlayerSummary[] | null>(null);
   const [playerKey, setPlayerKey] = useState("");
   const [player, setPlayer] = useState<StudyPlayerLibrary | null>(null);
@@ -309,6 +331,10 @@ export function AdvancedStudyPage() {
   const [jobAccountScope, setJobAccountScope] = useState<"selected" | "all">("all");
 
   const [cacheBytes, setCacheBytes] = useState(0);
+  // What the training entry point may claim. It must not say "nothing to train"
+  // while the queue is still being read, or when reading it failed.
+  const [queueState, setQueueState] = useState<"loading" | "ready" | "failed">("loading");
+  const [sourcesFailed, setSourcesFailed] = useState(false);
   const [workingItem, setWorkingItem] = useState<string | null>(null);
   const [jobWorking, setJobWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -318,6 +344,9 @@ export function AdvancedStudyPage() {
   // replace a temporary manual default when background analysis finishes.
   const playerSelectionTouched = useRef(false);
   const previousActiveJobs = useRef<string | null>(null);
+  // The queue is re-read on every data change; only a new population starts a
+  // fresh load, so a background refresh cannot flash the loading copy.
+  const loadedQueueKey = useRef<string | null>(null);
 
   const refreshJobs = useCallback(async () => {
     setJobs(await listHistoryAnalysisJobs());
@@ -339,14 +368,22 @@ export function AdvancedStudyPage() {
     setPlayerKey((current) => {
       const hasCurrent = current !== "" && nextSummaries.some(({ key }) => key === current);
       if (hasCurrent && !(current.startsWith("manual:") && !playerSelectionTouched.current)) return current;
+      // An explicit ?player= wins over the automatic pick, once, and only while
+      // that population still exists.
+      if (scopedPlayerKey !== "" && nextSummaries.some(({ key }) => key === scopedPlayerKey)) {
+        playerSelectionTouched.current = true;
+        return scopedPlayerKey;
+      }
       return nextSummaries.find(({ kind }) => kind === "connected-account")?.key ?? nextSummaries[0]?.key ?? "";
     });
     setPlayerRevision((current) => current + 1);
-  }, []);
+    setSourcesFailed(false);
+  }, [scopedPlayerKey]);
 
   useEffect(() => {
     void refreshSources().catch((error) => {
       setSummaries([]);
+      setSourcesFailed(true);
       setNotice(error instanceof Error ? error.message : "Unable to load training data.");
     });
   }, [refreshSources]);
@@ -370,16 +407,25 @@ export function AdvancedStudyPage() {
     if (!playerKey) {
       setPlayer(null);
       setQueue([]);
+      loadedQueueKey.current = null;
+      // No population means nothing is pending: leave the entry point able to
+      // say there is nothing to train instead of claiming it is still reading.
+      setQueueState("ready");
       return;
     }
+    if (loadedQueueKey.current !== playerKey) setQueueState("loading");
     void Promise.all([loadStudyPlayerLibrary(playerKey), listTrainingQueue(playerKey)]).then(([library, items]) => {
       if (!active) return;
       setPlayer(library);
       setQueue(items);
+      loadedQueueKey.current = playerKey;
+      setQueueState("ready");
     }).catch((error) => {
-      if (active) setNotice(error instanceof Error ? error.message : "Unable to load this player.");
+      if (!active) return;
+      setQueueState("failed");
+      setNotice(error instanceof Error ? error.message : "Unable to load this player.");
     });
-    const unsubscribe = subscribeLocalData(() => { void listTrainingQueue(playerKey).then((items) => { if (active) setQueue(items); }).catch((error) => { if (active) setNotice(String(error)); }); });
+    const unsubscribe = subscribeLocalData(() => { void listTrainingQueue(playerKey).then((items) => { if (active) { setQueue(items); loadedQueueKey.current = playerKey; setQueueState("ready"); } }).catch((error) => { if (active) { setQueueState("failed"); setNotice(String(error)); } }); });
     return () => { active = false; unsubscribe(); };
   }, [playerKey, playerRevision]);
 
@@ -442,9 +488,15 @@ export function AdvancedStudyPage() {
   const historyJobGroups = useMemo(() => collapseHistoryJobs(jobs), [jobs]);
   const coverage = useMemo(() => {
     if (player?.kind !== "connected-account") {
+      // Coverage describes the population the report describes, for every player
+      // kind. A manual import has no sync backlog to count, so its eligible
+      // population is exactly the games the current filters select — counting every
+      // analyzed game of the player here used to claim "complete coverage of 5 of 5
+      // games" while the report itself was describing none of them.
+      const scoped = compatibleGames.filter((game) => studyGameMatchesFilters(game, filters));
       return {
-        eligibleGames: compatibleGames.length,
-        analyzedGames: compatibleGames.length,
+        eligibleGames: scoped.length,
+        analyzedGames: scoped.length,
         staleGames: 0,
         failedGames: 0,
         excludedGames: 0,
@@ -468,7 +520,7 @@ export function AdvancedStudyPage() {
         return [{ provider, ...coverageFor(games) }];
       }),
     };
-  }, [cacheBytes, compatibleGames.length, eligibleSynced, excludedGameIds, failedGameIds, player, settings.reviewDepth]);
+  }, [cacheBytes, compatibleGames, eligibleSynced, excludedGameIds, failedGameIds, filters, player, settings.reviewDepth]);
   const report = useMemo(() => player ? buildAdvancedStudyReportV2(compatibleGames, filters, coverage) : null, [compatibleGames, coverage, filters, player]);
   const queueIds = useMemo(() => new Set(queue.map(({ id }) => id)), [queue]);
 
@@ -479,14 +531,14 @@ export function AdvancedStudyPage() {
     setFiltersState(clean);
   }
 
-  async function startHistoryAnalysis() {
+  async function startHistoryAnalysis(accountIds: string[] = selectedAccountIds) {
     if (jobWorking || accounts.length === 0) return;
     setJobWorking(true);
     setNotice(null);
     try {
       const scope: HistoryAnalysisScopeV1 = {
         providers: filters.providers,
-        accountIds: selectedAccountIds,
+        accountIds,
         timeClasses: filters.timeClasses,
         rated: filters.rated,
         freshness,
@@ -569,8 +621,35 @@ export function AdvancedStudyPage() {
   }
 
   const loading = summaries === null;
+  // The block owns the retry for its own failure state: the queue panel below can
+  // only retry its local read, which would leave this block still claiming failure.
+  function retryTrainingToday() {
+    // The block is showing the failure state, so the flag has to clear with the
+    // retry: otherwise it would keep claiming failure until the read settles.
+    setSourcesFailed(false);
+    setQueueState("loading");
+    void refreshSources().catch((error) => {
+      setSourcesFailed(true);
+      setNotice(error instanceof Error ? error.message : "Unable to load training data.");
+    });
+  }
+
+  const todayState: "loading" | "ready" | "failed" = summaries === null
+    ? "loading"
+    : sourcesFailed
+      ? "failed"
+      : queueState;
+  const focusedTask = focusedTaskId === "" ? undefined : queue.find((item) => item.id === focusedTaskId);
+  const todayTask = focusedTask && focusedTask.status !== "completed" ? focusedTask : todaysTrainingTask(queue);
   const analysisStatus = useMemo(() => liveAnalysisStatus(jobs), [jobs]);
   const scopeGameCount = report?.overview.summary.gameCount ?? (player?.games.length ?? eligibleSynced.length);
+  // The report answers for a population, so the decision to show it follows the
+  // player's own population and not the current filter: narrowing a filter to an
+  // empty scope must leave the report standing and say the scope is empty, rather
+  // than fold the whole page away under the visitor's hands. While that population
+  // is still loading no report is claimed: falling back to the imported-game count
+  // used to open the report and fold it away again a moment later.
+  const availableGames = player === null ? 0 : player.games.length;
   const primaryRating = report?.ratings.slice().sort((left, right) => right.sampleSize - left.sampleSize)[0];
   const phaseEntries = report
     ? (["opening", "middlegame", "endgame"] as const).map((phase) => ({ phase, profile: report.phases[phase] }))
@@ -587,19 +666,48 @@ export function AdvancedStudyPage() {
   } : null;
   const brilliantMoves = report?.specialMoves.filter((item) => item.annotations.includes("brilliant")) ?? [];
   const criticalMoves = report?.specialMoves.filter((item) => item.annotations.includes("critical")) ?? [];
+  const showStudyReport = Boolean(todayTask) || availableGames >= 5;
+  // A population this small cannot carry a statistics report, so the report stays
+  // folded. An analysis run is not statistics: a paused or failed run must keep
+  // its own controls wherever its status is reported, or the visitor is told work
+  // is waiting with no way to continue it.
+  const showRunHistory = historyJobGroups.length > 0;
+  // Imported games that still need objective analysis. A connected account is a
+  // population before it is a report, so this state has to be able to start the
+  // work that would produce one — starting with the account the visitor selected.
+  const unanalyzedEligibleCount = eligibleSynced.filter((game) => !excludedGameIds.has(game.id) && !game.analyzed).length;
+  const canAnalyzeHistory = accounts.length > 0 && unanalyzedEligibleCount > 0 && !hasActiveHistoryJob;
   return <main className="page-scroll study-page">
     <AppHeader />
     <section className="utility-heading study-heading">
       <h1>Training</h1>
       {summaries && summaries.length > 0 && <label className="study-player-select"><span>Player</span><select value={playerKey} onChange={(event) => { playerSelectionTouched.current = true; setPlayerKey(event.target.value); }}>{summaries.map((summary) => <option key={summary.key} value={summary.key}>{summary.name} · {summary.gameCount} games{summary.provider ? ` · ${summary.provider === "chesscom" ? "Chess.com" : "Lichess"}` : " · manual"}</option>)}</select></label>}
     </section>
+    <TrainingToday
+      state={todayState}
+      task={todayTask}
+      plan={report?.trainingPlan ?? []}
+      topWeakness={report?.weaknesses[0]}
+      focusedFromLink={focusedTaskId !== "" && todayTask?.id === focusedTaskId}
+      onAddFocus={(weakness) => void addWeakness(weakness)}
+      onRetry={retryTrainingToday}
+      disabled={!player || workingItem !== null}
+      {...(player?.games.at(-1) ? { lastReviewHref: `/review/${player.games.at(-1)!.gameId}` } : {})}
+    />
     <TrainingQueuePanel />
     {analysisStatus && <p className="study-analysis-status" role="status">{analysisStatus}</p>}
     {notice && <p className="study-notice" role="status">{notice}</p>}
     {loading ? <section className="study-empty">Loading…</section> : summaries.length === 0 ? <>
       {accounts.length > 0 && <ScopeFilters filters={filters} setFilters={setFilters} timeClasses={timeClasses} openingOptions={openingOptions} gameCount={scopeGameCount} open={scopeOpen} onToggle={setScopeOpen} />}
-      <section className="study-empty"><strong>{jobs.some((job) => job.items.some((item) => item.status === "cached" || item.status === "completed")) ? "Analysis is arriving" : "No current analyses"}</strong><span>{accounts.length > 0 ? `${eligibleSynced.length} synced games match this scope.` : "Sync games or complete an objective review."}</span>{accounts.length === 0 ? <Link className="primary-link" href="/history">Open History</Link> : <div className="empty-history-actions"><label><span>Freshness</span><select value={freshness} onChange={(event) => setFreshness(event.target.value as HistoryAnalysisScopeV1["freshness"])}><option value="all">All matching</option><option value="unanalyzed">Never analyzed</option><option value="stale">Stale only</option></select></label><button type="button" className="primary" disabled={jobWorking} onClick={() => void startHistoryAnalysis()}>{jobWorking ? "Analyzing…" : "Analyze my history"}</button><small>Background analysis · up to {HISTORY_ANALYSIS_CONCURRENCY} games at once.</small></div>}{historyJobGroups.length > 0 && <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />}</section>
-    </> : <>
+      <section className="study-empty"><strong>{jobs.some((job) => job.items.some((item) => item.status === "cached" || item.status === "completed")) ? "Analysis is arriving" : "No current analyses"}</strong><span>{accounts.length > 0 ? `${eligibleSynced.length} synced games match this scope.` : "Sync games or complete an objective review."}</span>{accounts.length === 0 ? <Link className="primary-link" href="/history">Open History</Link> : <div className="empty-history-actions"><HistoryAnalysisControls freshness={freshness} jobWorking={jobWorking} onFreshness={setFreshness} onStart={startHistoryAnalysis} /></div>}{historyJobGroups.length > 0 && <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />}</section>
+    </> : !showStudyReport ? (showRunHistory || canAnalyzeHistory ? <section className="study-runs-only">
+      {canAnalyzeHistory && <>
+        <div className="history-analysis-heading"><span>Analyse imported games</span></div>
+        <p className="quiet-empty">{unanalyzedEligibleCount} of {eligibleSynced.length} imported games in this scope have no objective analysis yet.</p>
+        <div className="empty-history-actions"><HistoryAnalysisControls freshness={freshness} jobWorking={jobWorking} onFreshness={setFreshness} onStart={() => startHistoryAnalysis(player?.accountId ? [player.accountId] : selectedAccountIds)} /></div>
+      </>}
+      {showRunHistory && <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />}
+    </section> : null) : <>
       <ScopeFilters filters={filters} setFilters={setFilters} timeClasses={timeClasses} openingOptions={openingOptions} gameCount={scopeGameCount} open={scopeOpen} onToggle={setScopeOpen} />
       <nav className="study-nav" aria-label="Training views">
         {NAV_GROUPS.map((group) => <div key={group.id} className="study-nav-group">{group.label ? <p className="study-nav-label">{group.label}</p> : <p className="study-nav-label study-nav-label-spacer" aria-hidden="true"> </p>}<div className="study-nav-tabs">{group.tabs.map((tab) => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => selectView(tab.id)}>{tab.label}</button>)}</div></div>)}
@@ -613,9 +721,9 @@ export function AdvancedStudyPage() {
             </header>
             <dl className="study-profile-facts">
               <div><dt>Current observed rating</dt><dd>{primaryRating?.currentRating ?? "—"}</dd><small>{primaryRating?.recentRange ? `Recent range ${primaryRating.recentRange.low}–${primaryRating.recentRange.high}` : "No platform rating in this scope"}</small></div>
-              <div><dt>Form</dt><dd>{report.overview.summary.accuracyChange === undefined ? "—" : `${report.overview.summary.accuracyChange >= 0 ? "+" : ""}${report.overview.summary.accuracyChange.toFixed(1)}`}</dd><small>Accuracy trend · {formatted(report.overview.summary.averageAccuracy)} average</small></div>
+              <div><dt>Form</dt><dd>{report.overview.summary.accuracyChange === undefined ? "—" : `${report.overview.summary.accuracyChange >= 0 ? "+" : ""}${report.overview.summary.accuracyChange.toFixed(1)}`}</dd><small>Accuracy trend · {formatted(report.overview.summary.averageAccuracy)} average per game</small></div>
               <div><dt>Next meaningful target</dt><dd>{primaryRating?.stabilizeTarget ?? primaryRating?.nextTarget ?? "—"}</dd><small>{primaryRating?.stabilizeTarget && primaryRating.nextTarget ? `Stabilize ${primaryRating.stabilizeTarget} · then ${primaryRating.nextTarget}` : "Build a larger rated sample"}</small></div>
-              <div><dt>Analysis coverage</dt><dd>{report.coverage.analyzedGames}/{report.coverage.eligibleGames}</dd><small>{formatted(report.coverage.coverageRate, "%")} current · {primaryRating?.confidence ?? "low"} confidence</small></div>
+              <div><dt>Analysis coverage</dt><dd>{report.coverage.state === "empty" ? "—" : `${report.coverage.analyzedGames}/${report.coverage.eligibleGames}`}</dd><small>{report.coverage.state === "empty" ? "No games in this scope" : `${formatted(report.coverage.coverageRate, "%")} current · ${primaryRating?.confidence ?? "low"} confidence`}</small></div>
             </dl>
             {primaryRating?.performanceRating !== undefined && <p className="study-profile-note">Estimated recent performance {primaryRating.performanceRating} from {primaryRating.performanceSampleSize} games with both opponent rating and result.</p>}
           </article>
@@ -630,7 +738,7 @@ export function AdvancedStudyPage() {
                 : phase === "middlegame"
                   ? `${formatted(profile.errorRate, "%")} decision errors`
                   : `${formatted(profile.errorRate, "%")} errors`;
-              return <article key={phase} className="study-wash" data-wash={wash}><span className="eyebrow">{phase}</span><strong>{formatted(profile.averageAccuracy)}</strong><small>{strongest ? "Strongest phase" : focus ? "Primary improvement area" : `${profile.moveCount} moves`}</small><p>{detail}</p></article>;
+              return <article key={phase} className="study-wash" data-wash={wash}><span className="eyebrow">{phase}</span><strong>{formatted(profile.averageAccuracy)}</strong><small>{strongest ? "Strongest phase" : focus ? "Primary improvement area" : `${profile.moveCount} moves`} · average move Accuracy</small><p>{detail}</p></article>;
             })}
           </div>}
           <article className="study-paper study-focus">
@@ -645,8 +753,8 @@ export function AdvancedStudyPage() {
             <div className="study-form-heading">
               <p className="study-ink-stats">
                 <span><strong>{report.overview.summary.gameCount}</strong> Games</span>
-                <span><strong>{formatted(report.overview.summary.averageAccuracy)}</strong> Accuracy</span>
-                <span><strong>{formatted(report.coverage.coverageRate, "%")}</strong> Coverage</span>
+                <span><strong>{formatted(report.overview.summary.averageAccuracy)}</strong> Accuracy per game</span>
+                <span><strong>{report.coverage.state === "empty" ? "—" : formatted(report.coverage.coverageRate, "%")}</strong> Coverage</span>
               </p>
               <p className="study-trend-legend">Result under each bar: <span data-result="win">W win</span><span data-result="draw">D draw</span><span data-result="loss">L loss</span></p>
             </div>
@@ -665,7 +773,7 @@ export function AdvancedStudyPage() {
           return <section id={activeTab}><header className="study-section-heading"><h2>{endgame ? "Endgame" : "Middlegame"}</h2><small>{endgame ? "How well you convert and defend late positions. No tablebase claims." : "How good your decisions are after the opening."}</small></header>
             <div className="study-metric-groups">
               <section className="study-wash" data-wash="mist"><h3>Decision quality</h3><dl><div><dt>Moves</dt><dd>{phase.moveCount}</dd></div><div><dt>Error rate</dt><dd>{formatted(phase.errorRate, "%")}</dd></div><div><dt>Average Win% loss</dt><dd>{formatted(phase.averageWinPercentLoss)}</dd></div>{!endgame && <div><dt>Decision errors</dt><dd>{phase.errorCount}</dd></div>}</dl></section>
-              <section className="study-wash" data-wash="cream"><h3>Recent form</h3><dl><div><dt>Accuracy</dt><dd>{formatted(phase.averageAccuracy)}</dd></div><div><dt>Recent Accuracy</dt><dd>{formatted(phase.recentAccuracy)}</dd></div></dl></section>
+              <section className="study-wash" data-wash="cream"><h3>Recent form</h3><dl><div><dt>Average move Accuracy</dt><dd>{formatted(phase.averageAccuracy)}</dd></div><div><dt>Recent average move Accuracy</dt><dd>{formatted(phase.recentAccuracy)}</dd></div></dl><small>{`Arithmetic mean of ${phase.accuracyMetric.sampleMoves} moves from ${phase.accuracyMetric.sampleGames} games. Review shows the canonical single-game phase Accuracy, which is a different measure.`}</small></section>
               <section className="study-wash" data-wash="sage"><h3>{endgame ? "Conversion" : "Advantages"}</h3><dl><div><dt>Advantages preserved</dt><dd>{phase.advantagePreserved}/{phase.advantageOpportunities}</dd></div>{endgame && <div><dt>Defensive holds</dt><dd>{phase.defensiveHolds}/{phase.defensivePositions}</dd></div>}</dl></section>
               <section className="study-wash" data-wash="pink"><h3>{endgame ? "Missed wins / mates" : "Opportunities"}</h3><dl><div><dt>Missed opportunities</dt><dd>{phase.missedOpportunities}</dd></div></dl>{evidence.length > 0 && <ul className="study-evidence-list">{evidence.map((item) => <li key={`${item.gameId}:${item.ply}`}><QualityIcon classification={item.classification} size={20} /><span><strong title={item.san}>{item.san}</strong><small>−{item.winPercentLoss.toFixed(1)} Win%</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul>}</section>
             </div>
@@ -675,8 +783,8 @@ export function AdvancedStudyPage() {
         {activeTab === "mistakes" && <section id="mistakes"><header className="study-section-heading"><h2>Mistakes</h2><small>Which decisions deserve review.</small></header>{report.mistakes.length === 0 ? <p className="study-section-empty">No errors in this population.</p> : <><ul className="study-evidence-list">{report.mistakes.slice(0, listLimit).map((item) => <li key={`${item.gameId}:${item.ply}`}><QualityIcon classification={item.classification} size={22} /><span><strong title={item.san}>{item.san} · {QUALITY_META[item.classification].label}</strong><small>{item.phase} · −{item.winPercentLoss.toFixed(1)} Win% · {new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Review →</Link></li>)}</ul>{report.mistakes.length > listLimit && <button type="button" className="text-button" onClick={() => setListLimit((current) => current + 12)}>Show more mistakes</button>}</>}</section>}
 
         {activeTab === "highlights" && <section id="highlights"><header className="study-section-heading"><h2>Highlights</h2><small>Notable chess moments, grouped by kind.</small></header>{report.specialMoves.length + report.gameHighlights.length === 0 ? <p className="study-section-empty">No verified highlights in this population.</p> : <div className="study-highlight-groups">
-          <section data-kind="brilliant"><h3>Brilliant <small>{brilliantMoves.length}</small></h3>{brilliantMoves.length === 0 ? <p className="study-section-empty">None in this population.</p> : <ul className="study-highlight-cards">{brilliantMoves.slice(0, 6).map((item) => <li key={`${item.gameId}:${item.ply}`} className="study-highlight-card" data-kind="brilliant"><QualityIcon classification="brilliant" size={22} /><span><strong>{item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Ply {item.ply} →</Link></li>)}</ul>}</section>
-          <section data-kind="critical"><h3>Critical <small>{criticalMoves.length}</small></h3>{criticalMoves.length === 0 ? <p className="study-section-empty">None in this population.</p> : <ul className="study-highlight-cards">{criticalMoves.slice(0, listLimit).map((item) => <li key={`${item.gameId}:${item.ply}`} className="study-highlight-card" data-kind="critical"><QualityIcon classification="great" size={22} /><span><strong>{item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Ply {item.ply} →</Link></li>)}</ul>}{criticalMoves.length > listLimit && <button type="button" className="text-button" onClick={() => setListLimit((current) => current + 12)}>View more critical moments</button>}</section>
+          <section data-kind="brilliant"><h3>Brilliant <small>{brilliantMoves.length}</small></h3>{brilliantMoves.length === 0 ? <p className="study-section-empty">None in this population.</p> : <ul className="study-highlight-cards">{brilliantMoves.slice(0, 6).map((item) => <li key={`${item.gameId}:${item.ply}`} className="study-highlight-card" data-kind="brilliant"><QualityIcon classification="brilliant" size={22} /><span><strong>{item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Open in Review →</Link></li>)}</ul>}</section>
+          <section data-kind="critical"><h3>Critical <small>{criticalMoves.length}</small></h3>{criticalMoves.length === 0 ? <p className="study-section-empty">None in this population.</p> : <ul className="study-highlight-cards">{criticalMoves.slice(0, listLimit).map((item) => <li key={`${item.gameId}:${item.ply}`} className="study-highlight-card" data-kind="critical"><QualityIcon classification="great" size={22} /><span><strong>{item.san}</strong><small>{new Date(item.playedAt).toLocaleDateString()}</small></span><Link href={`/review/${item.gameId}/moves?ply=${item.ply}`}>Open in Review →</Link></li>)}</ul>}{criticalMoves.length > listLimit && <button type="button" className="text-button" onClick={() => setListLimit((current) => current + 12)}>View more critical moments</button>}</section>
           {(["comeback", "save", "clean-conversion", "best-game"] as const).map((kind) => {
             const items = report.gameHighlights.filter((item) => item.kind === kind);
             if (items.length === 0) return null;
@@ -688,8 +796,8 @@ export function AdvancedStudyPage() {
 
         </section>}
 
-        {activeTab === "coverage" && <section id="coverage"><header className="study-section-heading"><h2>Coverage</h2><small>{report.algorithmVersion} · {report.objectiveAlgorithmVersion}</small></header><div className="study-metrics"><article><span>Eligible</span><strong>{report.coverage.eligibleGames}</strong></article><article><span>Current</span><strong>{report.coverage.analyzedGames}</strong><small>{formatted(report.coverage.coverageRate, "%")}</small></article><article><span>Stale</span><strong>{report.coverage.staleGames}</strong></article><article><span>Failed</span><strong>{report.coverage.failedGames}</strong></article></div>{report.coverage.providers && report.coverage.providers.length > 0 && <div className="coverage-provider-grid">{report.coverage.providers.map((item) => <article key={item.provider}><strong>{item.provider === "chesscom" ? "Chess.com" : "Lichess"}</strong><span>{item.analyzedGames}/{item.eligibleGames} current</span><small>{item.staleGames} stale · {item.failedGames} failed</small></article>)}</div>}<p className="study-section-empty">{report.coverage.partial ? "This report is partial. Conclusions use only current compatible analyses." : "This filtered population has complete current analysis coverage."}{report.coverage.excludedGames > 0 ? ` ${report.coverage.excludedGames} provider game${report.coverage.excludedGames === 1 ? "" : "s"} with invalid PGN ${report.coverage.excludedGames === 1 ? "is" : "are"} excluded and do not keep this range incomplete.` : ""}{filters.openingKeys.length > 0 ? " Opening is known only for current analyses, so coverage remains based on the broader synced scope." : ""} Local objective cache: {(cacheBytes / 1024 / 1024).toFixed(1)} MB.</p>
-          {accounts.length > 0 && <div className="history-analysis-controls"><label><span>Account scope</span><select value={jobAccountScope} onChange={(event) => setJobAccountScope(event.target.value as "selected" | "all")}><option value="all">All connected accounts</option><option value="selected" disabled={!player.accountId}>Selected account</option></select></label><label><span>Freshness</span><select value={freshness} onChange={(event) => setFreshness(event.target.value as HistoryAnalysisScopeV1["freshness"])}><option value="all">All matching (reuse cache)</option><option value="unanalyzed">Never analyzed</option><option value="stale">Stale only</option></select></label><button type="button" className="primary" disabled={jobWorking} onClick={() => void startHistoryAnalysis()}>{jobWorking ? "Analyzing…" : "Analyze my history"}</button><small>Background analysis · up to {HISTORY_ANALYSIS_CONCURRENCY} games at once.</small></div>}
+        {activeTab === "coverage" && <section id="coverage"><header className="study-section-heading"><h2>Coverage</h2><small>{report.algorithmVersion} · {report.objectiveAlgorithmVersion}</small></header><div className="study-metrics"><article><span>Eligible</span><strong>{report.coverage.eligibleGames}</strong></article><article><span>Current</span><strong>{report.coverage.analyzedGames}</strong><small>{formatted(report.coverage.coverageRate, "%")}</small></article><article><span>Stale</span><strong>{report.coverage.staleGames}</strong></article><article><span>Failed</span><strong>{report.coverage.failedGames}</strong></article></div>{report.coverage.providers && report.coverage.providers.length > 0 && <div className="coverage-provider-grid">{report.coverage.providers.map((item) => <article key={item.provider}><strong>{item.provider === "chesscom" ? "Chess.com" : "Lichess"}</strong><span>{item.analyzedGames}/{item.eligibleGames} current</span><small>{item.staleGames} stale · {item.failedGames} failed</small></article>)}</div>}<p className="study-section-empty">{report.coverage.state === "empty" ? "No imported games match this scope yet, so there is nothing to cover." : report.coverage.partial ? "This report is partial. Conclusions use only current compatible analyses." : `This filtered population has complete current analysis coverage: ${report.coverage.analyzedGames} of ${report.coverage.eligibleGames} games.`}{report.coverage.excludedGames > 0 ? ` ${report.coverage.excludedGames} provider game${report.coverage.excludedGames === 1 ? "" : "s"} with invalid PGN ${report.coverage.excludedGames === 1 ? "is" : "are"} excluded and do not keep this range incomplete.` : ""}{filters.openingKeys.length > 0 ? " Opening is known only for current analyses, so coverage remains based on the broader synced scope." : ""} Local objective cache: {(cacheBytes / 1024 / 1024).toFixed(1)} MB.</p>
+          {accounts.length > 0 && <div className="history-analysis-controls"><label><span>Account scope</span><select value={jobAccountScope} onChange={(event) => setJobAccountScope(event.target.value as "selected" | "all")}><option value="all">All connected accounts</option><option value="selected" disabled={!player.accountId}>Selected account</option></select></label><HistoryAnalysisControls freshness={freshness} jobWorking={jobWorking} onFreshness={setFreshness} onStart={startHistoryAnalysis} /></div>}
           <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />
         </section>}
       </div>}

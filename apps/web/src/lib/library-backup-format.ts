@@ -169,7 +169,16 @@ function task(value: unknown, games: Map<string, ReturnType<typeof parsePgn>>): 
     const entry = object(value);
     const position = { gameId: reviewId(entry.gameId), ply: integer(entry.ply, "reviewed ply", 1), reviewedAt: date(entry.reviewedAt) };
     if (!evidence.some((source) => trainingPositionKey(source) === trainingPositionKey(position))) throw new Error("Reviewed progress refers to a position outside its task.");
-    return position;
+    // What the review was worth and when it is next due: without these the restored
+    // library would treat every review as due at once and lose the schedule.
+    return {
+      ...position,
+      outcome: optional(entry.outcome, (v) => choice(v, ["unaided", "hinted", "exposed", "legacy"], "review outcome")),
+      mastery: optional(entry.mastery, (v) => choice(v, ["learning", "review", "mastered"], "mastery")),
+      streak: optional(entry.streak, (v) => integer(v, "streak", 0)),
+      attempts: optional(entry.attempts, (v) => integer(v, "attempts", 1)),
+      dueAt: optional(entry.dueAt, date),
+    };
   }) : [];
   if (new Set(positions.map(trainingPositionKey)).size !== positions.length) throw new Error("Duplicate reviewed position in the backup.");
   const base = {
@@ -177,7 +186,7 @@ function task(value: unknown, games: Map<string, ReturnType<typeof parsePgn>>): 
     weaknessKind: choice(v.weaknessKind, ["opening-decisions", "middlegame-decisions", "endgame-decisions", "missed-opportunities"], "weakness"),
     status: choice(v.status, ["queued", "in-progress", "completed"], "training status"), priority: number(v.priority, "priority"), evidence,
     createdAt: date(v.createdAt), updatedAt: date(v.updatedAt), completedAt: optional(v.completedAt, date), sourceReportVersion: "advanced-study-v2",
-    completionKind: optional(v.completionKind, (v) => choice(v, ["manual", "reviewed"], "completion kind")),
+    completionKind: optional(v.completionKind, (v) => choice(v, ["manual", "mastered", "reviewed"], "completion kind")),
     progress: { reviewedPositionCount: positions.length, totalPositionCount: evidence.length, positions,
       lastReviewedAt: optional(progress.lastReviewedAt, date), notes: optional(progress.notes, (v) => text(v, "notes", 10_000)) },
   };

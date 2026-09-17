@@ -57,6 +57,22 @@ function playerName(analysis: AnyGameAnalysis, color: PlayerColor): string | nul
   return playerNameFromHeaders(analysis.game.headers, color);
 }
 
+/**
+ * The training/Study player key for one side of one record, or null when the
+ * record cannot name a player for that side.
+ *
+ * The end-of-review handoff uses this so a task it creates belongs to the same
+ * player the Training page would show, instead of inventing a second identity.
+ */
+export function studyPlayerKeyForRecord(record: ReviewRecord, analysis: AnyGameAnalysis, color: PlayerColor): string | null {
+  if (record.external) {
+    if (record.preferredOrientation !== color) return null;
+    return connectedStudyPlayerKey(record.external.accountId);
+  }
+  const name = playerName(analysis, color);
+  return name === null ? null : manualStudyPlayerKey(name);
+}
+
 export function studyPlayerKey(name: string): string {
   return name.normalize("NFKC").trim().toLowerCase();
 }
@@ -179,6 +195,20 @@ export function buildStudyPlayerLibraries(
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const players = new Map<string, StudyPlayerLibrary>();
 
+  // A connected account is a population before it is an analysis. It appears as
+  // soon as it has synced games, so Training can offer the work that would analyze
+  // them instead of hiding the account until one game happens to be analyzed.
+  for (const account of connectedAccountsWithGames(syncedGames, accounts)) {
+    players.set(connectedStudyPlayerKey(account.id), {
+      key: connectedStudyPlayerKey(account.id),
+      name: account.displayName ?? account.username,
+      kind: "connected-account",
+      accountId: account.id,
+      provider: account.provider,
+      games: [],
+    });
+  }
+
   for (const record of records) {
     if (record.kind !== "pgn") continue;
     const analysis = latestAnalysisForRecord(record, latest);
@@ -242,6 +272,19 @@ async function recordProjectionPairs(
 
 function syncedGameKey(game: SyncedGame): string {
   return `${game.external.provider}:${game.external.accountId}:${game.external.externalGameId}`;
+}
+
+/** Linked accounts that have imported games, in account order. */
+function connectedAccountsWithGames(syncedGames: readonly SyncedGame[], accounts: readonly PlatformAccount[]): PlatformAccount[] {
+  const accountIdsWithGames = new Set(syncedGames.map((game) => game.external.accountId));
+  return accounts.filter((account) => accountIdsWithGames.has(account.id));
+}
+
+/** Imported games per linked account, which is an account's own population. */
+function syncedGameCountsByAccount(syncedGames: readonly SyncedGame[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const game of syncedGames) counts.set(game.external.accountId, (counts.get(game.external.accountId) ?? 0) + 1);
+  return counts;
 }
 
 /**
@@ -443,6 +486,22 @@ export async function loadStudyPlayerSummaries(): Promise<StudyPlayerSummary[]> 
         ...identified.identity,
       });
     }
+  }
+  // A connected account is listed by its own population, not by how much of it has
+  // been analyzed: 129 imported games and no analysis is a state the page has to be
+  // able to show and act on, not an absent player.
+  const syncedCounts = syncedGameCountsByAccount(syncedGames);
+  for (const account of connectedAccountsWithGames(syncedGames, accounts)) {
+    const key = connectedStudyPlayerKey(account.id);
+    const analyzed = summaries.get(key)?.gameCount ?? 0;
+    summaries.set(key, {
+      key,
+      name: account.displayName ?? account.username,
+      gameCount: Math.max(analyzed, syncedCounts.get(account.id) ?? 0),
+      kind: "connected-account",
+      accountId: account.id,
+      provider: account.provider,
+    });
   }
   return [...summaries.values()].sort((left, right) => right.gameCount - left.gameCount
     || Number(right.kind === "connected-account") - Number(left.kind === "connected-account")

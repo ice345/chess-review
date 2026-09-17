@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parsePgn } from "@chess-review/chess-core";
-import type { GameAnalysisV2, PlatformAccount } from "@chess-review/shared";
+import type { GameAnalysisV2, PlatformAccount, SyncedGame } from "@chess-review/shared";
 import { OBJECTIVE_ALGORITHM_VERSION } from "@chess-review/analysis";
 import type { ReviewRecord } from "./review-library";
 import { buildStudyPlayerLibraries, compactAnalysisForStudy, studyPlayerKey } from "./advanced-study-library";
@@ -32,6 +32,20 @@ function record(id: string, pgn: string, preferredOrientation?: "white" | "black
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-02T00:00:00.000Z",
     ...(preferredOrientation === undefined ? {} : { preferredOrientation }),
+  };
+}
+
+function syncedGame(accountId: string, externalGameId: string): SyncedGame {
+  return {
+    id: `chesscom:${externalGameId}`,
+    pgn: "pgn",
+    analyzed: false,
+    external: { provider: "chesscom", accountId, externalGameId, username: "ice-345", importedAt: "2026-08-01T00:00:00.000Z" },
+    playedAt: "2026-07-14T00:00:00.000Z",
+    syncedAt: "2026-08-01T00:00:00.000Z",
+    accountColor: "white",
+    white: { username: "ice-345" },
+    black: { username: "Opponent" },
   };
 }
 
@@ -98,6 +112,28 @@ describe("advanced study library", () => {
 
     expect(players.map(({ key }) => key).sort()).toEqual(["account:cc-ada", "account:li-ada"]);
     expect(players.every(({ kind }) => kind === "connected-account")).toBe(true);
+  });
+
+  it("lists a connected account that has imported games but no analysis yet", () => {
+    const account: PlatformAccount = { id: "cc-ice", provider: "chesscom", username: "ice-345", authMode: "public-username", verified: false, linkedAt: "2026-08-01T00:00:00.000Z" };
+
+    const players = buildStudyPlayerLibraries([], [], [syncedGame("cc-ice", "1"), syncedGame("cc-ice", "2")], [account]);
+
+    // The account is a population before it is an analysis: nothing is analyzed, and
+    // it is still the player Training has to be able to offer work for.
+    expect(players).toEqual([{ key: "account:cc-ice", name: "ice-345", kind: "connected-account", accountId: "cc-ice", provider: "chesscom", games: [] }]);
+  });
+
+  it("keeps the account entry and adds its analyzed game to it", () => {
+    const account: PlatformAccount = { id: "cc-ice", provider: "chesscom", username: "ice-345", displayName: "ice-345", authMode: "public-username", verified: false, linkedAt: "2026-08-01T00:00:00.000Z" };
+    const analyzed = record("game-1", "pgn-1", "white");
+    analyzed.external = { provider: "chesscom", externalGameId: "1", accountId: "cc-ice", username: "ice-345", importedAt: "2026-08-01T00:00:00.000Z" };
+
+    const players = buildStudyPlayerLibraries([analyzed], [analysis("pgn-1", "2026-08-01T00:00:00.000Z")], [syncedGame("cc-ice", "1"), syncedGame("cc-ice", "2")], [account]);
+
+    expect(players).toHaveLength(1);
+    expect(players[0]).toMatchObject({ key: "account:cc-ice", kind: "connected-account" });
+    expect(players[0]?.games).toHaveLength(1);
   });
 
   it("still joins analyses whose PGN serialization drifted, by move-sequence identity", () => {

@@ -30,14 +30,23 @@ async function seed() {
   return { record, fen, task, queue, lib };
 }
 async function backup() { return (await import("./library-backup")).createLibraryBackup(); }
+/** Move every recorded review's due date into the past, which is what waiting a day does. */
+async function makeDue(taskId: string) {
+  const queue = await import("./training-queue");
+  const item = (await queue.listTrainingQueue()).find((candidate) => candidate.id === taskId)!;
+  await queue.saveTrainingQueueItem({
+    ...item,
+    progress: { ...item.progress, positions: item.progress.positions.map((position) => ({ ...position, dueAt: new Date(Date.now() - 86_400_000).toISOString() })) },
+  });
+}
 async function freshPage() { vi.resetModules(); return import("./library-backup"); }
 
 describe("position review ledger", () => {
   it("opens the first pending source without credit, saves once, and resumes after reload", async () => {
     const { task, queue } = await seed();
     expect((await queue.startTrainingTask(task.id)).progress.reviewedPositionCount).toBe(0);
-    await queue.reviewTrainingPosition(task.id, task.evidence[0]!);
-    await queue.reviewTrainingPosition(task.id, task.evidence[0]!);
+    await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed");
+    await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed");
     vi.resetModules();
     const resumed = await (await import("./training-queue")).startTrainingTask(task.id);
     expect(resumed.progress.reviewedPositionCount).toBe(1);
@@ -45,15 +54,64 @@ describe("position review ledger", () => {
     const url = new URL(queue.trainingReviewHref(resumed), "http://localhost");
     expect(url.searchParams.get("training")).toBe(task.id);
     expect(url.searchParams.get("ply")).toBe("3");
-    const complete = await (await import("./training-queue")).reviewTrainingPosition(task.id, task.evidence[1]!);
-    expect(complete).toMatchObject({ status: "completed", completionKind: "reviewed", progress: { reviewedPositionCount: 2 } });
+    const opened = await (await import("./training-queue")).reviewTrainingPosition(task.id, task.evidence[1]!, "exposed");
+    // Every position reviewed, none mastered: the task stays open so the positions can
+    // come round again, which is the only way mastery is ever earned.
+    expect(opened).toMatchObject({ status: "in-progress", progress: { reviewedPositionCount: 2 } });
+    expect(opened.completionKind).toBeUndefined();
     expect((await (await import("./training-queue")).startTrainingTask(task.id)).progress.positions).toHaveLength(2);
+
+    // An early unaided review is recorded but earns nothing: without that rule this loop
+    // could master a position with three clicks in one sitting.
+    const reviewed = (await import("./training-queue")).reviewTrainingPosition;
+    const early = await reviewed(task.id, task.evidence[0]!, "unaided");
+    expect(early.progress.positions[0]).toMatchObject({ outcome: "unaided", mastery: "learning", streak: 0, attempts: 3 });
+
+    // Three unaided reviews of each position, each on a day the position had come due,
+    // finishes it. (Days pass here by moving the due date into the past, which is what a
+    // day passing does, and keeps the test deterministic without touching the clock.)
+    for (let round = 0; round < 3; round += 1) {
+      await makeDue(task.id);
+      await reviewed(task.id, task.evidence[0]!, "unaided");
+      await reviewed(task.id, task.evidence[1]!, "unaided");
+    }
+    const mastered = (await (await import("./training-queue")).listTrainingQueue())[0]!;
+    expect(mastered).toMatchObject({ status: "completed", completionKind: "mastered" });
+    expect(mastered.progress.positions.map((position) => position.mastery)).toEqual(["mastered", "mastered"]);
+    // The first position was also reviewed twice with the evidence on screen above.
+    expect(mastered.progress.positions.map((position) => position.attempts)).toEqual([6, 4]);
   });
+  it("stores what each review was worth and schedules the next one", async () => {
+    const { task, queue } = await seed();
+    const mastery = await import("./training-mastery");
+
+    // A review with the evidence on screen records learning, never mastery.
+    const exposed = await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed");
+    const first = exposed.progress.positions[0]!;
+    expect(first).toMatchObject({ outcome: "exposed", mastery: "learning", streak: 0, attempts: 1 });
+    expect(Date.parse(first.dueAt!)).toBeGreaterThan(Date.parse(first.reviewedAt));
+    expect(mastery.masterySummary(exposed, new Date(first.reviewedAt))).toMatchObject({ reviewed: 1, mastered: 0, due: 0 });
+    // Nothing is due at the moment of the review; the same record is due a day later.
+    expect(mastery.masterySummary(exposed, new Date(first.dueAt!)).due).toBe(1);
+
+    // An unaided review of another position reaches "in review" and schedules further out.
+    const unaided = await queue.reviewTrainingPosition(task.id, task.evidence[1]!, "unaided");
+    const second = unaided.progress.positions.find((position) => position.ply === task.evidence[1]!.ply)!;
+    expect(second).toMatchObject({ outcome: "unaided", mastery: "review", streak: 1, attempts: 1 });
+    expect(Date.parse(second.dueAt!)).toBeGreaterThan(Date.parse(second.reviewedAt));
+
+    // A review recorded before outcomes existed keeps its place and claims nothing.
+    const legacyTask = { ...unaided, progress: { ...unaided.progress, positions: [] } };
+    await queue.saveTrainingQueueItem(legacyTask);
+    const legacy = await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "legacy");
+    expect(legacy.progress.positions.at(-1)).toMatchObject({ outcome: "legacy", mastery: "learning", streak: 0 });
+  });
+
   it("merges concurrent acknowledgements and ignores a stale Add to queue", async () => {
     const { task, queue } = await seed();
-    await Promise.all(task.evidence.map((source) => queue.reviewTrainingPosition(task.id, source)));
+    await Promise.all(task.evidence.map((source) => queue.reviewTrainingPosition(task.id, source, "exposed")));
     await queue.saveTrainingQueueItem(task, { ifAbsent: true });
-    expect(await queue.listTrainingQueue()).toMatchObject([{ status: "completed", progress: { reviewedPositionCount: 2 } }]);
+    expect(await queue.listTrainingQueue()).toMatchObject([{ status: "in-progress", progress: { reviewedPositionCount: 2 } }]);
   });
   it("does not invent position identities for legacy manual completion", async () => {
     const { task, queue } = await seed();
@@ -65,7 +123,7 @@ describe("position review ledger", () => {
   it("rejects a missing or changed source without credit", async () => {
     const { task, queue } = await seed();
     await queue.saveTrainingQueueItem({ ...task, evidence: [{ ...task.evidence[0]!, san: "d4" }] });
-    await expect(queue.reviewTrainingPosition(task.id, task.evidence[0]!)).rejects.toThrow("no longer matches");
+    await expect(queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed")).rejects.toThrow("no longer matches");
     expect((await queue.listTrainingQueue())[0]!.progress.positions).toEqual([]);
     await queue.saveTrainingQueueItem({ ...task, evidence: [{ ...task.evidence[0]!, gameId: "missing" }] });
     await expect(queue.startTrainingTask(task.id)).rejects.toThrow("source game is missing");
@@ -75,17 +133,49 @@ describe("position review ledger", () => {
     const second = await lib.saveReviewRecord(await lib.buildReviewRecord("pgn", "1. d4 d5 *"));
     const other = { ...task.evidence[0]!, gameId: second.id, san: "d4" };
     await queue.saveTrainingQueueItem({ ...task, evidence: [task.evidence[0]!, other] });
-    await queue.reviewTrainingPosition(task.id, other);
+    await queue.reviewTrainingPosition(task.id, other, "exposed");
     await (await import("./local-data")).deleteReviewRecord(record.id);
     await freshPage();
-    expect(await (await import("./training-queue")).listTrainingQueue()).toMatchObject([{ status: "completed", completionKind: "reviewed", evidence: [other], progress: { reviewedPositionCount: 1, totalPositionCount: 1 } }]);
+    // Removing a source returns the task to the queue; the remaining acknowledged
+    // position keeps its review record.
+    expect(await (await import("./training-queue")).listTrainingQueue()).toMatchObject([{ status: "queued", evidence: [other], progress: { reviewedPositionCount: 1, totalPositionCount: 1 } }]);
+  });
+});
+
+describe("mastery survives a backup", () => {
+  it("restores a mastered position as mastered, with its streak and its due date", async () => {
+    const { task, queue } = await seed();
+    for (let round = 0; round < 3; round += 1) {
+      await makeDue(task.id);
+      await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "unaided");
+      await queue.reviewTrainingPosition(task.id, task.evidence[1]!, "unaided");
+    }
+    const before = (await queue.listTrainingQueue())[0]!;
+    expect(before).toMatchObject({ status: "completed", completionKind: "mastered" });
+    const file = await backup();
+
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    const api = await freshPage();
+    const preview = await api.previewLibraryRestore(file);
+    await api.restoreLibraryBackup(preview, "keep-existing", true);
+    // A restore bumps the data epoch, so the readers must be fresh module instances.
+    await freshPage();
+
+    // A mastered task must not come back as "reviewed once, nothing mastered, due now".
+    const restored = (await (await import("./training-queue")).listTrainingQueue())[0]!;
+    expect(restored).toMatchObject({ status: "completed", completionKind: "mastered" });
+    expect(restored.progress.positions.map((position) => position.mastery)).toEqual(["mastered", "mastered"]);
+    expect(restored.progress.positions.map((position) => position.streak)).toEqual([3, 3]);
+    expect(restored.progress.positions.map((position) => position.attempts)).toEqual([3, 3]);
+    expect(restored.progress.positions.map((position) => position.dueAt)).toEqual(before.progress.positions.map((position) => position.dueAt));
+    expect(restored.progress.positions.every((position) => Date.parse(position.dueAt!) > Date.now())).toBe(true);
   });
 });
 
 describe("versioned library backup", () => {
   it("round-trips games, FEN, original comments, preferences and exact review progress into a fresh browser", async () => {
     const { task, queue, record, fen } = await seed();
-    await queue.reviewTrainingPosition(task.id, task.evidence[0]!);
+    await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed");
     const settings = await import("./app-settings");
     window.localStorage.setItem(settings.APP_SETTINGS_STORAGE_KEY, JSON.stringify({ ...settings.DEFAULT_APP_SETTINGS, soundEnabled: false }));
     const file = await backup();
@@ -97,7 +187,13 @@ describe("versioned library backup", () => {
     const next = await freshPage();
     await next.applyPendingBackupSettings();
     expect(await entries("review-records")).toEqual(expect.arrayContaining([expect.objectContaining({ id: record.id, originalPgn: PGN }), expect.objectContaining({ id: fen.id, kind: "fen" })]));
-    expect(await (await import("./training-queue")).listTrainingQueue()).toMatchObject([{ progress: { reviewedPositionCount: 1, totalPositionCount: 2 } }]);
+    // The schedule survives the round trip: a restored review keeps its outcome, its
+    // mastery state and the date it is next due, so it is not treated as due at once.
+    const restoredTask = (await (await import("./training-queue")).listTrainingQueue())[0]!;
+    expect(restoredTask.progress).toMatchObject({ reviewedPositionCount: 1, totalPositionCount: 2 });
+    expect(restoredTask.progress.positions[0]).toMatchObject({ outcome: "exposed", mastery: "learning", streak: 0, attempts: 1 });
+    expect(restoredTask.progress.positions[0]?.dueAt).toBe((await (await import("./training-queue")).listTrainingQueue())[0]?.progress.positions[0]?.dueAt);
+    expect(Date.parse(restoredTask.progress.positions[0]!.dueAt!)).toBeGreaterThan(Date.parse(restoredTask.progress.positions[0]!.reviewedAt));
     expect(JSON.parse(window.localStorage.getItem(settings.APP_SETTINGS_STORAGE_KEY)!)).toMatchObject({ soundEnabled: false });
     expect(await entries("objective-analyses")).toEqual([]);
   });
@@ -136,7 +232,7 @@ describe("versioned library backup", () => {
   });
   it.each(["keep-existing", "use-backup"] as const)("previews duplicates and resolves conflicts with %s", async (mode) => {
     const { task, queue, record, lib } = await seed(); const file = await backup();
-    await queue.reviewTrainingPosition(task.id, task.evidence[0]!);
+    await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed");
     await lib.saveReviewRecord({ ...record, title: "New title" });
     const extra = await lib.saveReviewRecord(await lib.buildReviewRecord("pgn", "1. d4 *"));
     const api = await import("./library-backup"), preview = await api.previewLibraryRestore(file);
@@ -151,7 +247,7 @@ describe("versioned library backup", () => {
     collision.reviews = [{ ...different, id: record.id }]; collision.tasks = [];
     await expect(api.previewLibraryRestore(collision)).rejects.toThrow("different source game");
     const preview = await api.previewLibraryRestore(file);
-    await queue.reviewTrainingPosition(task.id, task.evidence[0]!);
+    await queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed");
     await expect(api.restoreLibraryBackup(preview, "use-backup", false)).rejects.toThrow("changed after the preview");
     expect((await queue.listTrainingQueue())[0]!.progress.reviewedPositionCount).toBe(1);
   });

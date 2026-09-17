@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { masterySummary } from "../lib/training-mastery";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { TrainingQueueItemV3 } from "@chess-review/shared";
@@ -36,13 +37,17 @@ export function TrainingQueuePanel() {
   if (!items.length && !error) return null;
   return <section className="training-queue-panel" aria-label="Saved review tasks">
     <h2>Your review tasks</h2>
-    <p>Review each source decision, then confirm it. These counts record your review, not solved puzzles or mastery.</p>
+    <p>Review each source decision, then say what happened. A review is not mastery: only a move you produced unaided advances the schedule, and a task is due again when its next review date arrives.</p>
     {error && <p className="error" role="alert">{error} <button type="button" className="text-button" onClick={() => { void listTrainingQueue().then((value) => { setItems(value); setError(null); }).catch((cause) => setError(String(cause))); }}>Retry</button></p>}
-    <div className="training-list">{(expanded ? items : items.slice(0, 3)).map((item) => <article key={item.id} className={item.status}>
-      <div><span className="training-status">{item.completionKind === "manual" ? "Previously completed manually" : item.status === "completed" ? "All positions reviewed" : item.status.replace("-", " ")}</span><strong>{TRAINING_TITLES[item.weaknessKind]}</strong><small>{item.progress.reviewedPositionCount} / {item.progress.totalPositionCount} positions reviewed</small></div>
-      <div className="training-sources">{item.evidence.map((source) => <Link key={`${source.gameId}:${source.ply}`} href={trainingReviewHref(item, source)}>{source.san} · ply {source.ply}</Link>)}</div>
-      <div className="training-actions"><button type="button" className="primary" disabled={busy || !item.evidence.length} onClick={() => void act(item, "start")}>{item.completionKind === "reviewed" ? "Revisit positions" : item.status === "in-progress" ? "Continue review" : "Start review"}</button><button type="button" className="text-button" disabled={busy} onClick={() => void act(item, "remove")}>Remove task</button></div>
-    </article>)}</div>
+    <div className="training-list">{(expanded ? items : items.slice(0, 3)).map((item) => {
+      // Per row: only unaided reviews advance mastery, so a task cannot claim it.
+      const mastery = masterySummary(item, new Date());
+      return <article key={item.id} className={item.status}>
+      <div><span className="training-status">{item.completionKind === "manual" ? "Previously completed manually" : item.status === "completed" ? "All positions mastered" : item.status.replace("-", " ")}</span><strong>{TRAINING_TITLES[item.weaknessKind]}</strong><small>{item.progress.reviewedPositionCount} / {item.progress.totalPositionCount} positions reviewed · {mastery.due > 0 ? `${mastery.due} due now` : mastery.unreviewed > 0 ? `${mastery.unreviewed} not yet reviewed` : `${mastery.mastered} mastered`}</small></div>
+      <div className="training-sources">{item.evidence.map((source) => <Link key={`${source.gameId}:${source.ply}`} href={trainingReviewHref(item, source)} aria-label={`Review ${source.san} in the game`}>{source.san}</Link>)}</div>
+      <div className="training-actions"><button type="button" className="secondary" disabled={busy || !item.evidence.length} onClick={() => void act(item, "start")}>{item.completionKind === "mastered" ? "Revisit positions" : item.status === "in-progress" ? "Continue review" : "Start review"}</button><button type="button" className="text-button" disabled={busy} onClick={() => void act(item, "remove")}>Remove task</button></div>
+    </article>;
+    })}</div>
     {items.length > 3 && <button type="button" className="text-button" onClick={() => setExpanded(!expanded)}>{expanded ? "Show fewer tasks" : `Show all ${items.length} tasks`}</button>}
   </section>;
 }
