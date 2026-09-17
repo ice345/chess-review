@@ -64,19 +64,39 @@ test("Training with no games says there is nothing to train, not that it is load
 
 test("Training says it is still reading the queue instead of claiming emptiness", async ({ page }) => {
   await mockLocalAi(page, "offline");
-  // Hold an older database open so the app's own open request waits (blocked),
-  // which is a real loading state rather than a race the test has to time.
-  await page.route("**/r3-storage-fixture", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Storage fixture</title>" }));
-  await page.goto("/r3-storage-fixture");
-  await page.evaluate(() => new Promise<void>((resolve) => {
-    const request = indexedDB.open("open-chess-review", 6);
-    request.onupgradeneeded = () => request.result.createObjectStore("review-records");
-    request.onsuccess = () => { (window as unknown as { heldDb: IDBDatabase }).heldDb = request.result; resolve(); };
-  }));
+  // The read is made slow, not blocked: a blocked upgrade is reported as a storage
+  // failure by design (the next test covers that), so the panel only says "still
+  // reading" while the database is genuinely still opening. Deferring the open's
+  // success event is what makes that state observable — holding an older database
+  // open in this same tab does not, because navigating here closes it, and the
+  // production build then resolves before the panel can be seen.
+  await page.addInitScript(() => {
+    const realOpen = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function patchedOpen(this: IDBFactory, ...args: Parameters<IDBFactory["open"]>) {
+      const request = realOpen.apply(this, args);
+      let handler: ((this: IDBRequest, event: Event) => unknown) | null = null;
+      Object.defineProperty(request, "onsuccess", {
+        configurable: true,
+        get: () => handler,
+        set: (value: (this: IDBRequest, event: Event) => unknown) => {
+          handler = value;
+          request.addEventListener("success", (event) => { setTimeout(() => value.call(request, event), 2_500); });
+        },
+      });
+      return request;
+    };
+  });
   await page.goto("/training");
   const today = page.getByRole("region", { name: "Today's training" });
   await expect(today.getByRole("heading", { name: "Checking today's task…" })).toBeVisible();
   await expect(today).not.toContainText("Nothing to train yet");
+  // A state, not a flash: it is still the only thing on the panel once the reader
+  // has had time to look at it, and it is announced as busy.
+  await page.waitForTimeout(800);
+  await expect(today.getByRole("heading", { name: "Checking today's task…" })).toBeVisible();
+  await expect(today).toHaveAttribute("aria-busy", "true");
+  // The queue then arrives and the panel stops claiming to be reading.
+  await expect(today.getByRole("heading", { name: "Checking today's task…" })).toHaveCount(0, { timeout: 15_000 });
 });
 
 test("Training never reports an unreadable queue as an empty one, and recovers when retried", async ({ page }) => {

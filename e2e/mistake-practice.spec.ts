@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { arrowCount, faultArrowCount } from "./arrow-helpers";
 import { goToReviewSection, mockLocalAi, seedReview, writeStores } from "./fixtures";
 
@@ -380,17 +380,31 @@ test("each side keeps its own count when the other is empty or both have work", 
   await expect(sideChooser(page)).toBeVisible();
 });
 
-test("the setup is keyboard operable", async ({ page }) => {
+async function tabTo(page: Page, target: Locator): Promise<void> {
+  await page.keyboard.press("Tab");
+  await expect(target).toBeFocused();
+}
+
+test("the setup is keyboard operable", async ({ page, browserName }) => {
   await enter(page, { start: false, extraFaultPly: 2 });
+  // WebKit only tabs through form controls once the visitor has switched on
+  // "Press Tab to highlight each item on a webpage" — a browser preference no page
+  // can set. Focusability and activation are asserted on every engine; the tab
+  // order itself is asserted where the engine provides it (Chromium, Firefox).
+  const tabs = browserName !== "webkit";
+
   await sideButton(page, "White").focus();
   await expect(sideButton(page, "White")).toBeFocused();
-  await page.keyboard.press("Tab");
+  await (tabs ? tabTo(page, sideButton(page, "Black")) : sideButton(page, "Black").focus());
   await expect(sideButton(page, "Black")).toBeFocused();
   await page.keyboard.press("Space");
   await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("checkbox", { name: "Include inaccuracies" })).toBeFocused();
-  await page.keyboard.press("Tab");
+  if (tabs) {
+    await tabTo(page, page.getByRole("checkbox", { name: "Include inaccuracies" }));
+    await tabTo(page, startButton(page));
+  } else {
+    await startButton(page).focus();
+  }
   await expect(startButton(page)).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(panel(page)).toContainText("Black to move");

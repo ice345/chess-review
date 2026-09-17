@@ -41,7 +41,21 @@ test("public settings, study and metadata reflect only implemented capabilities"
   await page.goto("/settings");
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    // Fonts change text metrics, and a swap that lands after the resize can be
+    // measured a frame early: settle them before asking about the layout.
+    await page.evaluate(() => document.fonts.ready);
+    const layout = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+      // Name what sticks out, so a failure on one engine is actionable instead of
+      // a bare false. Linux and macOS resolve font stacks differently, so a page
+      // that fits on one can be a few pixels wide on the other.
+      offenders: [...document.querySelectorAll("body *")]
+        .map((element) => ({ element, box: element.getBoundingClientRect() }))
+        .filter((row) => row.box.width > 0 && row.box.right > window.innerWidth + 0.5)
+        .slice(0, 5)
+        .map((row) => `${row.element.tagName.toLowerCase()}.${(row.element.className || "").toString().split(" ").slice(0, 2).join(".")} right=${Math.round(row.box.right)} width=${Math.round(row.box.width)}`),
+    }));
+    expect(layout.overflow, `settings at ${width}px overflows by ${layout.overflow}px: ${layout.offenders.join(" | ")}`).toBeLessThanOrEqual(0);
     await page.screenshot({ path: info.outputPath(`browser-settings-${width}.png`), fullPage: true });
   }
   await page.goto("/help");
