@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { mockLocalAi, openReviewEngineLines, openReviewGameSummary, seedReview } from "./fixtures";
 import { REVIEW_SHORTCUTS } from "../apps/web/src/lib/review-shortcuts";
 
@@ -200,20 +200,22 @@ test("floating review surfaces dismiss; the report behind them does not", async 
   await mockLocalAi(page, "available");
   await openReview(page);
 
-  // Content disclosures are not floating surfaces: the Game Summary and the engine
-  // lines stay open while the visitor steps the game, because clicking Next move
-  // must not close the report being read.
+  // Content disclosures are not floating surfaces: the Game Summary, the engine
+  // lines and the Why? evidence stay open while the visitor steps the game, because
+  // clicking Next move must not close the report being read.
   await openReviewGameSummary(page);
   await openReviewEngineLines(page);
   await page.getByRole("button", { name: "Next move" }).click();
+  await page.locator("details.move-verdict-why > summary").click();
+  await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator("details.game-summary-section")).toHaveAttribute("open", "");
   await expect(page.locator("details.review-engine-lines")).toHaveAttribute("open", "");
+  await expect(page.locator("details.move-verdict-why")).toHaveAttribute("open", "");
 
   // Every floating surface the dismissal hook owns, in the Stockfish lens.
   for (const [name, selector] of [
     ["More", "details.review-more"],
     ["Export", ".review-actions details:not(.review-more)"],
-    ["Why?", "details.move-verdict-why"],
   ] as const) {
     await expectFloatingDismissal(page, name, selector);
   }
@@ -226,6 +228,47 @@ test("floating review surfaces dismiss; the report behind them does not", async 
 
   // Dismissing the panels left the report that was open before them still open.
   await expect(page.locator("details.game-summary-section")).toHaveAttribute("open", "");
+});
+
+/* A disclosure is still laid out inside something, and a card that opens past its
+   holder's box is cut off by it: the Why? evidence used to hang past the context
+   panel — 150px left of it at a 1280px window — which took its label column with
+   it, and it covered whatever sat underneath. */
+test("floating surfaces stay inside the panel that holds them", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockLocalAi(page, "available");
+  await openReview(page);
+  await page.getByRole("button", { name: "Next move" }).click();
+  await expect(page.locator("details.move-verdict-why")).toBeVisible();
+
+  const contextPanel = page.locator(".context-panel");
+  const inside = async (name: string, popover: Locator) => {
+    const [panel, holder] = await Promise.all([popover.boundingBox(), contextPanel.boundingBox()]);
+    expect(panel, `${name} must be laid out`).not.toBeNull();
+    expect(holder).not.toBeNull();
+    expect(
+      Math.round(panel!.x),
+      `${name} opens at ${Math.round(panel!.x)}px, left of the context panel at ${Math.round(holder!.x)}px`,
+    ).toBeGreaterThanOrEqual(Math.round(holder!.x) - 1);
+    expect(
+      Math.round(panel!.x + panel!.width),
+      `${name} ends past the context panel's right edge`,
+    ).toBeLessThanOrEqual(Math.round(holder!.x + holder!.width) + 1);
+  };
+
+  await page.locator("details.move-verdict-why > summary").click();
+  await inside("the Why? evidence", page.locator(".move-verdict-evidence"));
+  // The labels carry the reading: geometry that fits but hides them is not the fix.
+  const panelBox = (await contextPanel.boundingBox())!;
+  for (const label of ["Engine", "Winning chances", "Accuracy", "Search"]) {
+    const box = await page.locator(".move-verdict-evidence dt", { hasText: label }).first().boundingBox();
+    expect(box, `${label} must be laid out`).not.toBeNull();
+    expect(Math.round(box!.x), `${label} must not be clipped away`).toBeGreaterThanOrEqual(Math.round(panelBox.x));
+  }
+
+  await page.locator(".lens-switch").getByRole("button", { name: /Maia/ }).click();
+  await page.locator("details.human-quick-settings > summary").click();
+  await inside("the Maia quick settings", page.locator(".human-lens-controls"));
 });
 
 test("publishes the same shortcut list on Help", async ({ page }) => {

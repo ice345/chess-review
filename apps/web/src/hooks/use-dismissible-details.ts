@@ -4,8 +4,8 @@ import { useEffect } from "react";
 
 /**
  * The review surfaces that paint over other content: Board settings, the More
- * and Export menus, the Maia quick settings, and the Why? evidence panel (all
- * absolutely positioned with a floating shadow). They
+ * and Export menus, and the Maia quick settings (all absolutely positioned with a
+ * floating shadow). They
  * dismiss the way Lichess/Chess.com tool popovers do — a pointer outside closes
  * them, and Escape closes the open panel before it leaves a variation.
  *
@@ -19,7 +19,6 @@ export const DISMISSIBLE_MENUS = [
   ".review-shell details.board-controls",
   ".review-shell .review-actions details",
   ".review-shell details.human-quick-settings",
-  ".review-shell details.move-verdict-why",
 ].join(", ");
 
 export function useDismissibleDetails(selector: string = DISMISSIBLE_MENUS): void {

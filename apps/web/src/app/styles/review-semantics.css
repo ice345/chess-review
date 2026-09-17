@@ -150,8 +150,9 @@
   text-overflow: ellipsis;
 }
 
-.objective-verdict details {
-  position: relative;
+/* The evidence spans the panel instead of hanging off its own disclosure. */
+.objective-verdict .move-verdict-why {
+  grid-column: 1 / -1;
 }
 
 .objective-verdict summary {
@@ -180,17 +181,15 @@
   line-height: 1.4;
 }
 
-.objective-verdict details .move-verdict-evidence {
-  position: absolute;
-  z-index: 7;
-  right: 0;
-  width: 280px;
+/* In place, not floating: the disclosure sits mid-panel, so a right-anchored card
+   opened 150px past the panel's left edge, where the context panel's own scroll box
+   cut off every label, and it covered the practice setup underneath it. */
+.objective-verdict .move-verdict-evidence {
   margin: 6px 0 0;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-paper);
-  box-shadow: 0 8px 24px rgba(48, 77, 84, .12);
   display: grid;
   gap: 5px;
   font-size: 12px;

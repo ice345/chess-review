@@ -117,16 +117,20 @@ uses one visual column for player strips, board and board-width transport; the
 adjacent contextual column contains current-position evidence and, on Review,
 Game Summary with the Evaluation Timeline. A modest amount of panel/document
 scrolling is expected; no persistent control may cover a piece. The floating
-surfaces — Board settings, More, Export, the practice Options menu, the Maia
-quick settings and the Why? evidence panel — dismiss with a pointer outside or
-with Escape, which closes the open one before it leaves a variation. Inline
-disclosures in the contextual panel — Engine lines, Game Summary, the evaluation
-timeline and the move evidence list — are content rather than floating panels:
-they stay open while the visitor steps the game. Every trigger of a floating
+surfaces — Board settings, More, Export, the practice Options menu and the Maia
+quick settings — dismiss with a pointer outside or with Escape, which closes the
+open one before it leaves a variation. Inline disclosures in the contextual panel
+— Engine lines, Game Summary, the evaluation timeline, the Why? evidence and the
+move evidence list — are content rather than floating panels: they stay open
+while the visitor steps the game, and they open inside the column that holds them
+instead of painting over it. A surface that closes under the pointer re-renders
+the column between pointerdown and click, which swallows the click that closed
+it; that is why the classification evidence opened in place rather than as a
+280px card hanging off its own trigger. Every trigger of a floating
 surface says that it opens: the labelled chips and text triggers (More, Export,
 the practice Options and Maia settings) carry one small chevron that turns while
 the panel is open, the Board settings trigger keeps its icon, and the Why?
-summary keeps the disclosure marker it draws. No trigger relies on a hidden
+summary keeps the disclosure marker it draws as an inline disclosure. No trigger relies on a hidden
 marker alone.
 
 Board transport follows First, Previous, Play/Pause, Next and Last. Autoplay
