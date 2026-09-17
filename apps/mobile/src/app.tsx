@@ -9,7 +9,7 @@ import {
   type MobileEndpointManifestV1,
   type MobileExecutionLane,
 } from "@chess-review/shared";
-import { BlueBishopMark, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
+import { BrandMark, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { isTauri } from "@tauri-apps/api/core";
 import { Chessboard } from "react-chessboard";
 import { FEATHER_PORCELAIN_PIECES } from "./piece-assets";
@@ -259,7 +259,7 @@ export function App() {
     <main className="mobile-shell">
       <header className="mobile-header">
         <a className="brand" href="#top" aria-label="Open Chess Review mobile home">
-          <span className="brand-mark"><BlueBishopMark size={27} decorative /></span>
+          <span className="brand-mark"><BrandMark decorative /></span>
           <span><strong>Open Chess Review</strong><small>Mobile companion</small></span>
         </a>
         <button type="button" className="language-button" onClick={() => setLanguage((current) => current === "en" ? "zh-CN" : "en")}>{text.language}</button>
@@ -340,7 +340,7 @@ export function App() {
       </section>
 
       <section className="source-card" aria-labelledby="source-heading">
-        <div className="source-icon"><BlueBishopMark size={38} decorative /></div>
+        <div className="source-icon"><BrandMark decorative /></div>
         <div><h2 id="source-heading">{text.sourceTitle}</h2><p>{text.sourceBody}</p><small>{text.footnote}</small></div>
       </section>
 

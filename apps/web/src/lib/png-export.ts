@@ -1,5 +1,5 @@
 import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis } from "@chess-review/shared";
-import { QUALITY_META } from "@chess-review/ui";
+import { BRAND_MARK_SOURCE, QUALITY_META } from "@chess-review/ui";
 import { PIECE_ASSET_DIR, PIECE_ASSET_KEYS, boardPieceImageKey, type PieceAssetKey, type PieceSetId } from "./board-piece-assets";
 
 const PIECES: Record<string, string> = {
@@ -29,6 +29,18 @@ function loadImage(source: string): Promise<HTMLImageElement | null> {
 }
 
 const pieceImageRequests = new Map<PieceSetId, Promise<BoardPieceImages>>();
+
+let brandMarkRequest: Promise<HTMLImageElement | null> | null = null;
+
+/** The product mark on every exported card. Read once per page: the asset is
+    fingerprinted build output, so a failed load keeps the export usable without
+    a mark rather than failing it, the same way a missing piece falls back to a
+    glyph. */
+export function loadBrandMark(): Promise<HTMLImageElement | null> {
+  if (typeof Image === "undefined") return Promise.resolve(null);
+  brandMarkRequest ??= loadImage(BRAND_MARK_SOURCE);
+  return brandMarkRequest;
+}
 
 /** Preloads the twelve authored PNGs once per piece set. An asset the browser
     cannot decode keeps the Unicode glyph fallback, so an offline or partial
@@ -169,42 +181,6 @@ function drawBadge(context: CanvasRenderingContext2D, move: MoveAnalysis, x: num
   context.restore();
 }
 
-function drawBlueBishopMark(context: CanvasRenderingContext2D, x: number, y: number, size: number) {
-  context.save();
-  context.translate(x, y);
-  context.scale(size / 48, size / 48);
-  context.fillStyle = "#6478a0";
-  context.beginPath();
-  context.moveTo(24, 3.7);
-  context.bezierCurveTo(19.3, 3.7, 15.9, 7.4, 15.9, 11.8);
-  context.bezierCurveTo(15.9, 14.7, 17.3, 16.9, 19.1, 18.8);
-  context.bezierCurveTo(14, 22, 10.8, 27.1, 10.6, 33);
-  context.lineTo(37.4, 33);
-  context.bezierCurveTo(37.2, 27.1, 34, 22, 28.9, 18.8);
-  context.bezierCurveTo(30.7, 16.9, 32.1, 14.7, 32.1, 11.8);
-  context.bezierCurveTo(32.1, 7.4, 28.7, 3.7, 24, 3.7);
-  context.fill();
-  context.strokeStyle = "#fbf7ef";
-  context.lineWidth = 3.1;
-  context.lineCap = "round";
-  context.beginPath();
-  context.moveTo(19.2, 7.8);
-  context.lineTo(28.8, 17.2);
-  context.stroke();
-  context.fillStyle = "#eadcc0";
-  context.globalAlpha = 0.92;
-  context.fill(new Path2D("M23.4 21.4c5.8-.6 10.2 1.7 12 5.7-4.9-.6-8.8-2.1-12-5.7Zm.3 1.4c.3 3.3-.3 6.3-2.2 9 3.8-1.3 6.2-3.8 7.4-7.4-1.7-.8-3.4-1.4-5.2-1.6Z"));
-  context.globalAlpha = 1;
-  context.strokeStyle = "#6478a0";
-  context.beginPath();
-  context.moveTo(7.6, 36.2);
-  context.lineTo(40.4, 36.2);
-  context.moveTo(10.7, 40.1);
-  context.lineTo(37.3, 40.1);
-  context.stroke();
-  context.restore();
-}
-
 function boardPieces(fen: string): Array<Array<string | null>> {
   return fen.split(" ")[0]!.split("/").map((rank) => {
     const squares: Array<string | null> = [];
@@ -259,14 +235,14 @@ function drawBoard(
   context.restore();
 }
 
-function background(context: CanvasRenderingContext2D, title: string, subtitle: string) {
+function background(context: CanvasRenderingContext2D, title: string, subtitle: string, mark: HTMLImageElement | null) {
   const gradient = context.createLinearGradient(0, 0, 1200, 675);
   gradient.addColorStop(0, "#fbf7ef");
   gradient.addColorStop(.55, "#f5f0e7");
   gradient.addColorStop(1, "#dfeae8");
   context.fillStyle = gradient;
   context.fillRect(0, 0, 1200, 675);
-  drawBlueBishopMark(context, 40, 15, 31);
+  if (mark) context.drawImage(mark, 40, 15, 31, 31);
   context.fillStyle = "#6c8c99";
   context.font = "900 20px system-ui";
   context.textAlign = "left";
@@ -293,8 +269,8 @@ export async function renderDisplayedPositionCard(options: {
   pieceSet?: PieceSetId;
 }): Promise<Blob> {
   const [element, context] = canvas();
-  const pieces = await loadBoardPieceImages(options.pieceSet ?? "liz-blue");
-  background(context, options.title, options.subtitle);
+  const [pieces, mark] = await Promise.all([loadBoardPieceImages(options.pieceSet ?? "liz-blue"), loadBrandMark()]);
+  background(context, options.title, options.subtitle, mark);
   roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
   drawBoard(context, options.fen, 50, 80, 520, options.orientation, pieces);
   context.fillStyle = "#294653";
@@ -313,9 +289,9 @@ export async function renderPositionCard(
   pieceSet: PieceSetId = "liz-blue",
 ): Promise<Blob> {
   const [element, context] = canvas();
-  const pieces = await loadBoardPieceImages(pieceSet);
+  const [pieces, mark] = await Promise.all([loadBoardPieceImages(pieceSet), loadBrandMark()]);
   const moveNumber = formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san });
-  background(context, moveNumber, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : move.phase);
+  background(context, moveNumber, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : move.phase, mark);
   roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
   drawBoard(context, move.fenAfter, 50, 80, 520, orientation, pieces);
 
@@ -362,7 +338,7 @@ export async function renderGameReviewCard(analysis: AnyGameAnalysis): Promise<B
   const [element, context] = canvas();
   const white = analysis.game.headers.White ?? "White";
   const black = analysis.game.headers.Black ?? "Black";
-  background(context, `${white} — ${black}`, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : "Objective game review");
+  background(context, `${white} — ${black}`, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : "Objective game review", await loadBrandMark());
 
   roundedRect(context, 40, 115, 530, 205, 18, "#fffdf8");
   roundedRect(context, 590, 115, 570, 205, 18, "#fffdf8");

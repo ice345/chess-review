@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { parsePgn, type NormalizedGame } from "@chess-review/chess-core";
-import { BlueBishopMark } from "@chess-review/ui";
+import { BrandMark } from "@chess-review/ui";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
@@ -121,7 +121,7 @@ export function App() {
     <main className="desktop-shell">
       <header className="desktop-header">
         <a className="desktop-brand" href="#top" aria-label="Open Chess Review desktop home">
-          <span className="desktop-mark"><BlueBishopMark size={30} decorative /></span>
+          <span className="desktop-mark"><BrandMark decorative /></span>
           <span><strong>Open Chess Review</strong><small>Objective · Human · Coach</small></span>
         </a>
         <span className="desktop-mode">{nativeRuntime ? "Native PGN ready" : "Desktop preview"}</span>

@@ -51,7 +51,7 @@ import { concealedAnswerPly, withheldPresentation } from "../lib/practice-presen
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { orderPlayersForBoard } from "../lib/player-identity";
 import { downloadBlob, renderDisplayedPositionCard, renderGameReviewCard, renderPositionCard, reviewFilename } from "../lib/png-export";
-import { BlueBishopMark } from "@chess-review/ui";
+import { BrandMark } from "@chess-review/ui";
 import { saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { exportAnalysisJson, exportAnnotatedPgn } from "@chess-review/shared";
 import { useReviewStore } from "../store/review-store";
@@ -308,11 +308,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         <LocalDataNotice />
         <div className="review-titlebar">
           <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
-            <span className="brand-mark"><BlueBishopMark decorative /></span>
+            <span className="brand-mark"><BrandMark decorative /></span>
           </Link>
         </div>
         <section>
-          <span className="brand-mark"><BlueBishopMark decorative /></span>
+          <span className="brand-mark"><BrandMark decorative /></span>
           <h1>{loadState === "missing" ? "Review not found" : loadState === "error" ? "Unable to open review" : "Preparing workspace"}</h1>
           <p>{loadError ?? (loadState === "missing" ? "This browser has no record for that review ID." : "Loading the persisted game and analysis cache…")}</p>
           {loadState === "error" && <button type="button" className="secondary" onClick={() => window.location.reload()}>Retry opening review</button>}
@@ -574,7 +574,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         <LocalDataNotice />
         <div className="review-titlebar">
           <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
-            <span className="brand-mark"><BlueBishopMark decorative /></span>
+            <span className="brand-mark"><BrandMark decorative /></span>
           </Link>
           <div className="review-title"><strong>{record.title}</strong><small>{record.subtitle}</small></div>
           <nav className="review-nav" aria-label="Review sections">

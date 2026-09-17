@@ -167,14 +167,17 @@ Preserve distinguishability between:
 
 Do not add:
 
-- literal blue-bird icons
+- a second bird or feather motif beyond the product mark
 - film artwork
 - anime characters
 - official logos
 - film frames
 - decorative feather repetition
 
-The Blue Bishop is the product's symbolic mark.
+The product's symbolic mark is the authored bishop-and-wing illustration at
+`packages/ui/assets/brand/logo.png`, derived into the app mark and every icon by
+`scripts/sync-brand-assets.mjs`. The mark is the one place the wing appears; it is
+not a licence to scatter birds or feathers through the interface.
 
 ## Acceptance question
 

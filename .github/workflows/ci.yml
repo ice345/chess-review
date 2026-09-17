@@ -32,9 +32,10 @@ jobs:
       - run: pnpm test
       - run: python3 -m unittest discover -s deploy/nuc -p "test_*.py"
       - run: pnpm build
-      - name: Verify the authored pieces reached both build outputs
+      - name: Verify the authored pieces and brand mark reached both build outputs
         run: |
           node scripts/sync-piece-assets.mjs --check
+          node scripts/sync-brand-assets.mjs --check
           test "$(find apps/mobile/dist/assets -name '*.png' | wc -l)" -ge 12
 
   local-ai:

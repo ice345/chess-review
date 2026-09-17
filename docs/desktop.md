@@ -7,7 +7,7 @@ not embed or start an SSR server.
 ## Implemented foundation
 
 - Vite owns the static React frontend and Tauri loads its `dist` output.
-- The first shell imports the project-owned `BlueBishopMark` from
+- The first shell imports the project-owned `BrandMark` from
   `@chess-review/ui` and parses a selected PGN through
   `@chess-review/chess-core`; it contains no duplicated chess rules.
 - Rust owns native application startup, PGN integration and owned-process

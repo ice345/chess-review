@@ -577,7 +577,7 @@ apps/desktop/
 
 ```tsx
 import { parsePgn, type NormalizedGame } from "@chess-review/chess-core";
-import { BlueBishopMark } from "@chess-review/ui";
+import { BrandMark } from "@chess-review/ui";
 ```
 
 文档里写得很清楚："desktop owns no analysis semantics"（桌面版不拥有任何分析语义）。桌面只负责：**开窗口 + 打开本地文件 + 起本地服务**。

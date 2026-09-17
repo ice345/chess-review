@@ -74,4 +74,13 @@ test("public settings, study and metadata reflect only implemented capabilities"
   await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "website");
   const robots = await request.get("/robots.txt");
   expect(await robots.text()).toContain("Disallow: /api/");
+  // The authored mark reaches the page: a decodable image rather than a broken
+  // reference, which no other check would notice in the header.
+  const mark = page.locator(".brand-mark .brand-mark-image");
+  expect(await mark.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  for (const icon of ["/icon.png", "/brand/icon-192.png", "/brand/icon-maskable-512.png"]) {
+    const response = await request.get(icon);
+    expect(response.headers()["content-type"], `${icon} must be served as a PNG`).toContain("image/png");
+    expect((await response.body()).length, `${icon} must not be empty`).toBeGreaterThan(0);
+  }
 });

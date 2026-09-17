@@ -16,6 +16,12 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#f4efe6",
     theme_color: "#4e7182",
-    icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
+    icons: [
+      { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      // Android masks install icons to its own shape, so the mark is inset on
+      // paper instead of being cropped by the launcher.
+      { src: "/brand/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
   };
 }
