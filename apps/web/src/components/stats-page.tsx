@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { TrainingQueueItemV3 } from "@chess-review/shared";
-import { Icon, type IconName } from "@chess-review/ui";
+import { ProviderMark } from "@chess-review/ui";
 import { subscribeLocalData } from "../lib/browser-storage";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import { listTrainingQueue } from "../lib/training-queue";
@@ -12,15 +12,16 @@ import { masterySummary } from "../lib/training-mastery";
 const RESULT_LABEL: Record<string, string> = { win: "Win", loss: "Loss", draw: "Draw" };
 const RESULT_RANK: Record<string, number> = { win: 0, loss: 1, draw: 2 };
 
-function StatRow({ icon, label, value }: { icon: IconName; label: string; value: number | string }) {
+function StatRow({ mark, label, value }: { mark?: ReactNode; label: string; value: number | string }) {
   return (
     <div className="stats-row">
-      <Icon name={icon} />
+      {mark ?? <span className="stats-row-gap" aria-hidden="true" />}
       <strong>{label}</strong>
       <span className="stats-row-meta">{value}</span>
     </div>
   );
 }
+
 
 export function StatsPage() {
   const { snapshot, error: libraryError, loading: refreshing, indexing, refresh } = useLibrarySnapshot();
@@ -127,7 +128,7 @@ export function StatsPage() {
               : "Loading library…"}
           </p>
         ) : empty ? (
-          <section className="stats-panel paper-panel">
+          <section className="stats-empty">
             <h2>Nothing to summarise yet</h2>
             <p className="stats-panel-note">Import a game to start a library.</p>
             <div className="stats-empty-links">
@@ -136,29 +137,30 @@ export function StatsPage() {
             </div>
           </section>
         ) : figures ? (
-          <>
-            <section className="stats-panel paper-panel">
+          <section className="stats-sheet">
+            <section>
               <h2>Library</h2>
+
               <div className="stats-rows">
-                <StatRow icon="library" label="Records" value={figures.records} />
-                <StatRow icon="book" label="Games" value={figures.games} />
-                <StatRow icon="review" label="Analyzed" value={figures.analysed} />
-                <StatRow icon="question" label="Pending" value={figures.pending} />
+                <StatRow label="Records" value={figures.records} />
+                <StatRow label="Games" value={figures.games} />
+                <StatRow label="Analyzed" value={figures.analysed} />
+                <StatRow label="Pending" value={figures.pending} />
               </div>
             </section>
-            <section className="stats-panel paper-panel">
+            <section>
               <h2>Sources</h2>
               <div className="stats-rows">
-                <StatRow icon="import" label="Manual" value={figures.manual} />
-                <StatRow icon="import" label="Chess.com" value={figures.chesscom} />
-                <StatRow icon="import" label="Lichess" value={figures.lichess} />
+                <StatRow mark={<ProviderMark provider="pgn" decorative />} label="Manual" value={figures.manual} />
+                <StatRow mark={<ProviderMark provider="chesscom" decorative />} label="Chess.com" value={figures.chesscom} />
+                <StatRow mark={<ProviderMark provider="lichess" decorative />} label="Lichess" value={figures.lichess} />
               </div>
               {figures.timeClasses.length > 0 && (
                 <div className="stats-group">
                   <h3>Time class</h3>
                   <div className="stats-rows">
                     {figures.timeClasses.map(([value, count]) => (
-                      <StatRow key={value} icon="moves" label={value.slice(0, 1).toUpperCase() + value.slice(1)} value={count} />
+                      <StatRow key={value} label={value.slice(0, 1).toUpperCase() + value.slice(1)} value={count} />
                     ))}
                   </div>
                 </div>
@@ -168,13 +170,13 @@ export function StatsPage() {
                   <h3>Result</h3>
                   <div className="stats-rows">
                     {figures.results.map(([value, count]) => (
-                      <StatRow key={value} icon="stats" label={RESULT_LABEL[value] ?? value} value={count} />
+                      <StatRow key={value} label={RESULT_LABEL[value] ?? value} value={count} />
                     ))}
                   </div>
                 </div>
               )}
             </section>
-            <section className="stats-panel paper-panel">
+            <section>
               <h2>Practice</h2>
               {queueError ? (
                 <p className="error" role="alert">{queueError}</p>
@@ -182,14 +184,15 @@ export function StatsPage() {
                 <p className="stats-status" role="status">Loading practice…</p>
               ) : (
                 <div className="stats-rows">
-                  <StatRow icon="practice" label="Mastered" value={practice.mastered} />
-                  <StatRow icon="evidence" label="Due" value={practice.due} />
-                  <StatRow icon="book" label="In progress" value={practice.inProgress} />
+                  <StatRow label="Mastered" value={practice.mastered} />
+                  <StatRow label="Due" value={practice.due} />
+                  <StatRow label="In progress" value={practice.inProgress} />
                 </div>
               )}
             </section>
-          </>
+          </section>
         ) : null}
+
       </div>
     </main>
   );

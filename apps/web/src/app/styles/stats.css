@@ -1,4 +1,4 @@
-/* Stats route composition. Route-head and paper-panel live in chrome.css. */
+/* Stats is one score sheet, not three dashboard cards. */
 .stats-stage {
   width: var(--scene-width, min(1220px, calc(100% - 44px)));
   margin: 0 auto;
@@ -8,18 +8,27 @@
   min-width: 0;
 }
 
-
-.stats-panel {
+.stats-sheet,
+.stats-empty {
   min-width: 0;
-  padding: 18px 18px 8px;
+  display: grid;
+  gap: 22px;
 }
-
-.stats-panel h2 {
+.stats-sheet > section {
+  min-width: 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.stats-sheet > section:last-child { border-bottom: 0; padding-bottom: 0; }
+.stats-sheet h2,
+.stats-empty h2 {
   margin: 0 0 6px;
   color: var(--ink-primary);
-  font: 500 20px/1.2 var(--font-serif);
-  letter-spacing: -.02em;
+  font: 650 13px/1.3 var(--font-sans);
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
+
 
 .stats-panel-note {
   margin: 0 0 8px;
@@ -47,10 +56,9 @@
 .stats-rows .stats-row:last-child {
   border-bottom: 0;
 }
+.stats-row-gap { width: 16px; }
+.stats-row .provider-mark { color: var(--ink-muted); }
 
-.stats-row svg {
-  color: var(--ink-muted);
-}
 
 .stats-row strong {
   min-width: 0;
@@ -106,10 +114,9 @@
   line-height: 1.55;
 }
 @media (max-width: 560px) {
-  .stats-panel {
-    padding: 16px 16px 6px;
-  }
+  .stats-sheet { gap: 18px; }
 }
+
 
 @media (min-width: 1080px) {
   .stats-stage {
