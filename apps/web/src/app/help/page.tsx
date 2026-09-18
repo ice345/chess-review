@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AppHeader } from "../../components/app-header";
 import { FEEDBACK_URL, PROJECT_URL } from "../../lib/site-info";
 import { REVIEW_SHORTCUT_GROUPS, shortcutKeysLabel, shortcutsInGroup } from "../../lib/review-shortcuts";
 
 export const metadata: Metadata = { title: "Help and data privacy", description: "What works in your browser, how to keep your chess library, and where optional connected services send data." };
 export default function HelpPage() {
-  return <main className="page-scroll utility-page"><AppHeader />
-    <section className="utility-heading"><span className="kicker">Using Open Chess Review</span><h1>Help and data privacy</h1><p>A free, open-source personal review and coaching workspace. Start with a game, understand a decision, and return to it later.</p></section>
+  return <main className="page-scroll utility-page">
+    <section className="page-head"><p className="page-kicker">Using Open Chess Review</p><h1 className="page-display">Help and data privacy</h1><p className="page-lede">A free, open-source personal review and coaching workspace. Start with a game, understand a decision, and return to it later.</p></section>
     <article className="help-content">
       <nav aria-label="Help topics"><a href="#first-review">First review</a><a href="#capabilities">Capabilities</a><a href="#shortcuts">Review shortcuts</a><a href="#your-data">Your data</a><a href="#enhanced-local">Enhanced Local</a><a href="#feedback">Feedback</a></nav>
       <section id="first-review"><h2>Your first review</h2><ol>

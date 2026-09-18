@@ -1,11 +1,16 @@
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
+/* Windowlight atmosphere, in the order the annex lists it (§11): the paper, the
+   cool daylight that comes off the window, and the warm bounce on the other
+   side. The layers are non-semantic tokens; the last literal is the paper's own
+   bottom shade, which is a surface rather than an atmosphere layer, and it is
+   the colour the page has always ended on. */
 body {
   margin: 0;
   color: var(--ink-primary);
   background:
-    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--wash-blue) 46%, transparent), transparent 28rem),
-    radial-gradient(circle at 8% 2%, color-mix(in srgb, var(--wash-pink) 24%, transparent), transparent 22rem),
+    radial-gradient(118% 86% at 90% 3%, var(--light-cool), transparent 62%),
+    radial-gradient(64% 54% at 3% 2%, var(--light-warm), transparent 58%),
     linear-gradient(180deg, var(--surface-raised) 0%, var(--surface-page) 72%, #f5f1e9 100%);
 }
 a { color: inherit; text-decoration: none; }

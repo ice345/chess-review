@@ -64,6 +64,30 @@
   --shadow-floating: 0 14px 38px rgba(52, 72, 78, .10);
   --shadow-board: 0 12px 30px rgba(52, 72, 78, .09);
 
+  /* Application frame. The rail is a persistent column from 1080px up and a
+     drawer behind a bar below it. Any layout that measures the viewport
+     subtracts whichever of the two is present, so adding the rail cannot push
+     content past the right edge. */
+  --rail-width: 0px;
+  --rail-bar-height: 48px;
+
+  /* Environmental light. Non-semantic: these layers shape the air around the
+     paper and no text contrast may depend on them. They are the fallback the
+     room photograph is drawn over, and what shows during overscroll. */
+  --light-cool: rgba(201, 220, 229, .20);
+  --light-warm: rgba(251, 244, 226, .20);
+
+  /* Motion. Two tiers, and nothing else: a micro-interaction on a control, and
+     a cognitive-mode change in the review panel. Both are short enough to read
+     as a state change rather than a performance, and neither may move the board
+     or resize the page. Windowlight annex §8. */
+  --motion-micro: 160ms;
+  --motion-mode: 240ms;
+  --motion-ease: ease;
+/* The one veil the reference keeps over the room photograph: about six percent
+   of paper, measured from its own background. */
+  --room-wash: color-mix(in srgb, var(--surface-page) 6%, transparent);
+
   /* Typography */
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: Georgia, "Songti SC", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -97,4 +121,15 @@
   --space-row: 6px;
   --measure-prose: 62ch;
   font-family: var(--font-sans);
+}
+
+/* Matches the rail breakpoint in `chrome.css`; media queries cannot read a
+   custom property, so the two must be changed together. */
+@media (min-width: 1080px) {
+  :root {
+    /* The rail tracks the reference's own proportion: its column ends 11.5% into
+       the window, so the desk stays composed at 1280 and at 2560. */
+    --rail-width: clamp(166px, 11.54vw, 190px);
+    --rail-bar-height: 0px;
+  }
 }

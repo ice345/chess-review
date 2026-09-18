@@ -37,7 +37,7 @@
 }
 
 .settings-grid + .connected-accounts {
-  width: min(1060px, calc(100% - 40px));
+  width: min(1220px, calc(100% - 44px));
   margin-top: 46px;
 }
 
@@ -53,7 +53,7 @@
 .synced-games-section h2 {
   margin: 5px 0 0;
   color: var(--ink-primary);
-  font: 500 29px Georgia, "Songti SC", serif;
+  font: 500 29px var(--font-serif);
 }
 
 .connected-accounts header p,
@@ -109,7 +109,7 @@
 .account-notice { margin: 13px 0 0; color: var(--ink-secondary); font-size: 11px; }
 
 .oauth-notice {
-  width: min(1060px, calc(100% - 40px));
+  width: min(1220px, calc(100% - 44px));
   margin: 32px auto -26px;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -125,12 +125,12 @@
 .platform-label { color: var(--ink-muted); font-size: var(--type-label); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .platform-label.lichess { color: var(--ink-muted); }
 .synced-game-grid strong { overflow: hidden; color: var(--ink-primary); font-size: var(--type-body); text-overflow: ellipsis; white-space: nowrap; }
-.synced-game-grid strong i { color: var(--ink-muted); font: italic 400 var(--type-caption) Georgia, "Songti SC", serif; }
+.synced-game-grid strong i { color: var(--ink-muted); font: italic 400 var(--type-caption) var(--font-serif); }
 .synced-game-grid small { color: var(--ink-muted); font-size: var(--type-caption); }
 .synced-game-grid a, .synced-game-grid button { justify-self: end; align-self: center; grid-column: 2; grid-row: 1 / span 3; color: var(--accent-primary); font-size: var(--type-caption); }
 
 .history-filters {
-  width: min(1060px, calc(100% - 40px));
+  width: min(1220px, calc(100% - 44px));
   margin: 0 auto 20px;
   padding: 13px;
   display: grid;
@@ -181,7 +181,7 @@
   border-radius: 50% 44% 52% 46%;
   background: #6f8f78;
   color: var(--surface-paper);
-  font: 700 11px Georgia, "Songti SC", serif;
+  font: 700 11px var(--font-serif);
 }
 
 .platform-avatar.lichess {

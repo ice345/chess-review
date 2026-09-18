@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import { SITE_DESCRIPTION, SITE_NAME } from "../lib/site-info";
 import type { ReactNode } from "react";
 import { ServiceWorkerRegistrar } from "../components/service-worker-registrar";
+import { AppShell } from "../components/app-shell";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/surfaces.css";
 import "./styles/chrome.css";
 import "./styles/home.css";
+import "./styles/import.css";
+import "./styles/review-index.css";
+import "./styles/stats.css";
 import "./styles/utilities.css";
 import "./styles/review-shell.css";
 import "./styles/review-panels.css";
@@ -34,7 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        {children}
+        <AppShell>{children}</AppShell>
         <ServiceWorkerRegistrar />
       </body>
     </html>
