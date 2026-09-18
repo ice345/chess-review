@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { GameAnalysisV2, PlayerColor } from "@chess-review/shared";
 import { Icon } from "@chess-review/ui";
 import type { RetroRuntime } from "../hooks/use-retrospect";
@@ -247,22 +248,33 @@ function ActiveSetup({
   onSelect: (color: PlayerColor) => void;
   onReset: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const count = setup.startable.count;
   return (
     <div className="practice-active-setup">
       <div className="practice-active-setup-head">
         <strong>Practice setup</strong>
-        <button type="button" className="text-button practice-reset" onClick={onReset}>
-          <Icon name="reset" /> Reset
+        <button type="button" className="text-button" onClick={() => setEditing((open) => !open)}>
+          {editing ? "Done" : "Edit"}
         </button>
       </div>
-      <div className="practice-play-as">
-        <span>Play as</span>
-        <SideChooser setup={setup} onSelect={onSelect} />
-      </div>
-      <label className="practice-inline-check practice-option-row">
-        Include inaccuracies
-        <input type="checkbox" checked={includeInaccuracies} onChange={(event) => onIncludeInaccuracies(event.target.checked)} />
-      </label>
+      {editing ? (
+        <>
+          <div className="practice-play-as">
+            <span>Play as</span>
+            <SideChooser setup={setup} onSelect={onSelect} />
+          </div>
+          <label className="practice-inline-check practice-option-row">
+            Include inaccuracies
+            <input type="checkbox" checked={includeInaccuracies} onChange={(event) => onIncludeInaccuracies(event.target.checked)} />
+          </label>
+          <button type="button" className="text-button practice-reset" onClick={onReset}>
+            <Icon name="reset" /> Reset
+          </button>
+        </>
+      ) : (
+        <p className="practice-setup-summary">{practiceSideName(setup.selected)} · {count} {count === 1 ? "position" : "positions"}</p>
+      )}
     </div>
   );
 }

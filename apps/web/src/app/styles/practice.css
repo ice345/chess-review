@@ -237,6 +237,12 @@
   font-size: 13px;
   font-weight: 650;
 }
+.practice-setup-summary {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 13px;
+}
+
 .practice-reset {
   display: inline-flex;
   align-items: center;
