@@ -46,34 +46,33 @@ const GLYPHS: Record<IconName, ReactNode> = {
   ),
   review: (
     <>
-      <rect x="2.8" y="3.2" width="10.4" height="9.6" rx="1.4" />
-      <path d="M8 3.2v9.6" />
-      <path d="M2.8 8h10.4" />
+      <rect x="2.8" y="2.8" width="10.4" height="10.4" rx="1.2" />
+      <path d="M8 2.8v10.4M2.8 8h10.4" />
+      <circle cx="10.6" cy="5.4" r="1.15" />
     </>
   ),
   practice: (
     <>
-      <path d="M2.8 8h3.4" />
-      <path d="M6.2 8c2.6 0 2.6-3.6 5.2-3.6h1.8" />
-      <path d="M6.2 8c2.6 0 2.6 3.6 5.2 3.6h1.8" />
-      <path d="M11.6 2.8 13.6 4.4l-2 1.6" />
-      <path d="M11.6 10.2l2 1.6-2 1.6" />
+      <rect x="2.6" y="2.6" width="6.6" height="6.6" rx="1" />
+      <path d="M12.4 6.4v5.8H6.6" />
+      <path d="M6.6 10.6 8.2 12.2 6.6 13.8" />
     </>
   ),
   library: (
     <>
-      <rect x="2.8" y="3.4" width="2.6" height="9.2" rx="0.5" />
-      <rect x="6.4" y="3.4" width="2.6" height="9.2" rx="0.5" />
-      <path d="M10.4 4.4l2.2-.6 2 8.4-2.2.5z" />
+      <path d="M8 3.2v9.6" />
+      <path d="M8 3.2H3.6A1 1 0 0 0 2.6 4.2v7.4A1 1 0 0 0 3.6 12.6H8" />
+      <path d="M8 3.2h4.4A1 1 0 0 1 13.4 4.2v7.4A1 1 0 0 1 12.4 12.6H8" />
+      <path d="M5 6.4h2M5 8.4h2M9.6 6.4h1.6" />
     </>
   ),
   stats: (
     <>
-      <path d="M3.6 12.8V8.4" />
-      <path d="M8 12.8V3.6" />
-      <path d="M12.4 12.8V6.6" />
+      <path d="M2.6 11.2 5.4 8.2 7.6 9.5 10.6 4.8 13.4 7.2" />
+      <path d="M2.6 12.8h10.8" />
     </>
   ),
+
   settings: (
     <>
       <path d="M2.8 5.6h10.4" />
