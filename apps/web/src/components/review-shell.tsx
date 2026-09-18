@@ -651,9 +651,6 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                 {more.map((item) => (
                   <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={sectionHref(item.href)} key={item.href}>{item.label}</Link>
                 ))}
-                <Link href="/history">Library</Link>
-                <Link href="/training">Practice</Link>
-                <Link href="/settings">Settings</Link>
               </div>
             </details>
             <details key={`export-${pathname}`}><summary>Export</summary><div className="action-menu">

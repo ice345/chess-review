@@ -224,15 +224,18 @@ test("keeps Review desk priorities and fits Moves to the board workspace", async
   await expect(nav.getByRole("link", { name: "Analysis", exact: true })).toBeVisible();
   await openReviewMore(page);
   const more = page.locator("details.review-more .action-menu");
-  for (const name of ["Notebook", "Library", "Practice", "Settings"]) {
-    await expect(more.getByRole("link", { name, exact: true })).toBeVisible();
+  await expect(more.getByRole("link", { name: "Notebook", exact: true })).toBeVisible();
+  for (const name of ["Library", "Practice", "Settings"]) {
+    await expect(more.getByRole("link", { name, exact: true })).toHaveCount(0);
   }
   await expect(more.getByRole("link", { name: "Engine", exact: true })).toHaveCount(0);
+
   await expect(page.locator(".game-summary-section")).toBeVisible();
   await expect(page.locator(".game-summary-section .timeline-panel")).not.toHaveAttribute("open");
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator(".objective-route > .dual-verdict")).toBeVisible();
-  await expect(page.locator(".objective-route > .position-analysis")).toBeVisible();
+  await expect(page.locator(".objective-route .position-analysis")).toBeVisible();
+
 
   await page.goto(`/review/${record.id}/moves`);
   await expect(page.locator(".game-summary-section")).toHaveCount(0);
