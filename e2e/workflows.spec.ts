@@ -133,8 +133,8 @@ test("non-submit Home controls never submit the import form", async ({ page }) =
       state.__unexpectedSubmits = (state.__unexpectedSubmits ?? 0) + 1;
     });
   });
-  await page.getByRole("button", { name: "FEN" }).click();
-  await page.getByRole("button", { name: "PGN" }).click();
+  await page.getByRole("button", { name: "FEN", exact: true }).click();
+  await page.getByRole("button", { name: "PGN", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as Window & { __unexpectedSubmits?: number }).__unexpectedSubmits)).toBe(0);
 });
 
@@ -224,7 +224,7 @@ test("keeps Review desk priorities and fits Moves to the board workspace", async
   await expect(nav.getByRole("link", { name: "Analysis", exact: true })).toBeVisible();
   await openReviewMore(page);
   const more = page.locator("details.review-more .action-menu");
-  for (const name of ["Notebook", "History", "Training", "Settings"]) {
+  for (const name of ["Notebook", "Library", "Practice", "Settings"]) {
     await expect(more.getByRole("link", { name, exact: true })).toBeVisible();
   }
   await expect(more.getByRole("link", { name: "Engine", exact: true })).toHaveCount(0);
@@ -328,7 +328,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
   await page.getByRole("button", { name: "Next move" }).click();
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator(".move-status").getByText("1… e5", { exact: true })).toBeVisible();
-  const stockfishVerdict = await page.locator(".objective-verdict strong").innerText();
+  const stockfishVerdict = await page.locator(".objective-verdict > strong").innerText();
   const objectiveBoardBadge = await page.locator(".board-quality-badge").getAttribute("aria-label");
   expect(objectiveBoardBadge).toBeTruthy();
   await expect(page.locator(".human-verdict")).toHaveCount(0);
@@ -337,7 +337,7 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
   await expect(page.locator(".human-verdict")).toContainText(/e5 · .*to find/);
   await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /Maia predicted human-game WDL/);
   await expect(page.locator(".objective-verdict")).toHaveCount(0);
-  await expect(page.locator(".human-verdict")).toContainText("MAIA · HUMAN FIND DIFFICULTY");
+  await expect(page.locator(".human-verdict")).toContainText("MAIA-3 5M @ 1400");
   await expect(page.locator(".board-quality-badge")).toHaveAttribute("aria-label", objectiveBoardBadge!);
   await expect(page.locator(".board-human-difficulty-badge")).toHaveCount(0);
   await expect.poll(() => mocked.requests.filter((request) => request.path === "/maia/move-review").length).toBeGreaterThan(0);
@@ -353,12 +353,12 @@ test("keeps move N, position N, model identity and persisted Coach facts aligned
 
   await page.getByRole("button", { name: "Stockfish" }).click();
   await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /Stockfish objective evaluation/);
-  await expect(page.locator(".objective-verdict strong")).toHaveText(stockfishVerdict);
+  await expect(page.locator(".objective-verdict > strong")).toHaveText(stockfishVerdict);
   await expect(page.locator(".human-verdict")).toHaveCount(0);
   await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.locator(".eval-bar")).toHaveAttribute("aria-label", /with Maia human marker/);
-  await expect(page.locator(".objective-verdict strong")).toHaveText(stockfishVerdict);
-  await expect(page.locator(".human-verdict")).toContainText("MAIA · HUMAN FIND DIFFICULTY");
+  await expect(page.locator(".objective-verdict > strong")).toHaveText(stockfishVerdict);
+  await expect(page.locator(".human-verdict")).toContainText("MAIA-3 5M @ 1400");
   await expect(page.locator(".board-quality-badge")).toHaveAttribute("aria-label", objectiveBoardBadge!);
   await expect(page.locator(".board-human-difficulty-badge")).toHaveCount(0);
   await page.getByRole("button", { name: /Maia · 1400/ }).click();
@@ -447,7 +447,7 @@ test("keeps Coach generation alive across review routes, guards rapid calls, and
   await expect(page.getByText(/Deterministic fallback used/)).toBeVisible();
   expect(mocked.requests.filter((request) => request.path === "/coach/explain")).toHaveLength(1);
   await page.getByRole("button", { name: "Build whole-game study" }).click();
-  await expect(page.locator(".game-coach-result")).toContainText("Training recommendations");
+  await expect(page.locator(".game-coach-result")).toContainText("Practice recommendations");
   expect(mocked.requests.filter((request) => request.path === "/coach/game-summary")).toHaveLength(1);
 
   await page.getByRole("button", { name: "Flip board" }).click();
@@ -630,7 +630,7 @@ test("builds advanced study evidence and persists an actionable training queue",
   const fixtures = await seedAdvancedStudy(page, { reportPopulation: true });
   await page.goto("/training");
 
-  await expect(page.getByRole("heading", { name: "Training" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Practice" })).toBeVisible();
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await expect(page.locator(".study-ink-stats")).toContainText("5");
   await expect(page.getByText("No platform rating in this scope", { exact: true })).toBeVisible();
@@ -680,7 +680,7 @@ test("builds advanced study evidence and persists an actionable training queue",
   await expect(page.getByRole("region", { name: "Position review task" })).toContainText("1 / 2 positions reviewed");
   // A review with the evidence on screen says so, and claims no mastery.
   await expect(page.getByRole("region", { name: "Position review task" })).toContainText("Learning · next review");
-  await page.getByRole("link", { name: "Pause and return to Training" }).click();
+  await page.getByRole("link", { name: "Pause and return to Practice" }).click();
   await expect(page).toHaveURL(/\/training$/);
   await page.reload();
   await page.locator(".training-list").getByRole("button", { name: "Continue review" }).click();
@@ -708,17 +708,25 @@ test("ANNOTATIONS use quality icons and the played-move label follows Brilliant"
   await expect(page.locator(".annotation-count").filter({ hasText: "Critical" }).locator("svg")).toHaveCount(1);
   await expect(page.locator(".annotation-count").filter({ hasText: "Sacrifice" }).locator("svg")).toHaveCount(1);
   await page.getByRole("button", { name: "Next move" }).click();
-  await expect(page.locator(".objective-verdict strong")).toContainText("Brilliant");
+  await expect(page.locator(".objective-verdict > strong")).toContainText("Brilliant");
   await expect(page.locator(".objective-route .review-move-list button.active .move-quality svg[aria-label='Sacrifice']")).toBeVisible();
   const brilliantAnnotations = page.locator(".annotation-count").filter({ hasText: "Brilliant" }).first();
   // The counts live in the panel's own scroll area, so reaching them must not
   // depend on the document scroll: move the panel and prove it lands inside.
   expect(await brilliantAnnotations.evaluate((element) => {
-    const panel = element.closest(".context-panel") as HTMLElement | null;
-    if (!panel) return false;
-    panel.scrollTop += element.getBoundingClientRect().top - panel.getBoundingClientRect().top - 40;
+    // The panel that scrolls is whichever ancestor actually overflows; walking to
+    // it keeps this about the behaviour (the counts scroll into view) rather than
+    // about which element carries the overflow.
+    let scroller: HTMLElement | null = element.parentElement;
+    while (scroller && scroller !== document.body) {
+      const overflowY = getComputedStyle(scroller).overflowY;
+      if ((overflowY === "auto" || overflowY === "scroll") && scroller.scrollHeight > scroller.clientHeight) break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller) return false;
+    scroller.scrollTop += element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 40;
     const box = element.getBoundingClientRect();
-    const panelBox = panel.getBoundingClientRect();
+    const panelBox = scroller.getBoundingClientRect();
     return box.top >= panelBox.top - 1 && box.bottom <= panelBox.bottom + 1;
   })).toBe(true);
 });

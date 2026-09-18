@@ -119,8 +119,10 @@ test("keeps guided progress across routes and a refresh", async ({ page }) => {
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator(".key-moment-progress")).toHaveText("1 key moment · 1 seen");
 
-  await page.getByRole("link", { name: "Study", exact: true }).click();
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  // Scope to the review's own section nav: the rail also has a Review row.
+  const sections = page.getByRole("navigation", { name: "Review sections" });
+  await sections.getByRole("link", { name: "Study", exact: true }).click();
+  await sections.getByRole("link", { name: "Review", exact: true }).click();
   await expect(page.locator(".key-moment-progress")).toHaveText("1 key moment · 1 seen");
 
   await page.reload();
@@ -171,13 +173,13 @@ test("adds this game's positions to Training from the end of the review", async 
   // The manual import has no learner, so the visitor names the side; the offer
   // starts on the side that actually recorded a trainable position.
   await expect(completion.getByRole("button", { name: "Black" })).toHaveAttribute("aria-pressed", "true");
-  await expect(completion).toContainText("1 position will join 1 training task");
-  await completion.getByRole("button", { name: "Add this position to Training" }).click();
+  await expect(completion).toContainText("1 position will join 1 practice task");
+  await completion.getByRole("button", { name: "Add this position to Practice" }).click();
 
   await expect(completion).toContainText("Added 1 position to 1 task");
-  await expect(completion).toContainText("1 position from this game is already in Training across 1 task");
+  await expect(completion).toContainText("1 position from this game is already in Practice across 1 task");
   await expect(completion.getByRole("link", { name: "Open the task →" })).toHaveAttribute("href", /^\/training\?player=manual%3A/);
-  await expect(completion.getByRole("button", { name: /Add .* to Training/ })).toHaveCount(0);
+  await expect(completion.getByRole("button", { name: /Add .* to Practice/ })).toHaveCount(0);
 });
 
 test("counts what was actually viewed when the review ends early", async ({ page }) => {
@@ -224,8 +226,8 @@ test("ends the review with canonical facts and a next step", async ({ page }) =>
   await expect(completion).toContainText("gave up 28.0% win probability");
   await expect(completion).toContainText("Worth another look");
   await expect(completion).toContainText("White's middlegame was the lowest-scoring phase in this game: Accuracy 60.0.");
-  await expect(completion).toContainText("No position from this game is in Training yet.");
-  await expect(completion.getByRole("link", { name: "Open Training" })).toHaveAttribute("href", "/training");
+  await expect(completion).toContainText("No position from this game is in Practice yet.");
+  await expect(completion.getByRole("link", { name: "Open Practice" })).toHaveAttribute("href", "/training");
   await expect(completion.getByRole("link", { name: "Study this game" })).toBeVisible();
 
   // The summary is a state, not a trap: the guided navigation returns.

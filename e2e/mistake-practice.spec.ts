@@ -113,7 +113,7 @@ test("solves in place on the review board with the answer hidden", async ({ page
     await expect(hiddenRow.locator(".move-quality")).toHaveAttribute("title", "Hidden while solving");
   });
   expect(await hiddenRow.locator("svg title, svg").first().innerHTML()).not.toContain("Blunder");
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Review", exact: true }).click();
   await expect(panel(page)).toContainText("Find a better move");
 
   // Jumping past the fault is refused: the session must not disclose it.
@@ -221,7 +221,7 @@ test("withholds the Study explanation while an answer is owed, and restores it a
   await expect(page.getByText("Engine lines are hidden while you solve this position.")).toBeVisible();
 
   // Solving restores every surface: the gate must be a pause, not an amputation.
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Review", exact: true }).click();
   await play(page, "d2", "d4");
   await expect(panel(page)).toContainText("That move keeps the position");
   await goToReviewSection(page, "Analysis");
@@ -250,7 +250,7 @@ test("hides Maia human candidates while an answer is owed", async ({ page }) => 
   await expect(page.locator(".human-lens-content")).toHaveCount(0);
 
   // Solving restores the lens: the gate must pause evidence, not delete it.
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Review", exact: true }).click();
   await play(page, "d2", "d4");
   await expect(panel(page)).toContainText("That move keeps the position");
   await expect(page.locator(".human-lens-content")).toBeVisible();
@@ -416,7 +416,7 @@ test("the selected side survives leaving the panel and resets on reload", async 
   await expect(startButton(page)).toHaveText(/Black/);
 
   await page.getByRole("link", { name: "Moves", exact: true }).click();
-  await page.getByRole("link", { name: "Review", exact: true }).click();
+  await page.getByRole("navigation", { name: "Review sections" }).getByRole("link", { name: "Review", exact: true }).click();
   await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
 
   await startButton(page).click();
@@ -500,3 +500,71 @@ test("direct local same-origin mutations reach validation, foreign origins stay 
   const cross = await page.request.post('/api/platforms/chesscom/sync', { headers: { Origin: 'https://foreign.example', 'Sec-Fetch-Site': 'cross-site' }, data: { username: 42 } });
   expect(cross.status()).toBe(403);
 });
+
+test("the practice head renders while active and is absent on the start ply", async ({ page }) => {
+  await enter(page, { start: false });
+  await expect(page.getByRole("heading", { name: "Practice this position" })).toHaveCount(0);
+  await expect(page.getByText("Take your time. Look closely. Find the best move.")).toHaveCount(0);
+
+  await startButton(page).click();
+  await expect(page.getByRole("heading", { name: "Practice this position" })).toBeVisible();
+  await expect(page.getByText("Take your time. Look closely. Find the best move.")).toBeVisible();
+  await expect(page.locator(".page-kicker")).toContainText("Practice");
+});
+
+test("the side selector stays reversible after a side with positions is chosen", async ({ page }) => {
+  await enter(page);
+  await expect(sideButton(page, "White")).toBeVisible();
+  await expect(sideButton(page, "White")).toContainText("1 position");
+  await expect(sideButton(page, "Black")).toBeVisible();
+  await expect(sideButton(page, "Black")).toContainText("0 positions");
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+
+  await sideButton(page, "Black").click();
+  await expect(sideButton(page, "Black")).toHaveAttribute("aria-pressed", "true");
+  await expect(sideButton(page, "White")).toBeVisible();
+  await expect(panel(page)).toContainText("Find a better move");
+  await expect(panel(page)).toContainText("White to move");
+
+  await sideButton(page, "White").click();
+  await expect(sideButton(page, "White")).toHaveAttribute("aria-pressed", "true");
+  await expect(sideButton(page, "Black")).toBeVisible();
+  await expect(panel(page)).toContainText("White to move");
+});
+
+test("Hint and Show answer stay available while an answer is owed", async ({ page }) => {
+  await enter(page);
+  const hint = panel(page).getByRole("button", { name: "Hint" });
+  const answer = panel(page).getByRole("button", { name: "View the solution" });
+  await expect(hint).toBeVisible();
+  await expect(panel(page).getByText("Show answer")).toBeVisible();
+  await expect(answer).toBeVisible();
+
+  await hint.click();
+  await expect(panel(page).locator(".retro-hint")).toContainText("Look at the piece on");
+  await expect(hint).toHaveCount(0);
+  await expect(answer).toBeVisible();
+
+  await answer.click();
+  await expect(panel(page)).toContainText("Solution");
+  await expect(panel(page)).toContainText("Best was");
+});
+
+test("active practice does not overflow at 1280×720 or 390×844", async ({ page }) => {
+  await enter(page);
+  await expect(panel(page)).toContainText("Find a better move");
+
+  await page.setViewportSize({ width: 1586, height: 992 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.screenshot({ path: test.info().outputPath("practice-1586x992.png") });
+  await panel(page).screenshot({ path: test.info().outputPath("practice-panel-1586.png") });
+  for (const [width, height] of [[1280, 720], [390, 844]] as const) {
+    await page.setViewportSize({ width, height });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${width}x${height}`).toBe(true);
+    expect(await panel(page).evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  }
+  await page.screenshot({ path: test.info().outputPath("practice-390x844.png") });
+  await panel(page).screenshot({ path: test.info().outputPath("practice-panel-390.png") });
+});
+

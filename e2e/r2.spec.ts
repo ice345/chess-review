@@ -61,7 +61,8 @@ test("the complete example gets real Stockfish evidence and a working learning e
   await page.goto("/");
   await page.getByRole("button", { name: "Load example game" }).click();
   await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 70_000 });
-  await expect(page.getByRole("region", { name: "Review next step" })).toContainText("Start with a key moment");
+  await expect(page.getByText("Start with the first moment that mattered.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Review next step" })).toContainText("Next key moment");
   const study = await page.getByRole("link", { name: "Open in Study →", exact: true }).getAttribute("href");
   expect(study).toMatch(/\/coach\?ply=\d+$/);
   await page.getByRole("button", { name: "Next key moment →" }).click();
@@ -95,8 +96,13 @@ test("keyboard import focus and 200% text remain usable without horizontal overf
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "FEN", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Open PGN file" })).toBeFocused();
+  await expect(page.getByLabel("Paste a complete PGN")).toBeFocused();
+  // The action row follows the field it acts on. The commit stays disabled until
+  // there is something to commit, so Tab reaches the file control from the field
+  // and Shift+Tab returns.
   await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Open PGN file" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await expect(page.getByLabel("Paste a complete PGN")).toBeFocused();
   // Enlarge rendered text, including CSS pixel-sized copy. Width also models
   // a 1440px desktop reflowing at 200% browser zoom.

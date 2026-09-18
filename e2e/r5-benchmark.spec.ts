@@ -35,7 +35,7 @@ for (const count of [1_000, 10_000]) {
     expect(await page.locator(".history-list > article").count()).toBe(60);
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     started = performance.now();
-    await page.getByRole("link", { name: "History", exact: true }).click();
+    await page.getByRole("link", { name: "Library", exact: true }).click();
     await expect(page.locator(".history-summary")).toContainText(`${count} All records`);
     measurements.revisitMs = performance.now() - started;
     await page.locator(".history-scope > summary").click();

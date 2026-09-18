@@ -178,7 +178,7 @@ test("restores backup into a fresh browser with progress, FEN and games but no c
     await expect(target.getByRole("region", { name: "Backup restore preview" })).toContainText("4");
     await target.getByRole("button", { name: "Restore this backup" }).click();
     await expect(target.getByText("Library restored. Reload to continue with your games and saved progress.", { exact: true })).toBeVisible();
-    await target.getByRole("button", { name: "Reload and open Training" }).click();
+    await target.getByRole("button", { name: "Reload and open Practice" }).click();
     await expect(target.getByRole("region", { name: "Saved review tasks" })).toContainText("1 / 3 positions reviewed");
     await target.getByRole("button", { name: "Continue review" }).click();
     await expect(target).toHaveURL(new RegExp(`/review/${games[0]!.record.id}/moves`));
@@ -203,7 +203,7 @@ test("previews conflicts, defaults to keeping progress, and rejects malformed fi
   await expect(page.getByText("1 differing items")).toBeVisible();
   await expect(page.getByLabel("When an ID already exists")).toHaveValue("keep-existing");
   await page.getByRole("button", { name: "Restore this backup" }).click();
-  await page.getByRole("button", { name: "Reload and open Training" }).click();
+  await page.getByRole("button", { name: "Reload and open Practice" }).click();
   await expect(page.getByRole("region", { name: "Saved review tasks" })).toContainText("1 / 3 positions reviewed");
 });
 

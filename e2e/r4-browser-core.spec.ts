@@ -22,7 +22,7 @@ test("fresh production visitor completes real Stockfish review and grounded stud
   await expect(page.getByText("GAME SUMMARY", { exact: true })).toBeVisible({ timeout: 90_000 });
   await page.getByRole("link", { name: "Study", exact: true }).click();
   await page.getByRole("button", { name: "Build whole-game study" }).click();
-  await expect(page.locator(".game-coach-result")).toContainText("Training recommendations");
+  await expect(page.locator(".game-coach-result")).toContainText("Practice recommendations");
   await page.getByRole("button", { name: "Next move", exact: true }).click();
   await page.getByRole("button", { name: "Review e4 from facts", exact: true }).click();
   await expect(page.locator(".coach-result")).toBeVisible();

@@ -44,8 +44,8 @@ test("F7: controls that act stay at least 40 px tall", async ({ page }) => {
   // Home's standalone actions, which are links rather than buttons.
   await seedReview(page);
   await page.goto("/");
-  await expect(page.locator(".view-history")).toBeVisible();
-  for (const selector of [".view-history", ".home-resume"]) {
+  await expect(page.locator(".recent-section .panel-heading a")).toBeVisible();
+  for (const selector of [".recent-section .panel-heading a", ".home-resume"]) {
     await expectAtLeast(page, selector, MIN_ACTION);
   }
 

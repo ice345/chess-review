@@ -361,3 +361,67 @@ test("plays a move from the keyboard without dragging a piece", async ({ page })
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.locator(".move-entry-error")).toContainText("is not a legal move");
 });
+
+test("page head, board card and panel rows compose the review", async ({ page }, testInfo) => {
+  const fixture = await seedReview(page, { visualLabels: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/review/${fixture.record.id}`);
+  await expect(page.getByRole("region", { name: "Persistent board workspace" })).toBeVisible();
+
+  const head = page.locator(".review-head-slot > .page-head");
+  await expect(head.locator(".page-kicker")).toBeVisible();
+  await expect(head.locator(".page-display")).toBeVisible();
+  await expect(head.locator(".page-steps")).toBeVisible();
+  await expect(head.locator('.page-steps [data-step="current"]')).toHaveCount(1);
+
+  const card = page.locator(".board-card");
+  await expect(card).toBeVisible();
+  await expect(card.locator(".board-wrap")).toBeVisible();
+  await expect(card.locator(".move-transport")).toBeVisible();
+
+  const panel = page.locator(".objective-route");
+  await expect(panel.getByText("Moves, quality and accuracy")).toBeVisible();
+  await expect(panel.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Engine lines")).toBeVisible();
+
+  const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+
+  for (const [width, height, name] of [
+    [1440, 900, "composition-start-1440.png"],
+    [1586, 992, "composition-start-1586.png"],
+    [1280, 720, "composition-start-1280.png"],
+    [390, 844, "composition-start-390.png"],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    // Below 560px the head keeps its display line and gives up the kicker: a phone
+    // has to reach the move transport on its first screen.
+    await expect(head.locator(".page-display")).toBeVisible();
+    if (width > 560) await expect(head.locator(".page-kicker")).toBeVisible();
+    await expect(card.locator(".move-transport")).toBeVisible();
+    expect(await noOverflow(), `${width}×${height} start overflow`).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(name) });
+  }
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await expect(page.locator(".review-mode-panel")).toHaveAttribute("data-mode", "moment");
+  await expect(head.locator(".page-kicker")).toBeVisible();
+  await expect(head.locator(".page-display")).toBeVisible();
+  await expect(head.locator('.page-steps [data-step="current"]')).toHaveCount(1);
+  await expect(card.locator(".board-wrap")).toBeVisible();
+  await expect(card.locator(".move-transport")).toBeVisible();
+  await expect(panel.getByText("Nearby moves")).toBeVisible();
+  await expect(panel.getByText("Engine lines")).toBeVisible();
+
+  for (const [width, height, name] of [
+    [1440, 900, "composition-moment-1440.png"],
+    [1586, 992, "composition-moment-1586.png"],
+    [1280, 720, "composition-moment-1280.png"],
+    [390, 844, "composition-moment-390.png"],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    expect(await noOverflow(), `${width}×${height} moment overflow`).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(name) });
+  }
+});
+
