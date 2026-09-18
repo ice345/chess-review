@@ -6,8 +6,8 @@ import { applySyncedAnalysisPolicy } from "../lib/auto-analysis";
 import type { PlatformSyncMode } from "../lib/platform-sync";
 import { ConnectedAccounts } from "./connected-accounts";
 import { ImportForm } from "./import-desk";
-import { RecentReviewsPanel } from "./recent-reviews";
 import { SyncedGamesPanel } from "./synced-games-panel";
+
 
 /**
  * The import desk. The landing page keeps a compact copy of the same form beside
@@ -48,14 +48,6 @@ export function ImportPage() {
         <div className="import-stage-aside">
           <ConnectedAccounts compact onGamesUpdated={applySyncPolicy} />
           <SyncedGamesPanel games={games} records={records} statuses={snapshot?.statuses} limit={5} onOpened={refresh} />
-          <RecentReviewsPanel
-            records={records}
-            statuses={snapshot?.statuses}
-            limit={5}
-            viewAllHref="/history"
-            loading={loading && !snapshot}
-            empty="Nothing imported yet. Your games appear here once one is saved."
-          />
         </div>
       </section>
     </main>

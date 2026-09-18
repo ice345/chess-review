@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import { playLegalBoardMove } from "@chess-review/chess-core";
 import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
-import { WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
+import { ProviderMark, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { useBoardPieces } from "../hooks/use-board-pieces";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import type { LibrarySnapshot } from "../lib/library-snapshot";
@@ -14,6 +14,7 @@ import { listPlatformAccounts } from "../lib/platform-library";
 import { buildReviewRecord, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { externalGameKey } from "../lib/review-status";
 import { ImportForm, STARTING_FEN, openSyncedGameRecord, type ImportPreview } from "./import-desk";
+
 
 
 interface PlayedMove {
@@ -29,10 +30,14 @@ function boardMeta(played: readonly PlayedMove[]): string {
 }
 
 function playedLine(played: readonly PlayedMove[]): string {
-  return played.map((move, index) => (
-    index % 2 === 0 ? `${Math.floor(index / 2) + 1}. ${move.san}` : move.san
-  )).join(" ");
+  const recent = played.slice(-2);
+  const start = played.length - recent.length;
+  return recent.map((move, index) => {
+    const ply = start + index;
+    return ply % 2 === 0 ? `${Math.floor(ply / 2) + 1}. ${move.san}` : move.san;
+  }).join(" ");
 }
+
 
 export function HomeWorkspace() {
   const pieces = useBoardPieces();
@@ -72,19 +77,9 @@ export function HomeWorkspace() {
           </p>
         </section>
 
-        {/* Aside first in the document so a phone reads the form before the board;
-            the desktop grid puts the board back on the left. */}
-        <div className="home-aside">
+        <div className="home-import">
           <ImportForm surface="instrument" onPreview={setPreview} />
           {libraryError && <p className="error" role="alert">{libraryError} <button type="button" className="text-button" disabled={libraryLoading} onClick={() => void refreshLibrary()}>Retry loading games</button></p>}
-          <HomeAccounts games={snapshot?.games ?? []} />
-          <HomeContinue
-            records={recent}
-            games={syncedGames}
-            statuses={snapshot?.statuses}
-            loading={libraryLoading && !snapshot}
-            onOpened={refreshLibrary}
-          />
         </div>
 
         <figure className="home-board paper-panel">
@@ -149,13 +144,23 @@ export function HomeWorkspace() {
           </div>
         </figure>
 
+        <HomeSources games={snapshot?.games ?? []} />
+        <HomeContinue
+          records={recent}
+          games={syncedGames}
+          statuses={snapshot?.statuses}
+          loading={libraryLoading && !snapshot}
+          onOpened={refreshLibrary}
+        />
+
         <p className="product-help-link"><Link href="/help">Help, capabilities and data privacy →</Link></p>
+
       </div>
     </main>
   );
 }
 
-function HomeAccounts({ games }: { games: readonly SyncedGame[] }) {
+function HomeSources({ games }: { games: readonly SyncedGame[] }) {
   const [accounts, setAccounts] = useState<PlatformAccount[] | null>(null);
   useEffect(() => {
     void listPlatformAccounts().then(setAccounts);
@@ -167,18 +172,20 @@ function HomeAccounts({ games }: { games: readonly SyncedGame[] }) {
   const lichessCount = games.filter((game) => game.external.provider === "lichess").length;
 
   return (
-    <section className="home-accounts instrument-panel">
+    <section className="home-sources">
       <div className="panel-heading">
-        <h2>Connected accounts</h2>
+        <h2>Sources</h2>
         <Link className="text-button" href="/settings#connected-accounts">Manage</Link>
       </div>
       <ul className="home-account-rows">
         <li>
+          <ProviderMark provider="chesscom" decorative />
           <span>Chess.com</span>
           <strong>{chesscom ? chesscom.username : "Not connected"}</strong>
           <em>{chesscom ? `${chesscomCount} ${chesscomCount === 1 ? "game" : "games"}` : ""}</em>
         </li>
         <li>
+          <ProviderMark provider="lichess" decorative />
           <span>Lichess</span>
           <strong>{lichess ? lichess.username : "Not connected"}</strong>
           <em>{lichess ? `${lichessCount} ${lichessCount === 1 ? "game" : "games"}` : ""}</em>
@@ -233,7 +240,8 @@ function HomeContinue({
   }
 
   return (
-    <section className="home-continue instrument-panel">
+    <section className="home-continue">
+
       <div className="panel-heading">
         <h2>Continue</h2>
         {records.length > 0 ? <Link className="text-button" href="/history">View all →</Link> : null}

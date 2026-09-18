@@ -8,12 +8,15 @@
   display: grid;
   grid-template-areas:
     "head head"
-    "board aside"
-    "foot aside";
+    "board import"
+    "board sources"
+    "board continue"
+    "foot .";
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.92fr);
   gap: 10px clamp(18px, 3.2vw, 48px);
   align-items: start;
 }
+
 
 .home-scene > .page-head {
   grid-area: head;
@@ -55,9 +58,10 @@
   white-space: nowrap;
 }
 .home-board-frame {
-  width: min(100%, max(280px, calc(100dvh - 340px)));
+  width: min(100%, max(460px, calc(100dvh - 340px)));
   aspect-ratio: 1;
 }
+
 
 .board-card-dock {
   display: grid;
@@ -86,28 +90,20 @@
   font-size: 12px;
 }
 
-.home-aside {
-  grid-area: aside;
+.home-import,
+.home-sources,
+.home-continue {
   min-width: 0;
-  display: grid;
-  gap: 12px;
-  align-content: start;
 }
+.home-import { grid-area: import; }
+.home-sources { grid-area: sources; }
+.home-continue { grid-area: continue; }
+.home-import textarea,
+.home-import select { min-width: 0; }
 
-.home-scene > .product-help-link {
-  grid-area: foot;
-  width: auto;
-  margin: 4px 0 0;
-}
+.home-sources,
+.home-continue { padding: 4px 2px 8px; display: grid; gap: 8px; }
 
-/* A grid item's automatic minimum size is its min-content width, and a textarea
-   carrying a multi-line placeholder reports one far wider than this column. */
-.home-aside > * { min-width: 0; }
-.home-aside textarea,
-.home-aside select { min-width: 0; }
-
-.home-accounts,
-.home-continue { padding: 16px 16px 12px; display: grid; gap: 10px; }
 .home-account-rows {
   margin: 0;
   padding: 0;
@@ -119,13 +115,14 @@
   min-height: 44px;
   padding: 8px 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 8px 12px;
+  grid-template-columns: 16px auto minmax(0, 1fr) auto;
+  gap: 8px 10px;
   align-items: center;
   border-bottom: 1px solid var(--line-soft);
   color: var(--ink-secondary);
   font-size: 13px;
 }
+
 .home-account-rows li:last-child { border-bottom: 0; }
 .home-account-rows strong { overflow: hidden; color: var(--ink-primary); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .home-account-rows em { color: var(--ink-muted); font-size: 12px; font-style: normal; }
@@ -178,7 +175,8 @@
 
 .import-card { min-width: 0; padding: 18px 18px 16px; display: grid; gap: 12px; }
 .import-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.import-heading h2 { margin: 0; color: var(--ink-primary); font: 500 20px/1.2 var(--font-serif); letter-spacing: -.02em; }
+.import-heading h2 { margin: 0; color: var(--ink-primary); font: 650 15px/1.2 var(--font-sans); letter-spacing: 0; }
+
 .import-help-link {
   width: 22px; height: 22px;
   display: grid;
@@ -269,8 +267,10 @@
   .home-scene {
     grid-template-areas:
       "head"
-      "aside"
+      "import"
       "board"
+      "sources"
+      "continue"
       "foot";
     grid-template-columns: minmax(0, 1fr);
   }
@@ -280,7 +280,8 @@
 
 @media (max-width: 560px) {
   .home-scene { width: min(100% - 24px, 1220px); }
-  .import-card, .home-board, .home-accounts, .home-continue, .synced-games-section, .recent-section { padding: 16px; }
+  .import-card, .home-board { padding: 16px; }
+
   .import-field textarea { font-size: 16px; min-height: 132px; }
   .board-card-head { grid-template-columns: auto minmax(0, 1fr); }
   .board-card-meta { grid-column: 2; }
