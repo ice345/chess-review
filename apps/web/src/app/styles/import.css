@@ -4,13 +4,14 @@
 .import-page { padding-bottom: 46px; }
 
 .import-stage {
-  width: min(1220px, calc(100% - 44px));
+  width: var(--scene-width, min(1220px, calc(100% - 44px)));
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(330px, .8fr);
   gap: clamp(18px, 2.4vw, 32px);
   align-items: start;
 }
+
 
 .import-stage-main { min-width: 0; display: grid; gap: 14px; align-content: start; }
 .import-stage-aside { min-width: 0; display: grid; gap: 14px; align-content: start; }
@@ -44,6 +45,14 @@
    narrower aside column. */
 .import-stage-main .import-card { padding: 20px 22px 18px; }
 .import-stage-main .import-field textarea { min-height: 190px; }
+
+
+@media (min-width: 1080px) {
+  .import-stage {
+    width: var(--scene-width);
+    margin-inline: var(--scene-inline-start) auto;
+  }
+}
 
 @media (max-width: 1080px) {
   .import-stage { grid-template-columns: minmax(0, 1fr); }

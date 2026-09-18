@@ -73,7 +73,8 @@ export function SettingsPage() {
 
   return (
     <main className="page-scroll utility-page">
-      <section className="page-head">
+      <section className="page-head head-instrument">
+
         <p className="page-kicker">Open Chess Review</p>
         <h1 className="page-display">Settings</h1>
         <p className="page-lede">{enhanced ? "Enhanced Local" : "Browser Core"} · Your games and review progress are saved in this browser.</p>

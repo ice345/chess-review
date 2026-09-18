@@ -22,24 +22,45 @@
    wash over the photograph, so the veil is that wash and nothing more. Cards and
    panels are the opaque surfaces; a heading that sits on the room is protected
    by its own backing, not by washing out the room. */
-.app-frame::before {
-  content: "";
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  background:
-    linear-gradient(var(--room-wash), var(--room-wash)),
-    url("/atmosphere/room.webp") center / cover no-repeat var(--surface-page);
-  pointer-events: none;
-}
-
 .app-frame {
+  --room-presence: 1;
+  --room-veil: 6%;
   container-type: inline-size;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
 }
+
+.app-frame::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  opacity: var(--room-presence);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--surface-page) var(--room-veil), transparent),
+      color-mix(in srgb, var(--surface-page) var(--room-veil), transparent)
+    ),
+    url("/atmosphere/room.webp") center / cover no-repeat var(--surface-page);
+  pointer-events: none;
+}
+
+/* The room recedes as the work gets harder. Presence is the photograph;
+   veil is extra paper over what remains. Not blur. */
+.app-frame[data-route="home"] { --room-presence: 1; --room-veil: 6%; }
+.app-frame[data-route="import"] { --room-presence: .72; --room-veil: 10%; }
+.app-frame[data-route="review"] { --room-presence: .7; --room-veil: 12%; }
+.app-frame[data-route="review"]:has(.review-shell[data-mode="start"]) { --room-presence: .7; --room-veil: 11%; }
+.app-frame[data-route="review"]:has(.review-shell[data-mode="moment"]) { --room-presence: .55; --room-veil: 16%; }
+.app-frame[data-route="review"]:has(.review-shell[data-mode="move"]) { --room-presence: .62; --room-veil: 14%; }
+.app-frame[data-route="review"]:has(.review-shell[data-mode="practice"]),
+.app-frame[data-route="practice"] { --room-presence: .4; --room-veil: 20%; }
+.app-frame[data-route="library"] { --room-presence: .52; --room-veil: 14%; }
+.app-frame[data-route="stats"] { --room-presence: .4; --room-veil: 16%; }
+.app-frame[data-route="settings"] { --room-presence: .32; --room-veil: 20%; }
+
 
 /* Below the rail breakpoint this is the top bar. It is deliberately *not*
    sticky: a bar that stays on screen covers the top of the board in the review
@@ -61,12 +82,15 @@
 }
 
 .app-content {
+  --scene-inline-start: 22px;
+  --scene-width: min(1220px, calc(100% - 44px));
   grid-column: 1;
   grid-row: 2;
   min-width: 0;
   /* No veil of its own: the room is the page. */
   background: none;
 }
+
 
 .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .brand > span:last-child { min-width: 0; display: grid; gap: 1px; }
@@ -242,13 +266,21 @@
     text-transform: uppercase;
   }
 
-  .app-content { grid-column: 2; grid-row: 1; }
+  .app-content {
+    --scene-inline-start: clamp(24px, 3.2vw, 56px);
+    --scene-inline-end: clamp(48px, 7.5vw, 140px);
+    --scene-width: min(1280px, calc(100% - var(--scene-inline-start) - var(--scene-inline-end)));
+    grid-column: 2;
+    grid-row: 1;
+  }
 }
 
-/* Route composition: the kicker, display line, lede and step trail that every
-   screen in the reference opens with. The steps are a position, not a control. */
+
+/* Route composition. Four head modes share kicker/display/lede, not one magazine
+   template: threshold (Home), task (Review), focus (Practice), instrument
+   (Import / Library / Stats / Settings). */
 .page-head {
-  width: min(1220px, calc(100% - 44px));
+  width: var(--scene-width, min(1220px, calc(100% - 44px)));
   margin: 0 auto;
   padding: 26px 0 16px;
   display: grid;
@@ -291,23 +323,43 @@
 .page-steps > span:last-child::after { display: none; }
 .page-steps [data-step="current"] { color: var(--ink-primary); }
 
+.head-threshold { padding: 22px 0 10px; gap: 8px; }
+.head-task .page-display { font-size: clamp(22px, 2.4vw, 36px); }
+.head-task .page-lede { max-width: 58ch; font-size: 14px; line-height: 1.5; }
+.head-focus { padding: 16px 0 8px; gap: 6px; }
+.head-focus .page-display { font-size: clamp(22px, 2.3vw, 34px); }
+.head-focus .page-lede { font-size: 14px; }
+.head-instrument { padding: 22px 0 14px; gap: 8px; }
+.head-instrument .page-display {
+  font: 550 clamp(22px, 2vw, 30px)/1.2 var(--font-sans);
+  letter-spacing: -.02em;
+}
+.head-instrument .page-lede { max-width: 54ch; font-size: 14px; }
+
 /* The reference's display composition is a desktop one. On a phone the head
    shrinks to a title and one line so the import form still reaches the first
    screen — the form is the job, the head is the threshold. */
 @media (max-width: 820px) {
   .page-head { padding: 16px 0 10px; gap: 5px; }
   .page-display { font-size: clamp(24px, 7vw, 30px); }
+  .head-instrument .page-display { font-size: clamp(22px, 6vw, 26px); }
   .page-lede { font-size: 13.5px; line-height: 1.5; }
   .page-steps { display: none; }
 }
 
-/* The reference's panel: paper, one hairline, a soft shadow. Not glass — there is
-   no backdrop filter anywhere in the product. */
+/* Surfaces. Focus is the one paper card that holds attention. Instrument is a
+   hairline tool. Open copy sits on the room. */
 .paper-panel {
   border: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface-paper) 88%, transparent);
   box-shadow: 0 12px 34px rgba(52, 72, 78, .07);
+}
+.instrument-panel {
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-paper) 92%, transparent);
+  box-shadow: none;
 }
 
 .page-scroll { min-height: calc(100dvh - var(--rail-bar-height)); }
@@ -318,13 +370,9 @@
   .brand strong { font-size: 12px; }
 }
 
-/* The reference's content column, measured from its own mockups: 7% of the
-   window past the rail, 67.7% wide, with the room open on the right rather than
-   the column centred. Desktop only — the composed pages stack below the rail
-   breakpoint and keep their own full-width containers. */
 @media (min-width: 1080px) {
   .page-head {
-    width: min(67.7vw, 1400px);
-    margin-inline: 7vw auto;
+    width: var(--scene-width);
+    margin-inline: var(--scene-inline-start) auto;
   }
 }

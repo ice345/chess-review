@@ -114,7 +114,8 @@ export function HistoryPage() {
 
   return (
     <main className="page-scroll utility-page">
-      <section className="page-head">
+      <section className="page-head head-instrument">
+
         <p className="page-kicker">Open Chess Review</p>
         <h1 className="page-display">Games and reviews</h1>
         <p className="page-lede">Everything you have imported, and the reviews built from it. Filter it down, open one, or remove something you no longer need.</p>

@@ -27,7 +27,8 @@ export function ImportPage() {
 
   return (
     <main className="page-scroll import-page">
-      <section className="page-head">
+      <section className="page-head head-instrument">
+
         <p className="page-kicker">Open Chess Review</p>
         <h1 className="page-display">Bring your games in.</h1>
         <p className="page-lede">

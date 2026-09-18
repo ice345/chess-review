@@ -677,7 +677,8 @@ export function AdvancedStudyPage() {
   const unanalyzedEligibleCount = eligibleSynced.filter((game) => !excludedGameIds.has(game.id) && !game.analyzed).length;
   const canAnalyzeHistory = accounts.length > 0 && unanalyzedEligibleCount > 0 && !hasActiveHistoryJob;
   return <main className="page-scroll study-page">
-    <section className="page-head study-heading">
+    <section className="page-head head-instrument study-heading">
+
       <p className="page-kicker">Open Chess Review</p>
       <h1 className="page-display">Practice</h1>
       <p className="page-lede">Recurring decisions across your analysed games, and what to work on next.</p>

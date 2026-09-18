@@ -15,7 +15,8 @@ export function ReviewIndexPage() {
 
   return (
     <main className="page-scroll review-index">
-      <section className="page-head">
+      <section className="page-head head-instrument">
+
         <span className="page-kicker">Open Chess Review</span>
         <h1 className="page-display">Pick up where you left off.</h1>
         <p className="page-lede">Saved games on this machine, newest first.</p>

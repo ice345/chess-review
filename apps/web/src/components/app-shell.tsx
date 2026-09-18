@@ -44,6 +44,18 @@ const RAIL_REGISTER: readonly { quote: string; foot: [string, string] }[] = [
   { quote: "Your machine, your games.", foot: ["Built for", "A quieter tomorrow"] },
 ] as const;
 
+
+function sceneRoute(pathname: string): string {
+  if (pathname === "/") return "home";
+  if (pathname.startsWith("/import")) return "import";
+  if (pathname.startsWith("/review")) return "review";
+  if (pathname.startsWith("/training")) return "practice";
+  if (pathname.startsWith("/history")) return "library";
+  if (pathname.startsWith("/stats")) return "stats";
+  if (pathname.startsWith("/settings")) return "settings";
+  return "other";
+}
+
 function isCurrentRoute(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -87,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [open]);
 
   return (
-    <div className="app-frame">
+    <div className="app-frame" data-route={sceneRoute(pathname)}>
       <header className="app-rail">
         <Link className="brand" href="/" aria-label="Open Chess Review home">
           <span className="brand-mark"><BrandMark decorative /></span>

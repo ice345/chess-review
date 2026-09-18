@@ -105,7 +105,8 @@ export function StatsPage() {
 
   return (
     <main className="page-scroll stats-page">
-      <section className="page-head">
+      <section className="page-head head-instrument">
+
         <span className="page-kicker">Open Chess Review</span>
         <h1 className="page-display">What the library says.</h1>
         <p className="page-lede">Counts from what this browser has saved.</p>
