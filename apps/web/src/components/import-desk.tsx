@@ -44,7 +44,7 @@ export function previewImport(kind: ReviewRecordKind, input: string): { fen: str
  * owns the library snapshot, because loading it twice in one tree would index
  * the whole library twice.
  */
-export function ImportForm({ latestReview, onPreview }: { latestReview?: ReviewRecord | undefined; onPreview?: (preview: ImportPreview) => void }) {
+export function ImportForm({ latestReview, onPreview, surface = "paper" }: { latestReview?: ReviewRecord | undefined; onPreview?: (preview: ImportPreview) => void; surface?: "paper" | "instrument" }) {
   const router = useRouter();
   const [kind, setKind] = useState<ReviewRecordKind>("pgn");
   const [input, setInput] = useState("");
@@ -122,7 +122,7 @@ export function ImportForm({ latestReview, onPreview }: { latestReview?: ReviewR
 
   return (
     <form
-      className={`import-card paper-panel${dragging ? " drag-active" : ""}`}
+      className={`import-card ${surface === "instrument" ? "instrument-panel" : "paper-panel"}${dragging ? " drag-active" : ""}`}
       aria-busy={busy}
       onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
       onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setDragging(false); }}

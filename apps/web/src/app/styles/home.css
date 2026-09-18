@@ -1,67 +1,180 @@
-/* The landing composition, following the reference: a head (from `chrome.css`),
-   then a wide board panel on the left and a column of paper panels on the right.
-   The room behind the frame is the environment; this file only composes. */
-.home-stage {
-  width: min(1220px, calc(100% - 44px));
+/* Home is one scene: the head, the board and the aside share a grid so the
+   hero is not a separate magazine strip above a dashboard. */
+
+.home-scene {
+  width: var(--scene-width, min(1220px, calc(100% - 44px)));
   margin: 0 auto;
   padding-bottom: 46px;
   display: grid;
-  grid-template-columns: minmax(0, 1.62fr) minmax(300px, 1fr);
-  gap: clamp(18px, 3.66vw, 56px);
+  grid-template-areas:
+    "head head"
+    "board aside"
+    "foot aside";
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.92fr);
+  gap: 10px clamp(18px, 3.2vw, 48px);
   align-items: start;
 }
 
-/* Board first: the chess surface takes the wider column, and the panel column
-   stays narrow enough that it never rivals it. */
-.home-board {
-  grid-column: 1;
-  grid-row: 1;
+.home-scene > .page-head {
+  grid-area: head;
+  width: auto;
   margin: 0;
-  /* The reference's board card holds its board with a 38px margin on each side,
-     which is what makes the card and the board the same size as its. */
-  padding: 24px 38px 20px;
-  display: grid;
-  gap: 14px;
-  justify-items: stretch;
+  padding: 14px 0 4px;
+  gap: 6px;
 }
+.home-scene .page-lede { font-size: 14px; line-height: 1.45; }
 
-.board-card-head { display: flex; align-items: center; gap: 13px; }
+.home-board {
+  grid-area: board;
+  margin: 0;
+  padding: 16px 28px 14px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+.home-board .board-card-head,
+.home-board .board-card-dock { width: 100%; }
+
+
+
+.board-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+}
 .board-card-pip { width: 17px; height: 17px; flex: none; border: 1.5px solid var(--line-accent); border-radius: 50%; }
 .board-card-head h2 { margin: 0; color: var(--ink-primary); font: 500 20px/1.2 var(--font-serif); letter-spacing: -.02em; }
 .board-card-head p { margin: 3px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
-.home-board-frame { width: 100%; max-width: 660px; aspect-ratio: 1; }
-.board-card-foot { margin: 0; color: var(--ink-muted); font-size: 12px; }
+.board-card-meta {
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.home-board-frame {
+  width: min(100%, max(280px, calc(100dvh - 340px)));
+  aspect-ratio: 1;
+}
 
-.home-aside { grid-column: 2; grid-row: 1; min-width: 0; display: grid; gap: 14px; align-content: start; }
+.board-card-dock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 16px;
+  align-items: center;
+}
+.home-board-transport { display: flex; gap: 4px; }
+.home-board-transport button {
+  min-height: 40px;
+  min-width: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.home-board-transport button:hover:not(:disabled) { background: var(--wash-blue); color: var(--ink-primary); }
+.home-open-lab { justify-self: start; }
+.board-card-foot {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.home-aside {
+  grid-area: aside;
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.home-scene > .product-help-link {
+  grid-area: foot;
+  width: auto;
+  margin: 4px 0 0;
+}
 
 /* A grid item's automatic minimum size is its min-content width, and a textarea
-   carrying a multi-line placeholder reports one far wider than this column.
-   Without these the panel column inflates the track and the page overflows. */
+   carrying a multi-line placeholder reports one far wider than this column. */
 .home-aside > * { min-width: 0; }
 .home-aside textarea,
 .home-aside select { min-width: 0; }
-.home-aside .connected-accounts,
-.home-aside .connected-accounts > *,
-.home-aside .account-row { min-width: 0; }
 
-/* The compact accounts panel in the aside column. Settings keeps its own wide
-   two-column header; here it is one paper panel that must be able to shrink. */
-.home-aside .connected-accounts.compact {
-  width: auto;
+.home-accounts,
+.home-continue { padding: 16px 16px 12px; display: grid; gap: 10px; }
+.home-account-rows {
   margin: 0;
-  padding: 18px;
-  border-top: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  list-style: none;
 }
-.home-aside .connected-accounts > header { grid-template-columns: minmax(0, 1fr); gap: 4px; align-items: start; }
-.home-aside .connected-accounts h2 { margin: 2px 0 0; font-size: 20px; }
-.home-aside .account-link-grid { margin-top: 12px; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.home-aside .account-link-card { min-height: 0; padding: 12px 13px; flex-wrap: wrap; gap: 10px; }
-.home-aside .account-link-card input { width: 100%; }
-.home-aside .compact-account-empty { margin-top: 12px; flex-wrap: wrap; gap: 10px; }
+.home-account-rows li {
+  min-height: 44px;
+  padding: 8px 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-secondary);
+  font-size: 13px;
+}
+.home-account-rows li:last-child { border-bottom: 0; }
+.home-account-rows strong { overflow: hidden; color: var(--ink-primary); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.home-account-rows em { color: var(--ink-muted); font-size: 12px; font-style: normal; }
 
-.home-aside .synced-games-section > div:first-child { grid-template-columns: minmax(0, 1fr); gap: 4px; align-items: start; }
-.home-aside .synced-games-section h2 { margin: 0; font-size: 20px; }
-.home-aside .synced-games-section { width: auto; margin: 0; padding: 18px; border-top: 0; }
+.continue-grid { display: grid; gap: 0; }
+.continue-grid a,
+.continue-grid button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.continue-grid a:last-child,
+.continue-grid button:last-child { border-bottom: 0; }
+.continue-grid a:hover,
+.continue-grid button:hover:not(:disabled) { background: color-mix(in srgb, var(--wash-blue) 40%, transparent); }
+.continue-grid strong {
+  grid-column: 1;
+  overflow: hidden;
+  color: var(--ink-primary);
+  font-size: var(--type-body);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.continue-grid small {
+  grid-column: 1;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--type-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.continue-grid em {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--ink-muted);
+  font-size: var(--type-caption);
+  font-style: normal;
+}
 
 .import-card { min-width: 0; padding: 18px 18px 16px; display: grid; gap: 12px; }
 .import-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -100,7 +213,7 @@
 .import-field { display: grid; gap: 7px; }
 .import-field textarea {
   width: 100%;
-  min-height: 138px;
+  min-height: 118px;
   padding: 11px 12px;
   resize: vertical;
   border: 1px solid var(--line);
@@ -124,18 +237,13 @@
 
 .home-resume { display: block; min-height: 40px; max-width: 100%; padding-top: 11px; color: var(--ink-secondary); font-size: 13px; overflow-wrap: anywhere; }
 
-/* A long game title must not push the submit button off a phone's first screen:
-   one line, ellipsised, with the full title still in Recent reviews. */
 @media (max-width: 560px) {
   .home-resume { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
-/* Panel headings in the aside column. */
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-/* The header link reads small, like the reference's, but it is a tap target: the
-   hit area is 40px tall while the text stays its own size. */
 .panel-heading .text-button { display: inline-flex; align-items: center; min-height: 40px; }
-.panel-heading h2 { margin: 0; color: var(--ink-primary); font: 500 20px/1.2 var(--font-serif); letter-spacing: -.02em; }
+.panel-heading h2 { margin: 0; color: var(--ink-primary); font: 500 18px/1.2 var(--font-sans); letter-spacing: -.01em; }
 .panel-meta { color: var(--ink-muted); font-size: 12px; }
 
 .synced-games-section,
@@ -148,27 +256,38 @@
 .recent-grid strong { grid-column: 1; overflow: hidden; font-size: var(--type-body); text-overflow: ellipsis; white-space: nowrap; }
 .recent-grid small { overflow: hidden; color: var(--muted); font-size: var(--type-caption); text-overflow: ellipsis; white-space: nowrap; }
 .recent-grid em { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--accent-primary); font-size: var(--type-caption); font-style: normal; }
-.recent-empty { padding: 22px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: 13px; text-align: center; }
+.recent-empty { padding: 18px 8px; color: var(--muted); font-size: 13px; text-align: center; }
 
 @media (min-width: 1080px) {
-  /* Aligned with the head above it, the way the reference's board card is. */
-  .home-stage {
-    width: min(67.7vw, 1400px);
-    margin-inline: 7vw auto;
+  .home-scene {
+    width: var(--scene-width);
+    margin-inline: var(--scene-inline-start) auto;
   }
 }
 
 @media (max-width: 1080px) {
-  .home-stage { grid-template-columns: minmax(0, 1fr); }
-  .home-board, .home-aside { grid-column: auto; grid-row: auto; }
-  .home-board { justify-items: center; }
+  .home-scene {
+    grid-template-areas:
+      "head"
+      "aside"
+      "board"
+      "foot";
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-board { justify-items: center; padding-inline: 18px; }
   .home-board-frame { width: min(100%, 560px); }
 }
 
 @media (max-width: 560px) {
-  .home-stage { width: min(100% - 24px, 1220px); }
-  .import-card, .home-board, .synced-games-section, .recent-section { padding: 16px; }
+  .home-scene { width: min(100% - 24px, 1220px); }
+  .import-card, .home-board, .home-accounts, .home-continue, .synced-games-section, .recent-section { padding: 16px; }
   .import-field textarea { font-size: 16px; min-height: 132px; }
+  .board-card-head { grid-template-columns: auto minmax(0, 1fr); }
+  .board-card-meta { grid-column: 2; }
+  .board-card-dock { grid-template-columns: minmax(0, 1fr); }
+  .continue-grid a,
+  .continue-grid button { grid-template-columns: minmax(0, 1fr); }
+  .continue-grid em { grid-column: 1; grid-row: auto; }
   .recent-grid a { grid-template-columns: minmax(0, 1fr); }
   .recent-grid em { grid-column: 1; grid-row: auto; align-self: start; justify-self: start; }
 }
