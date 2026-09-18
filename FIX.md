@@ -17,7 +17,8 @@ The previous brief is **correct as product direction** and **mostly correct as a
 | Stockfish 18, MultiPV, Accuracy / WinPercent, classifications, Maia / Compare, Coach, Explorer, tablebase **UI**, Training mastery 1/3/7/21, Chess.com + Lichess import, Windowlight / Feather Porcelain | **Correct. Present.** |
 | Docs drift: `advanced-study.md` denies then defines mastery; Help says acknowledgements not mastery; Explorer filters “absent”; Syzygy “not integrated” | **Correct. Still true. P0.** |
 | Practice White/Black becomes irreversible after a side with positions is chosen | **Correct. Confirmed in `retro-practice.tsx`.** |
-| Home board is an inert preview | **Correct. `inert` / `aria-hidden` / no drag.** |
+| Home board is an inert preview | **Fixed.** Home board accepts legal drags; PGN input still previews. |
+
 | Clock intelligence, personal “My games” explorer, practice↔Training attempt unification | **Correct as missing.** Still not built. These are Phase D, design first. |
 | “Inspect every viewport and run the full suite before changing analysis semantics” | Process instruction. **Not executed** in this audit pass. |
 | Project Kylin as a visual reference | **Was missing.** Now inspected. Borrow structure, not palette. |
@@ -72,8 +73,8 @@ Treat this as what exists. Do not report these as missing.
 
 **Confirmed defects (code):**
 
-- Practice side selector disappears once a side with `count > 0` is chosen. If learner color is already known, there is **no** switcher at all (`apps/web/src/components/retro-practice.tsx`).
-- Home board is a non-interactive preview.
+- Practice side selector disappears once a side with `count > 0` is chosen. If learner color is already known, there is **no** switcher at all (`apps/web/src/components/retro-practice.tsx`). *(Later pass restored a stable White/Black selector; keep it.)*
+
 
 **Confirmed missing (not bugs, product gaps):**
 
@@ -382,14 +383,14 @@ Those are two concepts. Do not conflate them.
 
 ## 10. Home page
 
-The board is attractive and inert. That wastes the most recognizably chess surface.
-
-Direction (prototype before implementation): the board becomes a real workspace — paste PGN, open PGN, connect account, or make a move — without destroying the simple import path.
+The landing board is a real workspace: legal drags update the position, PGN/FEN
+input still previews, and a played line can open Engine Lab. Import stays on the
+right as Bring a game in; accounts and recent activity are continuation, not a
+dashboard.
 
 Home should feel: “Here is a chessboard.”  
 Not: “Here is a SaaS form with a chess illustration.”
 
-Optional, after Phase B. Not a blocker for A–C.
 
 ---
 

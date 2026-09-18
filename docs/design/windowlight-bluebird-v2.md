@@ -69,17 +69,17 @@ Implementation state, 2026-09-18:
 | --- | --- |
 | Persistent left rail, drawer below 1080px | implemented — `components/app-shell.tsx`, `styles/chrome.css` |
 | Seven rail destinations | implemented — `/`, `/import`, `/review`, `/training`, `/history`, `/stats`, `/settings`; each marks itself current, and a review workspace keeps Review marked |
-| Route head on every screen | implemented — `.page-head` in `chrome.css`, including the utility screens that used to carry `.utility-heading` |
-| Room environment + content veil | implemented — `.app-frame::before` in `chrome.css`, `public/atmosphere/room.webp` |
-| Route head (kicker, display, lede, step trail) | implemented — `.page-head` and its children in `chrome.css` |
-| Icon set | implemented — `packages/ui/src/icons.tsx` |
-| Typography roles (§6) | implemented — one serif token for narrative, sans for instrumentation |
-| Home composition (§7.1) | implemented — board card on the left, the import / accounts / recent panel column on the right |
-| Import desk composition | implemented — `components/import-page.tsx`; the form itself is shared with Home (`components/import-desk.tsx`), so the import rules live once |
+| Route head variants | implemented — `.head-threshold` / `.head-task` / `.head-focus` / `.head-instrument` in `chrome.css`; utility screens no longer share Home's editorial display |
+| Room environment + route presence | implemented — `.app-frame::before` with `--room-presence` / `--room-veil` per `data-route` and review `data-mode` |
+| Icon set | family implemented; review / practice / library / stats glyphs refined toward chess-desk marks — `packages/ui/src/icons.tsx` |
+| Typography roles (§6) | implemented — serif for Home and Key Moment questions; sans for instrument pages |
+| Home composition (§7.1) | structural implementation complete; visual refinement in progress — one `.home-scene`, interactive board, compact accounts, merged Continue |
+| Import desk composition | implemented — `components/import-page.tsx`; the form itself is shared with Home (`components/import-desk.tsx`) |
 | Library / Stats / Review composition | implemented — panels of icon + label + value rows over canonical stored data; no derived number is computed in a component |
 | Practice vocabulary | implemented — the rail, the hub's display line and every user-facing label say Practice; `training-*` keeps its module names |
-| Review Start, Key Moment, Practice composition (§7.2–§7.4) | implemented against the mockups; the practice selector contract is unchanged |
+| Review Start, Key Moment, Practice composition (§7.2–§7.4) | structural implementation complete; hierarchy and surface refinement in progress |
 | Tier A and Tier B motion (§8) | implemented — `--motion-micro` / `--motion-mode`, review mode transitions, practice stagger, answer reveal |
+
 | Tier C first-visit passage (§8, §9) | **not adopted** — removed by the owner |
 | Surfaces policy (§10) | superseded by §0.3: the mockups' paper panels are the target |
 | Brand mark | **unchanged**; Brand Mark V2 is a separate future task |

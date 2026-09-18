@@ -69,19 +69,20 @@ implementation names, not interface copy.
 
 ### Route head
 
-Desktop routes open with a head — a kicker, a serif display line, a lede and a step
-trail — above the screen's own stage (`.page-head`, `.page-kicker`,
-`.page-display`, `.page-lede`, `.page-steps` in `chrome.css`). The steps are a
-position, not a control. On desktop the column is the reference's, measured from its own
-mockups: it starts 7% of the window past the rail and is 67.7% wide, so the room stays
-open on the right instead of the column being centred; the display line scales with it
-(`clamp(28px, 2.77vw, 46px)`) so the headline keeps one line at every width. Review keeps
-its own head aligned with the workspace below it rather than with that offset, because the
-game's board card is the widest thing on the screen. Below 820px the head collapses to the
-display line and the lede: a phone's first screen belongs to the job, not to the
-threshold, and the import form must still reach the first screen at 320×740. Inside Review the budget
-is tighter still — below 560px the head drops its kicker and the board card drops
+Routes share a kicker / display / lede vocabulary, not one magazine template.
+Home uses `.head-threshold` (serif display, lede, step trail). Review uses
+`.head-task` and active Practice `.head-focus`. Import, Library, Stats, Settings
+and Help use `.head-instrument` — a restrained sans title, not a 46px editorial
+headline. The steps are a position, not a control. On desktop the column uses
+`--scene-width` inside the content pane, with a start gutter and the room left
+open on the right. Review keeps its own head aligned with the workspace below it
+rather than with that offset, because the game's board card is the widest thing
+on the screen. Below 820px the head collapses to the display line and the lede:
+a phone's first screen belongs to the job, not to the threshold, and the import
+form must still reach the first screen at 320×740. Inside Review the budget is
+tighter still — below 560px the head drops its kicker and the board card drops
 its event line, because the move transport has to be on that first screen.
+
 
 ### Icons
 
