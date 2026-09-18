@@ -11,12 +11,95 @@ The product is route-based rather than a single analysis dashboard:
 - `/review/[gameId]/engine` is the advanced Stockfish lab.
 - `/history`, `/training` and `/settings` are application utilities.
 
+### Application frame
+
+Every route renders inside one application frame: a persistent rail beside the
+route content, and that same rail as a drawer behind a top-bar trigger below the
+rail breakpoint (1080px). The rail carries the product mark — which is also the
+link to `/` — and the three utility routes; the current route is marked with
+`aria-current="page"` plus a wash and an inset rule, so the selected state never
+depends on color alone.
+
+Two rules the implementation must keep:
+
+- **One navigation landmark.** The drawer is the same `<nav>` element as the
+  rail, switched by CSS. A second copy would give assistive technology two
+  identical landmarks and would make every role-based link query ambiguous.
+- **A rail column never covers content.** At desktop sizes the rail is a grid
+  column, so nothing can sit under it. Below the breakpoint the bar scrolls with
+  the document rather than sticking: a bar that stays on screen covers the top of
+  the board in Review, which is reachability the zoom acceptance pass checks.
+
+The rail is chrome, not a card: a column of the room with one inner hairline, no
+radius, no shadow, no blur. Its paper thickens toward the foot — where the quiet line
+and the imprint sit — so the room reads through the navigation while the rail's small
+print keeps its contrast. Its width tracks the reference proportion
+(`clamp(166px, 11.54vw, 190px)`; the reference's own column ends 11.5% into its window)
+and its bar height is 48px below the breakpoint; both live in `tokens.css` as
+`--rail-width` and `--rail-bar-height`, and every layout that measures the viewport
+subtracts one of them. The review workspace bounds its board
+with container-query units against the frame (`100cqw`) rather than `100vw`, so a
+document-scale zoom cannot make the board overflow its column.
+
+The rail's contents follow the reference: the mark, a two-line serif wordmark and a
+two-line tagline above a short rule, then one row per destination with an icon and its
+label (rows flush with the column's edge, the current one washed and accented), the
+quiet line just under the navigation, and the product's two micro-caps words at the
+foot. The register at the
+foot changes with the current row, the way the reference's does per screen. All of
+it is decorative: nothing in the rail is load-bearing except the links.
+
+The seven rows are the reference's seven, and each one is a real destination:
+
+| Row | Route | What it is |
+| --- | --- | --- |
+| Home | `/` | the desk: board preview beside the import, account and recent panels |
+| Import | `/import` | the import desk: paste, file and account in one place, with the library's own tools |
+| Review | `/review` | the reviews you have, newest first, each one a way back in |
+| Practice | `/training` | recurring decisions across analysed games and today's task |
+| Library | `/history` | every imported game and review, with filters, open and delete |
+| Stats | `/stats` | counts from what this browser has saved |
+| Settings | `/settings` | local data, engine, coach and library settings |
+
+A review workspace lives under Review, so that row stays marked while one is open.
+Practice is the reference's word for the training hub and is now the product's
+word too: every user-facing label that pointed at `/training` says Practice. The
+data structures and modules keep their `training-*` names; those are
+implementation names, not interface copy.
+
+### Route head
+
+Desktop routes open with a head — a kicker, a serif display line, a lede and a step
+trail — above the screen's own stage (`.page-head`, `.page-kicker`,
+`.page-display`, `.page-lede`, `.page-steps` in `chrome.css`). The steps are a
+position, not a control. On desktop the column is the reference's, measured from its own
+mockups: it starts 7% of the window past the rail and is 67.7% wide, so the room stays
+open on the right instead of the column being centred; the display line scales with it
+(`clamp(28px, 2.77vw, 46px)`) so the headline keeps one line at every width. Review keeps
+its own head aligned with the workspace below it rather than with that offset, because the
+game's board card is the widest thing on the screen. Below 820px the head collapses to the
+display line and the lede: a phone's first screen belongs to the job, not to the
+threshold, and the import form must still reach the first screen at 320×740. Inside Review the budget
+is tighter still — below 560px the head drops its kicker and the board card drops
+its event line, because the move transport has to be on that first screen.
+
+### Icons
+
+Every interface icon comes from one authored set, `packages/ui/src/icons.tsx`: one
+16-unit grid, one stroke weight, round caps, no fill, current colour. It is not the
+brand mark and not the Move Quality family. A new interface icon is added there;
+the product takes no icon font and no third-party icon set.
+
 Import UI is never mounted inside the review workspace. A valid input is normalized, saved as a deterministic IndexedDB review record, and navigated to its review route. The objective cache remains separate and is not duplicated by routing.
 
 Home places paste, Open PGN file, Analyze game and the complete Opera Game
 example in its opening section. File selection/drop and pasted collections share
 an explicit multi-game chooser. The board preview follows the paste; it is not
-a second analysis workspace. Unlinked Chess.com/Lichess intake on Home is one
+a second analysis workspace. Home's stage is the reference's arrangement: the
+board panel on the left with its own header and footer, and one column on the
+right of paper panels — the import form, the connected accounts and the recent
+reviews. The board panel is a preview and says so; it does not promise a drag it
+cannot accept, and it has no move transport. Unlinked Chess.com/Lichess intake on Home is one
 quiet row, not identity cards. Mobile reading/tab order puts the form before
 the non-interactive board preview. Returning users have a Continue last review
 link above the form. See [PGN import and export](pgn-import-export.md) for limits,
@@ -28,10 +111,15 @@ The nested review layout owns the board, evaluation bar, selected ply, orientati
 
 At desktop sizes the opening review fits the players, board and move transport
 within the viewport at the R2 acceptance sizes. Review uses one titlebar (mark,
-game title, Review/Moves/Study, More, Export). Board size responds to both
+game title, Review/Moves/Study, More, Export) inside the application frame, so
+the rail is the left edge of the page and the titlebar is the game's own context
+within it. Board size responds to both
 width and available height; after the single-titlebar pass the default is
 about 488px at 1280×720 and about 662px at 1440×900, clamped by
-`100dvh - 232px` and `46vw` so the transport stays in the viewport. Flip stays on the player row; sound, focus board
+`100dvh - 232px` and `46vw` so the transport stays in the viewport, and capped by
+`100cqw - --rail-width - 434px` so a persisted board preference can never push
+the contextual column off-screen. The rail therefore removes width from the
+contextual column before it removes it from the board. Flip stays on the player row; sound, focus board
 and typed-move entry live in Board settings (`/` opens the move field).
 The contextual column scrolls within the board column's height. On Review,
 Game Summary is collapsed until opened, and engine lines are behind a
@@ -82,7 +170,7 @@ The visual language distinguishes three sources:
 - Human: Maia target Elo, candidate probabilities and experimental Find Difficulty.
 - Study: generated teaching from canonical facts, with concise provenance and grounding details on demand.
 
-The primary review navigation contains Review, Moves, Study and Analysis — the Engine Lab route under the name that says what it is for. Notebook, History, Training and Settings sit under More. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with one key-moment action when one exists (or a walk-through line when none does), the current-move line, a single practice text action and a compact nearby-move list. Side and filter controls stay behind Options unless the visitor must pick a side. Engine lines and Game Summary stay collapsed until opened, and both say how they open. Before full-game analysis, its Analyze action precedes position candidates. Engine Lab remains a separate advanced route; its MultiPV rows are the same selectable rows Review shows, in raw UCI form, and the panel's Score and rows always describe the position the board is actually on.
+The primary review navigation contains Review, Moves, Study and Analysis — the Engine Lab route under the name that says what it is for. Notebook, Library, Practice and Settings sit under More. Stockfish/Maia/Compare selection lives in Review as `[Stockfish] [Maia · Elo] [Compare]`; target Elo and model are defaults in Settings with a lightweight Review popover. The Review route panel leads with one key-moment action when one exists (or a walk-through line when none does), the current-move line, a single practice text action and a compact nearby-move list. Side and filter controls stay behind Options unless the visitor must pick a side. Engine lines and Game Summary stay collapsed until opened, and both say how they open. Before full-game analysis, its Analyze action precedes position candidates. Engine Lab remains a separate advanced route; its MultiPV rows are the same selectable rows Review shows, in raw UCI form, and the panel's Score and rows always describe the position the board is actually on.
 
 Quality icons come from `packages/ui` and use Move Quality Annotation System V3 across the move list, destination-square overlay, charts, summary and PNG exports. Diamonds identify elite/special moves, circles positive and ring states, rounded squares informational/warning states, and octagons severe errors. The schema classification `great` is presented to users as **Critical**, matching its only-good-move meaning without changing the persisted classification key or algorithm. Silhouette and glyph remain readable at 20–28px without relying on color. The destination-square badge always remains the canonical Stockfish Move Quality icon in Stockfish, Maia and Compare modes; changing analysis source never relabels the played move. Human Find Difficulty keeps its quieter, separate mark family in the evidence panel. Board overlays derive square placement from orientation and square size rather than fixed pixels. The board is warm paper `--board-square-light` `#eee8d9` with celadon/mist `--board-square-dark` `#b1c6c2`, notation `#516a75`/`#38525e`, a 6px radius, one fine outline and the shared board shadow; the flip control sits outside the board.
 
@@ -90,11 +178,22 @@ The project identity is the authored bishop-and-wing artwork kept at `packages/u
 
 The visual system is **Windowlight**: warm paper, mist blue, dusty pink, sage and cream with blue-gray ink. Surfaces are separated mostly by whitespace and fine rules; this is an editorial study environment, not a glassmorphic dashboard. The reference mood is implemented through original tokens and shapes, without copied characters, frames or branded assets.
 
-There is one production light theme. `tokens.css` is the color source of truth: `--surface-page` `#f8f6ef`, `--surface-paper` `#fffef9`, `--surface-raised` `#fbf8f1`, the `--wash-*` atmosphere colors, `--ink-primary`/`-secondary`/`-muted`/`-faint`, `--line`/`--line-soft`/`--line-accent`, `--accent-primary` `#587493` with `--accent-hover` and `--focus-ring`, the board tokens, `--danger`/`--success-soft`/`--warning-soft` semantics, and the three paper shadows. The legacy aliases (`--bg`, `--surface`, `--text`, `--muted`, `--accent`, `--paper`, `--mist`, `--pink`, `--sage`, `--cream`) remain for existing feature stylesheets. There is no second switchable theme and no theme provider: the piece-set preference stays an independent setting.
+There is one production light theme. `tokens.css` is the color source of truth: `--surface-page` `#f8f6ef`, `--surface-paper` `#fffef9`, `--surface-raised` `#fbf8f1`, the `--wash-*` atmosphere colors, `--ink-primary`/`-secondary`/`-muted`/`-faint`, `--line`/`--line-soft`/`--line-accent`, `--accent-primary` `#587493` with `--accent-hover` and `--focus-ring`, the board tokens, `--danger`/`--success-soft`/`--warning-soft` semantics, the three paper shadows, the `--rail-*` frame metrics, the two motion durations, and the fallback light layer `--light-cool` / `--light-warm`. The legacy aliases (`--bg`, `--surface`, `--text`, `--muted`, `--accent`, `--paper`, `--mist`, `--pink`, `--sage`, `--cream`) remain for existing feature stylesheets. There is no second switchable theme and no theme provider: the piece-set preference stays an independent setting.
+
+The environment is the room: `apps/web/public/atmosphere/room.webp`, a compressed
+derivative of the reference's `background_pic.png`, painted once and fixed behind the whole
+application (`.app-frame::before` in `chrome.css`). Nothing hides it: the frame paints the
+photograph under `--room-wash` (6% paper, the veil the reference's own background measures),
+the route column adds no surface of its own, the rail thickens its paper only toward its
+foot, and the route head carries a soft glow where its words are. Words on the room use the
+primary ink tier; the muted and secondary tiers belong to words on paper, and
+`e2e/room-contrast.spec.ts` measures every room-sitting element against the pixels the
+browser paints. `body` keeps the paper plus the two light washes as the pre-load fallback
+(`--light-cool`, `--light-warm`). The photograph never moves and is never a per-screen hero.
 
 Board appearance is centralized in `apps/web/src/lib/board-appearance.ts` as `WINDOWLIGHT_BOARD_APPEARANCE`; Home, Review and the design fixtures spread it into their react-chessboard options instead of repeating hex values, and it references the board tokens by CSS variable. Board interaction states live in `board-move-hints.ts`: a dusty-rose selection with a restrained brass wash, a rose ring for legal captures and a rose dot for quiet moves, all token-owned and kept more visible than the theme. Stockfish (blue), Maia (green), fault (rose) and overlap (teal) arrow families keep their source-aware semantics and are never folded into one aesthetic palette.
 
-Motion stays nearly invisible: color, border, background and opacity transitions of 120–180ms. Hover must not change geometry — no rotation, scale, card lift or negative-margin width expansion — and no ambient or looping animation is used. Transparency means reduced visual weight rather than blur: no `backdrop-filter` on the app header or review titlebar, and repeated dense content is an ink row (transparent with a fine divider) rather than another translucent card. Rare sections such as Game Summary, real popovers and the promotion chooser may remain paper with a shadow. Functional text is at least 11px; 9–10px is reserved for decorative uppercase kickers.
+Motion stays nearly invisible and has exactly two tiers, both token-owned in `tokens.css`: micro-interactions on controls (`--motion-micro`, 160ms) and the review panel's cognitive-mode changes (`--motion-mode`, 240ms). The review contextual panel fades and travels no more than a few pixels when the visitor moves from the start ply to a key moment, from a key moment into practice, or when a withheld answer is revealed; ordinary ply stepping inside one mode does not animate, and the board column never moves, resizes or bounces. Hover must not change geometry — no rotation, scale, card lift or negative-margin width expansion — and no ambient or looping animation is used. Transparency means reduced visual weight rather than blur: no `backdrop-filter` on the rail, the app header or review titlebar, and repeated dense content is an ink row (transparent with a fine divider) rather than another translucent card. Rare sections such as Game Summary, real popovers and the promotion chooser may remain paper with a shadow. Functional text is at least 11px; 9–10px is reserved for decorative uppercase kickers. Under `prefers-reduced-motion: reduce` every transition and animation collapses to an instant state change, and JS-driven motion does not run at all (`usePrefersReducedMotion`).
 
 The default piece family is **Feather Porcelain**, the authored 512×512 RGBA PNG set served from the versioned directory `/pieces/feather_porcelain_v1_1/`; its persisted setting id remains `liz-blue` for compatibility, and Settings exposes it as “Feather Porcelain” beside the optional `classic` react-chessboard SVG set. The authored masters live once, in `packages/ui/assets/pieces/feather-porcelain-v1.1/`; `scripts/sync-piece-assets.mjs` validates them (exactly twelve files, 512×512, PNG with an alpha channel) and writes the Web copy in `apps/web/public/pieces/feather_porcelain_v1_1/`, and its `--check` mode fails on any drift, so an art revision cannot land in one place only. The mobile companion imports the canonical files through Vite and needs no copy. Piece bytes are cache-first under `/pieces/`, so an art pass publishes into a new version directory instead of overwriting the previous URLs; overwriting bytes at the same URLs instead requires a `CACHE_VERSION` bump in `apps/web/public/sw.js`. PNG export and the promotion chooser use the same piece vocabulary as the board: Feather Porcelain draws the authored PNGs onto the export canvas and the promotion buttons, Classic SVG keeps the Unicode glyph export and its own SVG pieces, and any asset the browser cannot decode falls back to the Unicode glyph so an offline or partial cache never fails an export. The export canvas reads `--board-square-light`/`--board-square-dark` from the document and carries identical literal fallbacks in `png-export.ts`, which a regression test keeps equal to `tokens.css`. Two internal routes are the acceptance environments for this system: `/design/quality-icons` for the Move Quality icons and `/design/pieces` for all twelve pieces at 32/40/48/56/72px on both square colors plus selection, quiet, capture, arrow and badge states. `/design/pieces` also owns the recognition passes — an unlabelled King/Queen/Bishop position behind a reveal, a silhouette pass, a distance blur pass and a side-by-side Classic comparison — because rendering correctly is not the same as being identifiable. `docs/design/2026-09-13-windowlight-implementation.md` records the theme pass and `docs/design/2026-09-14-feather-porcelain-v1-1-integration.md` records the v1.1 art integration and its recognition findings; the older 2026-09-05 proposal is historical.
 

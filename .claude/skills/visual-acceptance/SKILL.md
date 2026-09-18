@@ -23,8 +23,23 @@ Read:
 
 `docs/design/windowlight-contract.md`
 
+and its adopted art-direction annex:
+
+`docs/design/windowlight-bluebird-v2.md`
+
+The annex defines the per-route composition, typography roles, motion tiers and
+atmosphere layer. Its §0 records which decisions are already implemented; do not
+treat its target behaviour as the shipped baseline.
+
 Also inspect the relevant existing component and styles before judging the
 result.
+
+When a design reference image is being used as the comparison, read
+`docs/design/references/windowlight-bluebird-v2/README.md` first. The four screen
+mockups are the **layout authority** for Home, Review Start, Key Moment and
+Practice: compare composition (head, board card, panel column, rows) against them.
+They still exaggerate two things the contract forbids — frosted-glass cards and
+per-screen photographic scenery — so match the arrangement, not the surface.
 
 ## 3. Verify functionality first
 

@@ -578,6 +578,15 @@ Especially:
 - roadmap.md
 - research.md
 
+UI and design changes additionally inspect:
+
+- docs/design/windowlight-contract.md — the normative visual contract
+- docs/design/windowlight-bluebird-v2.md — the adopted art-direction annex
+  (composition, typography roles, motion tiers, atmosphere)
+- docs/ui-spec.md — the information architecture and vocabulary
+- docs/design/references/windowlight-bluebird-v2/README.md — what the design
+  reference images may and may not be used for
+
 If implementation changes documented behavior, update the corresponding
 documentation in the same change.
 
@@ -710,6 +719,12 @@ The same classification semantics should be reused across:
 - image export
 
 Do not implement separate classification meanings for different views.
+
+Visual changes must satisfy `docs/design/windowlight-contract.md` and its
+art-direction annex `docs/design/windowlight-bluebird-v2.md`, and must be accepted
+from a real rendered state before they are claimed as done — see the
+`visual-acceptance` skill. A visual change is not proven by CSS source alone, and
+a regenerated Playwright baseline is not proof of correctness.
 
 ---
 

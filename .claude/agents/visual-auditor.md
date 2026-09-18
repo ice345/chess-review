@@ -16,6 +16,10 @@ Evaluate the current implementation against:
 
 `docs/design/windowlight-contract.md`
 
+and its adopted art-direction annex:
+
+`docs/design/windowlight-bluebird-v2.md`
+
 Inspect only the areas relevant to the current change.
 
 When useful, inspect:

@@ -15,6 +15,21 @@ Before intentionally changing the visual language, read:
 
 `docs/design/windowlight-contract.md`
 
+For composition per route, typography roles, motion tiers and the atmosphere
+layer, read the adopted annex:
+
+`docs/design/windowlight-bluebird-v2.md`
+
+The contract stays normative; the annex amends it. Where the annex's §0 records a
+decision that contradicts this file, the annex wins and this file is updated in
+the same change.
+
+For the composition of Home, Review Start, Key Moment and Practice, the four
+mockups in `docs/design/references/windowlight-bluebird-v2/` are the layout
+authority; the room photograph (`background_pic.png`, served as
+`apps/web/public/atmosphere/room.webp`) is the environment the product is painted
+on. Follow their arrangement; never let them decide a product fact.
+
 ## Preserve
 
 - warm paper rather than pure white
@@ -28,15 +43,24 @@ Before intentionally changing the visual language, read:
 - editorial rather than dashboard-like hierarchy
 - almost invisible motion
 - the chessboard as the primary workspace
+- the persistent left rail as the desktop navigation frame (decided 2026-09-18)
 
 ## Identity boundaries
 
 - Feather Porcelain carries the feather / organic motif.
-- Blue Bishop carries the symbolic brand identity.
+- The bishop-and-wing mark at `packages/ui/assets/brand/logo.png` carries the symbolic
+  brand identity. It is not being replaced; do not add a bird to the brand derivation
+  chain, the icon sets or the export cards.
 - The surrounding UI carries air, light, distance and paper.
 
-Do not add literal film imagery, blue-bird decoration, decorative feathers,
-anime characters, film frames, or official artwork.
+One exception, and only one: the first-visit Bluebird Passage may place a single authored
+bluebird as a narrative element, and Home carries it only until that passage ends.
+
+Do not add a second bird or feather motif, decorative feathers, drifting petals,
+anime characters, film frames, film artwork, official artwork or logos.
+
+Any bird or feather outside the passage's single appearance is decoration and is
+prohibited. Passages are not a licence for birds on working screens.
 
 ## Avoid
 
