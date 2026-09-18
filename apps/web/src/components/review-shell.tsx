@@ -602,20 +602,27 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         : "Start";
   const reviewDisplay = atStartPly
     ? "Walk through this game."
-    : concealed && keyPos
-      ? `Key moment ${keyPos.index} of ${keyPos.total}`
-      : currentAnalysis
-        ? `${formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })} · ${displayedMoveQualityLabel(currentAnalysis)}`
-        : currentMove
-          ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}`
-          : "Walk through this game.";
+    : retro.active
+      ? "Practice this position"
+      : concealed && keyPos
+        ? `Key moment ${keyPos.index} of ${keyPos.total}`
+        : keyPos && currentAnalysis
+          ? formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })
+          : currentAnalysis
+            ? `${formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })} · ${displayedMoveQualityLabel(currentAnalysis)}`
+            : currentMove
+              ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}`
+              : "Walk through this game.";
   const reviewLede = atStartPly
     ? keyPlies.length > 0
-      ? "This review walks the key moments of this game, one at a time."
-      : "This review walks each move of this game and shows the evidence for the one on the board."
-    : concealed || !currentAnalysis
+      ? `${keyPlies.length} ${keyPlies.length === 1 ? "moment carries" : "moments carry"} what changed in this game.`
+      : "Each move, then the evidence for the one on the board."
+    : retro.active || keyPos || concealed || !currentAnalysis
       ? null
       : moveEvidenceSentence(currentAnalysis);
+
+  const sceneMode = retro.active ? "practice" : keyPos ? "moment" : atStartPly ? "start" : "move";
+
   const reviewSteps = reviewStepTrail(state.currentPly, totalPlies, keyPlies);
   const sideToMove = state.positionFen.split(" ")[1] === "b" ? "Black" : "White";
   const topAccuracy = state.analysis?.[orderedPlayers.top.color].accuracy;
@@ -624,7 +631,7 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   return (
     <ReviewRuntimeProvider value={runtime}>
-      <main className="review-shell">
+      <main className="review-shell" data-mode={sceneMode}>
         <div className="review-titlebar">
           <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
             <span className="brand-mark"><BrandMark decorative /></span>
@@ -690,14 +697,14 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         {exportError && <div className="review-export-error" role="alert"><p className="error">{exportError} Open Export to retry.</p><button type="button" className="text-button" onClick={() => setExportError(null)}>Dismiss export error</button></div>}
         <div className="review-head-slot">
         {retro.active && (
-          <section className="page-head practice-page-head">
-            <p className="page-kicker">Open Chess Review — Practice</p>
+          <section className="page-head head-focus practice-page-head">
+            <p className="page-kicker">Practice — Position {Math.min(runtime.retro.currentIndex + 1, Math.max(runtime.retro.totalCount, 1))} of {Math.max(runtime.retro.totalCount, 1)}</p>
             <h1 className="page-display">Practice this position</h1>
             <p className="page-lede">Take your time. Look closely. Find the best move.</p>
           </section>
         )}
         {!retro.active && (
-          <section className="page-head review-page-head">
+          <section className="page-head head-task review-page-head">
             <p className="page-kicker">{`Review — ${reviewKickerState}`}</p>
             <h1 className="page-display">{reviewDisplay}</h1>
             {reviewLede ? <p className="page-lede">{reviewLede}</p> : null}

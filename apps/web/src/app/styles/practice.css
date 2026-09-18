@@ -69,9 +69,10 @@
 .retro-idle {
   padding: 2px 0 10px;
   margin-bottom: 8px;
-  justify-items: start;
+  justify-items: stretch;
   gap: 8px;
 }
+
 .practice-heading {
   margin: 0;
   color: var(--ink-secondary);
@@ -79,29 +80,35 @@
   font-weight: 650;
 }
 .practice-setup {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding-top: 8px;
-  border-top: 1px solid var(--line-soft);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
 }
 .practice-side {
-  min-height: 44px;
-  min-width: 72px;
-  padding: 4px 12px;
+  min-height: 52px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 12px;
   display: grid;
   align-content: center;
-  justify-items: start;
+  justify-items: center;
   gap: 1px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--ink-secondary);
   font: inherit;
   font-weight: 650;
   cursor: pointer;
-  transition: background-color var(--motion-micro) var(--motion-ease), border-color var(--motion-micro) var(--motion-ease), color var(--motion-micro) var(--motion-ease);
+  transition: background-color var(--motion-micro) var(--motion-ease), color var(--motion-micro) var(--motion-ease);
+}
+.practice-side + .practice-side {
+  border-left: 1px solid var(--line-soft);
 }
 .practice-side small {
   color: var(--ink-muted);
@@ -109,13 +116,13 @@
   font-weight: 500;
 }
 .practice-side[aria-pressed="true"] {
-  border-color: var(--line);
-  background: color-mix(in srgb, var(--wash-blue) 50%, transparent);
+  background: color-mix(in srgb, var(--wash-blue) 70%, transparent);
   color: var(--ink-primary);
 }
 .practice-side[data-empty="true"] {
   color: var(--ink-muted);
 }
+
 .retro-idle-start {
   min-height: 44px;
   width: auto;

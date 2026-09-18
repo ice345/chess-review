@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { practiceMoves } from "@chess-review/analysis";
-import { formatMoveNotation, formatMoveNumber, type GameAnalysisV2, type MoveQuality } from "@chess-review/shared";
+import { formatMoveNumber, type GameAnalysisV2, type MoveQuality } from "@chess-review/shared";
+
 import { QualityIcon } from "@chess-review/ui";
 import { useReviewStore } from "../../store/review-store";
 import { useReviewRuntime } from "../review-runtime";
@@ -77,18 +77,49 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
 
   if (plies.length === 0) return null;
 
-  const firstMove = analysis.moves[plies[0]! - 1];
   const atStart = currentPly === 0 && !branch;
   const nextIsPrimary = position === null && next !== null;
 
+  if (atStart) {
+    return (
+      <section className="key-moment-nav key-moment-invite" aria-label="Review next step">
+        <div className="key-moment-invite-actions">
+          <button type="button" className="primary key-moment-step" onClick={() => goToMoment(plies[0]!)}>
+            First key moment
+          </button>
+          <button type="button" className="text-button" disabled={analysis.moves.length === 0} onClick={() => runtime.navigateToPly(1)}>
+            Step to move 1 →
+          </button>
+        </div>
+        <div className="key-moment-journey">
+          <div className="key-moment-journey-head">
+            <strong>This game</strong>
+            <span className="key-moment-progress">{plies.length} key {plies.length === 1 ? "moment" : "moments"} · {counts.seen} seen</span>
+          </div>
+          <ol className="key-moment-dots">
+            {plies.map((ply, index) => (
+              <li key={ply}>
+                <button
+                  type="button"
+                  aria-label={`Key moment ${index + 1}${progress.seen.includes(ply) ? ", seen" : ""}`}
+                  data-seen={progress.seen.includes(ply) ? "true" : undefined}
+                  onClick={() => goToMoment(ply)}
+                />
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="key-moment-finish">
+          <button type="button" className="text-button" onClick={() => setFinished(true)}>
+            Finish review early
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <section className="key-moment-nav" aria-label={atStart ? "Review next step" : "Key moments"}>
-      {atStart && firstMove && (
-        <p className="key-moment-lead">
-          <strong>{formatMoveNotation({ fenBefore: firstMove.fenBefore, color: firstMove.color, san: firstMove.san })} · {displayedMoveQualityLabel(firstMove)}</strong>
-          <Link href={`/review/${runtime.gameId}/coach?ply=${firstMove.ply}`}>Open in Study →</Link>
-        </p>
-      )}
+    <section className="key-moment-nav" aria-label="Key moments">
       <div className="key-moment-row">
         <button
           type="button"
@@ -111,8 +142,6 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
         >
           Next key moment →
         </button>
-        {/* The exit lives with the progress it reports, not on a row of its own:
-            ending the review is a secondary action at every point but the end. */}
         <div className="key-moment-finish">
           {complete && <span role="status">You have seen every key moment.</span>}
           <button type="button" className={complete ? "primary" : "text-button"} onClick={() => setFinished(true)}>
@@ -120,6 +149,7 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
           </button>
         </div>
       </div>
+
 
       {withheld ? (
         <div className="key-moment-action">

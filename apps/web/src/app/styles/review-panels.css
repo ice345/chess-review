@@ -822,26 +822,37 @@
 .key-moment-progress { color: var(--ink-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .key-moment-action {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--wash-blue);
+  padding: 12px 0 4px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
 }
 
+.key-moment-action-heading {
+  color: var(--ink-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+.key-moment-action-meta {
+  justify-self: end;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
 .key-moment-action-fact {
+  grid-column: 1 / -1;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--ink-primary);
-  font-size: 12px;
+  color: var(--ink-secondary);
+  font-size: 13px;
+  line-height: 1.45;
 }
-.key-moment-retry { min-height: 44px; padding-inline: 18px; }
+.key-moment-retry { min-height: 44px; padding-inline: 18px; justify-self: start; }
 
 .key-moment-finish {
   display: flex;
@@ -852,6 +863,7 @@
   color: var(--ink-muted);
   font-size: 12px;
 }
+
 .key-moment-finish button { min-height: 44px; }
 
 /* The Training handoff: what will be added, and to which tasks. */
@@ -1063,4 +1075,91 @@
 @media (prefers-reduced-motion: reduce) {
   .review-row-chevron { transition: none; }
 }
+
+.key-moment-invite {
+  gap: 16px;
+  padding-bottom: 16px;
+}
+.key-moment-invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.key-moment-invite .primary.key-moment-step {
+  min-width: 200px;
+  justify-content: center;
+}
+.key-moment-journey {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+.key-moment-journey-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.key-moment-journey-head strong {
+  color: var(--ink-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+.key-moment-dots {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+}
+.key-moment-dots li {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+.key-moment-dots li:last-child { flex: none; }
+.key-moment-dots li:not(:last-child)::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.key-moment-dots button {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  padding: 0;
+  border: 1.5px solid var(--line-accent);
+  border-radius: 50%;
+  background: var(--surface-paper);
+  cursor: pointer;
+}
+.key-moment-dots button[data-seen="true"] {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.review-other-paths {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+  opacity: .84;
+}
+.review-other-paths .review-panel-row > summary,
+.review-other-paths .review-row-static {
+  min-height: 40px;
+  gap: 10px;
+}
+.review-other-paths svg { width: 14px; height: 14px; }
+.review-other-paths .review-row-meta { color: var(--ink-faint); }
+.review-other-paths .retro-idle {
+  margin: 0;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
 

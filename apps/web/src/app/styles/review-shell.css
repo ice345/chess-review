@@ -405,9 +405,12 @@
 }
 .review-head-slot > .page-head {
   width: 100%;
+  margin-inline: 0;
   padding: 12px 0 6px;
   gap: 6px;
 }
+
+
 .review-page-head .page-display {
   font-size: clamp(22px, 2.5vw, 36px);
 }

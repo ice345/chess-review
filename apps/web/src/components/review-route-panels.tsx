@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { noLegalMoveTerminalStatus, replayUciLine } from "@chess-review/chess-core";
-import { type GameAnalysisV2 } from "@chess-review/shared";
+import { formatMoveNotation, type GameAnalysisV2 } from "@chess-review/shared";
+
 import { EvaluationGraph, Icon, QUALITY_META, QualityIcon, type IconName } from "@chess-review/ui";
 import { CoachPanel } from "./coach-panel";
 import { AnalysisLensPanel } from "./review/analysis-lens-panel";
@@ -246,11 +247,14 @@ export function ObjectiveRoutePanel() {
           ) : null}
         </header>
       )}
-      {!practice && !atStart && mode === "moment" && (
+      {!practice && !atStart && mode === "moment" && move && (
         <header className="review-panel-head">
           <p className="kicker">The moment</p>
+          <h2 className="review-panel-display">{`Why does ${formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san })} matter?`}</h2>
+          <p className="review-panel-lede">{moveEvidenceSentence(move)}</p>
         </header>
       )}
+
       {!practice && !hasKeyMoments && atStart && (
         <p className="review-next-step" role="region" aria-label="Review next step">
           {/* A game with no key moments still has one thing to do first: the start ply
@@ -264,7 +268,9 @@ export function ObjectiveRoutePanel() {
           the whole-game report stay folded so the first screen has one job. */}
       {!practice && <KeyMomentNavigation analysis={analysis} />}
       {!practice && move && !answerWithheld && <CurrentMoveVerdict move={move} />}
+      <div className={atStart ? "review-other-paths" : undefined}>
       <RetroPractice analysis={analysis} />
+
       {!practice && (atStart ? (
         <details className="review-context-moves folded-block review-panel-row">
           <PanelRowSummary
@@ -304,6 +310,7 @@ export function ObjectiveRoutePanel() {
           <EvaluationTimeline analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} />
         </details>
       )}
+      </div>
     </div>
   );
 }
