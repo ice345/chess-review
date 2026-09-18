@@ -4,4 +4,5 @@ export * from "./board-human-difficulty-badge";
 export * from "./brand-mark";
 export * from "./evaluation-graph";
 export * from "./human-difficulty-mark";
+export * from "./icons";
 export * from "./quality-icon";
