@@ -403,7 +403,8 @@ test("page head, board card and panel rows compose the review", async ({ page },
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   await expect(page.locator(".review-mode-panel")).toHaveAttribute("data-mode", "moment");
   await expect(head.locator(".page-kicker")).toBeVisible();
   await expect(head.locator(".page-display")).toBeVisible();

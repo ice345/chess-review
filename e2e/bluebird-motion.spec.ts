@@ -56,7 +56,8 @@ test("stepping from the start ply to a key moment changes cognitive mode and set
   await openGuidedReview(page);
 
   await expect(modePanel(page)).toHaveAttribute("data-mode", "start");
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   await expect(modePanel(page)).toHaveAttribute("data-mode", "moment");
   await expect(page.locator(".key-moment-progress")).toHaveText("Moment 1 of 1");
 
@@ -86,7 +87,8 @@ test("a mode change plays inside the Tier B budget and leaves an opened report o
   const summary = page.locator("details.game-summary-section");
   await expect(summary).toHaveAttribute("open", "");
 
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   await expect(modePanel(page)).toHaveAttribute("data-mode", "moment");
 
   // Sampled inside the page, one frame at a time, so the tier is measured rather
@@ -115,7 +117,8 @@ test("a mode change plays inside the Tier B budget and leaves an opened report o
 test("starting practice keeps working controls and does not move the board column", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   await expect(modePanel(page)).toHaveAttribute("data-mode", "moment");
 
   const board = page.locator(".analysis-column");
@@ -174,7 +177,8 @@ test("reduced motion keeps the state changes and collapses animation duration", 
   const startDuration = animationDurationMs(await modePanel(page).evaluate((element) => getComputedStyle(element).animationDuration));
   expect(startDuration).toBeLessThanOrEqual(1);
 
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   await expect(modePanel(page)).toHaveAttribute("data-mode", "moment");
   const momentDuration = animationDurationMs(await modePanel(page).evaluate((element) => getComputedStyle(element).animationDuration));
   expect(momentDuration).toBeLessThanOrEqual(1);
@@ -204,7 +208,8 @@ test("mode changes do not cause horizontal overflow at 1280×720 or 390×844", a
     await expect(modePanel(page)).toHaveAttribute("data-mode", "start");
     expect(await noHorizontalOverflow(page), `${width}×${height} start`).toBe(true);
 
-    await page.getByRole("button", { name: "Next key moment →" }).click();
+    await page.getByRole("button", { name: "First key moment" }).click();
+
     await expect(modePanel(page)).toHaveAttribute("data-mode", "moment");
     await settledTransform(page);
     expect(await noHorizontalOverflow(page), `${width}×${height} moment`).toBe(true);

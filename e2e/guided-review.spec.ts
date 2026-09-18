@@ -41,17 +41,18 @@ test("navigates the key moments and says where the visitor is", async ({ page })
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
   const progress = page.locator(".key-moment-progress");
-  const previous = page.getByRole("button", { name: "← Previous key moment" });
-  const next = page.getByRole("button", { name: "Next key moment →" });
+  const first = page.getByRole("button", { name: "First key moment" });
 
-  // The board starts before the first moment.
   await expect(progress).toHaveText("1 key moment · 0 seen");
-  await expect(previous).toBeDisabled();
-  await expect(next).toBeEnabled();
+  await expect(page.getByRole("button", { name: "← Previous key moment" })).toHaveCount(0);
+  await expect(first).toBeEnabled();
 
-  await next.click();
+  await first.click();
+
   await expect(page.locator(".move-status")).toContainText("1… e5");
   await expect(progress).toHaveText("Moment 1 of 1");
+  const previous = page.getByRole("button", { name: "← Previous key moment" });
+  const next = page.getByRole("button", { name: "Next key moment →" });
   await expect(next).toBeDisabled();
 
   // The visitor is never locked in: any move is still reachable directly.
@@ -62,10 +63,12 @@ test("navigates the key moments and says where the visitor is", async ({ page })
   await expect(progress).toHaveText("Moment 1 of 1");
 });
 
+
 test("practises a key moment with a hint before the answer", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
 
   // Guided navigation offers the moment blind: the answer stays withheld until the
   // visitor chooses to solve it or to reveal it.
@@ -112,7 +115,8 @@ test("practises a key moment with a hint before the answer", async ({ page }) =>
 test("keeps guided progress across routes and a refresh", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   await expect(page.locator(".key-moment-progress")).toHaveText("Moment 1 of 1");
 
   // Step off the moment, so a session that reset would be visible.
@@ -133,7 +137,8 @@ test("marks practice that follows an answer the visitor already saw", async ({ p
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
 
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+  await page.getByRole("button", { name: "First key moment" }).click();
+
   const action = page.locator(".key-moment-action");
   // Choosing to look retires the blind offer and shows the analysis.
   await action.getByRole("button", { name: "Show the analysis" }).click();
@@ -210,10 +215,10 @@ test("names a key-moment icon by the move's own label", async ({ page }) => {
 test("ends the review with canonical facts and a next step", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
+  await page.getByRole("button", { name: "First key moment" }).click();
   const finish = page.locator(".key-moment-finish");
-  await expect(finish.getByRole("button", { name: "Finish review early" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Next key moment →" }).click();
+
   await expect(finish).toContainText("You have seen every key moment.");
   await finish.getByRole("button", { name: "Finish review" }).click();
 
