@@ -91,6 +91,12 @@ Every interface icon comes from one authored set, `packages/ui/src/icons.tsx`: o
 brand mark and not the Move Quality family. A new interface icon is added there;
 the product takes no icon font and no third-party icon set.
 
+Chess.com, Lichess, PGN and FEN use `ProviderMark`
+(`packages/ui/src/provider-mark.tsx`): a 16px letter in a quiet outline, with the
+provider name beside it. Navigation icons never stand in for a source. Avatars are
+people; the mark is the source. The product does not ship Chess.com or Lichess logos.
+
+
 Import UI is never mounted inside the review workspace. A valid input is normalized, saved as a deterministic IndexedDB review record, and navigated to its review route. The objective cache remains separate and is not duplicated by routing.
 
 Home places paste, Open PGN file, Analyze game and the complete Opera Game

@@ -47,7 +47,10 @@ Adopted in this round:
 **Removed by the owner, later the same day:** the first-visit Bluebird Passage. There is
 no introductory overlay, no `introSeen` flag and no setting to replay it. The bird that
 appears in the room photograph is part of the environment image, not an interface motif,
-and no interface element draws a bird or a feather.
+and no interface element draws a bird or a feather. V3 does **not** add a second
+environmental bird, flute/oboe still-life, or official provider logos. `room.webp` stays
+the shipped photograph.
+
 
 Explicitly **not** adopted:
 
@@ -71,13 +74,15 @@ Implementation state, 2026-09-18:
 | Seven rail destinations | implemented — `/`, `/import`, `/review`, `/training`, `/history`, `/stats`, `/settings`; each marks itself current, and a review workspace keeps Review marked |
 | Route head variants | implemented — `.head-threshold` / `.head-task` / `.head-focus` / `.head-instrument` in `chrome.css`; utility screens no longer share Home's editorial display |
 | Room environment + route presence | implemented — `.app-frame::before` with `--room-presence` / `--room-veil` per `data-route` and review `data-mode` |
-| Icon set | family implemented; review / practice / library / stats glyphs refined toward chess-desk marks — `packages/ui/src/icons.tsx` |
+| Icon set | family implemented; Review focus-dot and Practice recall-arc optically separated from dashboard/undo — `packages/ui/src/icons.tsx` |
+| ProviderMark | implemented — original C/L/P/F outline marks in `packages/ui/src/provider-mark.tsx`; used on Home Sources, Import accounts, Review Index, Library, Stats, synced games, Practice profile |
 | Typography roles (§6) | implemented — serif for Home and Key Moment questions; sans for instrument pages |
-| Home composition (§7.1) | structural implementation complete; visual refinement in progress — one `.home-scene`, interactive board, compact accounts, merged Continue |
-| Import desk composition | implemented — `components/import-page.tsx`; the form itself is shared with Home (`components/import-desk.tsx`) |
-| Library / Stats / Review composition | implemented — panels of icon + label + value rows over canonical stored data; no derived number is computed in a component |
+| Home composition (§7.1) | implemented — one `.home-scene`; interactive board; Sources with ProviderMark; Continue as an open ruled list; mobile order head → import → board → sources → continue |
+| Import desk composition | implemented — `components/import-page.tsx`; Recent reviews removed; the form itself is shared with Home (`components/import-desk.tsx`) |
+| Library / Stats / Review composition | implemented — open archive rows and a Stats score sheet over canonical stored data; no derived number is computed in a component |
 | Practice vocabulary | implemented — the rail, the hub's display line and every user-facing label say Practice; `training-*` keeps its module names |
-| Review Start, Key Moment, Practice composition (§7.2–§7.4) | structural implementation complete; hierarchy and surface refinement in progress |
+| Review Start, Key Moment, Practice composition (§7.2–§7.4) | implemented — First key moment CTA; desktop titlebar without BrandMark; More is Notebook only; active Practice setup collapses to a summary |
+
 | Tier A and Tier B motion (§8) | implemented — `--motion-micro` / `--motion-mode`, review mode transitions, practice stagger, answer reveal |
 
 | Tier C first-visit passage (§8, §9) | **not adopted** — removed by the owner |
