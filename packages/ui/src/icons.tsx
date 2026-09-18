@@ -39,23 +39,23 @@ const GLYPHS: Record<IconName, ReactNode> = {
   ),
   import: (
     <>
-      <path d="M3 10.4v2.6h10v-2.6" />
-      <path d="M8 3.2v6.6" />
-      <path d="M5.5 7.3 8 9.8l2.5-2.5" />
+      <path d="M5.2 3.4h5.6v6.4H5.2z" />
+      <path d="M6.4 5.2h3.2M6.4 7h2.2" />
+      <path d="M3.2 12.6h9.6" />
     </>
   ),
   review: (
     <>
       <rect x="2.8" y="2.8" width="10.4" height="10.4" rx="1.2" />
       <path d="M8 2.8v10.4M2.8 8h10.4" />
-      <circle cx="10.6" cy="5.4" r="1.15" />
+      <circle cx="11" cy="5" r="1" />
     </>
   ),
   practice: (
     <>
-      <rect x="2.6" y="2.6" width="6.6" height="6.6" rx="1" />
-      <path d="M12.4 6.4v5.8H6.6" />
-      <path d="M6.6 10.6 8.2 12.2 6.6 13.8" />
+      <rect x="2.6" y="2.6" width="6" height="6" rx="1" />
+      <path d="M11.4 4.2a4.2 4.2 0 1 1-1.2 6.4" />
+      <circle cx="12.4" cy="11.4" r="0.9" />
     </>
   ),
   library: (
@@ -68,10 +68,11 @@ const GLYPHS: Record<IconName, ReactNode> = {
   ),
   stats: (
     <>
-      <path d="M2.6 11.2 5.4 8.2 7.6 9.5 10.6 4.8 13.4 7.2" />
-      <path d="M2.6 12.8h10.8" />
+      <path d="M2.8 11 6.4 7.2 9.6 8.8 13.2 4.6" />
+      <path d="M2.8 12.8h10.4" />
     </>
   ),
+
 
   settings: (
     <>
