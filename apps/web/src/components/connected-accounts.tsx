@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { PlatformAccount, PlatformSyncState, SyncedGame } from "@chess-review/shared";
+import { ProviderMark } from "@chess-review/ui";
 import { chessComProvider, lichessProvider, PlatformRequestError } from "../lib/platforms/provider";
 import { retryAt, type PlatformSyncMode } from "../lib/platform-sync";
+
 import { loadAppSettings } from "../lib/app-settings";
 import { HISTORY_ANALYSIS_CONCURRENCY, queueAutomaticHistoryAnalysis } from "../lib/history-analysis-jobs";
 import {
@@ -273,8 +275,10 @@ export function ConnectedAccounts({
       <section className="connected-accounts compact connected-accounts-quiet" id="connected-accounts">
         <p>Optional: import games from a platform.</p>
         <div className="account-link-inline" id="chesscom-link">
+          <ProviderMark provider="chesscom" decorative />
           <input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Chess.com username" />
           <button type="button" className="text-button" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button>
+          <ProviderMark provider="lichess" decorative />
           <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Connect Lichess in Settings</Link>
         </div>
         {notice && <p className="account-notice" role="status">{notice}</p>}
@@ -290,11 +294,12 @@ export function ConnectedAccounts({
       </header>
       <div className="account-link-grid">
         <div className="account-link-card chesscom-link" id="chesscom-link">
-          <div><strong>Chess.com</strong><small>Public username · ownership unverified</small></div>
+          <div><strong><ProviderMark provider="chesscom" decorative /> Chess.com</strong><small>Public username · ownership unverified</small></div>
           <div><input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" /><button type="button" className="secondary" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button></div>
         </div>
         <div className="account-link-card lichess-link" id="lichess-link">
-          <div><strong>Lichess</strong><small>{compact ? "Verified OAuth session" : "OAuth 2 · PKCE · verified session"}</small></div>
+          <div><strong><ProviderMark provider="lichess" decorative /> Lichess</strong><small>{compact ? "Verified OAuth session" : "OAuth 2 · PKCE · verified session"}</small></div>
+
           <div>
             {(!compact || lichessConfigured === true) && <button type="button" className="secondary" disabled={working !== null || lichessConfigured !== true} onClick={() => void linkLichess()}>{lichessConfigured === false ? "Not configured on this server" : "Connect Lichess"}</button>}
             {compact && <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Connect Lichess in Settings</Link>}
@@ -305,13 +310,17 @@ export function ConnectedAccounts({
         const syncState = syncStates[account.id];
         const isSyncing = working === account.id && syncState?.status === "syncing";
         return <article key={account.id}>
-          <span className={`platform-avatar ${account.provider}`}>
-            <b>{account.username.slice(0, 2).toUpperCase()}</b>
-            {account.avatarUrl && <img alt="" src={account.avatarUrl} referrerPolicy="no-referrer" />}
+          <span className="account-face">
+            <span className="platform-avatar">
+              <b>{account.username.slice(0, 2).toUpperCase()}</b>
+              {account.avatarUrl && <img alt="" src={account.avatarUrl} referrerPolicy="no-referrer" />}
+            </span>
+            <ProviderMark provider={account.provider} size={14} decorative />
           </span>
           <div className="account-identity">
             <strong>{account.displayName ?? account.username}</strong>
             <small>@{account.username} · {account.provider === "chesscom" ? "Chess.com public link" : "Lichess verified OAuth"}</small>
+
             <small>{ratingSummary(account)}{account.lastSyncAt ? ` · synced ${new Date(account.lastSyncAt).toLocaleDateString()}` : ""}</small>
             {syncState && syncState.status !== "idle" && <span className={`sync-summary ${syncState.status}`}>
               {syncState.status.replaceAll("-", " ")} · {syncState.importedCount} new · {syncState.completedBatches ?? 0} batches

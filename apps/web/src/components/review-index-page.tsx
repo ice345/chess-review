@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Icon } from "@chess-review/ui";
+import { providerKindFor } from "../lib/provider-kind";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
+import { SourceChip } from "./source-chip";
 
 const VISIBLE_CAP = 8;
 
@@ -37,23 +38,12 @@ export function ReviewIndexPage() {
           </section>
         ) : (
           <>
-            <section className="review-index-list paper-panel" aria-label="Saved reviews">
+            <section className="review-index-list" aria-label="Saved reviews">
               {visible.map((record) => {
                 const status = snapshot?.statuses.get(record.id)?.label;
-                const provider = record.external?.provider;
-                const chip = provider === "chesscom"
-                  ? { icon: "import" as const, label: "Chess.com" }
-                  : provider === "lichess"
-                    ? { icon: "import" as const, label: "Lichess" }
-                    : record.kind === "fen"
-                      ? { icon: "engine" as const, label: "FEN" }
-                      : { icon: "review" as const, label: "PGN" };
                 return (
                   <article className="review-index-row" key={record.id}>
-                    <span className="review-index-chip">
-                      <Icon name={chip.icon} />
-                      <span>{chip.label}</span>
-                    </span>
+                    <SourceChip provider={providerKindFor(record)} />
                     <span className="review-index-copy">
                       <strong>{record.title}</strong>
                       <small>{status ? `${record.subtitle} · ${status}` : record.subtitle}</small>
@@ -64,6 +54,7 @@ export function ReviewIndexPage() {
                 );
               })}
             </section>
+
             {records.length > VISIBLE_CAP && (
               <p className="review-index-more">
                 <Link href="/history">View all →</Link>

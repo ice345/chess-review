@@ -90,7 +90,8 @@
 .account-link-card:target { border-color: var(--focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 12%, transparent); }
 .account-link-card > div { min-width: 0; }
 .account-link-card > div:first-child { display: grid; gap: 5px; }
-.account-link-card strong { color: var(--ink-primary); }
+.account-link-card strong { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-primary); }
+
 .account-link-card small { color: var(--ink-muted); font-size: 11px; }
 /* "Not configured on this server" is a long label: the row wraps and the button
    shrinks instead of pushing the card past the viewport. */
@@ -171,6 +172,43 @@
 .history-game strong { color: var(--ink-primary); font-size: 13px; }
 .history-game small, .history-game time { color: var(--ink-muted); font-size: 11px; }
 
+.provider-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  border: 1.25px solid currentColor;
+  border-radius: 4px;
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1;
+  user-select: none;
+}
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.account-face {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+.account-face .provider-mark {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  background: var(--surface-paper);
+}
+
 .platform-avatar {
   position: relative;
   width: 40px;
@@ -179,14 +217,11 @@
   place-items: center;
   overflow: hidden;
   border-radius: 50% 44% 52% 46%;
-  background: #6f8f78;
+  background: color-mix(in srgb, var(--ink-secondary) 28%, var(--surface-paper));
   color: var(--surface-paper);
   font: 700 11px var(--font-serif);
 }
 
-.platform-avatar.lichess {
-  background: #768d9b;
-}
 
 .platform-avatar img {
   position: absolute;

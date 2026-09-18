@@ -20,7 +20,8 @@ import type {
   SyncedGame,
   TrainingQueueItemV3,
 } from "@chess-review/shared";
-import { QUALITY_META, QualityIcon } from "@chess-review/ui";
+import { ProviderMark, QUALITY_META, QualityIcon } from "@chess-review/ui";
+
 import { TrainingQueuePanel } from "./training-queue-panel";
 import { TrainingToday } from "./training-today";
 import { subscribeLocalData } from "../lib/browser-storage";
@@ -710,14 +711,27 @@ export function AdvancedStudyPage() {
       {showRunHistory && <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />}
     </section> : null) : <>
       <ScopeFilters filters={filters} setFilters={setFilters} timeClasses={timeClasses} openingOptions={openingOptions} gameCount={scopeGameCount} open={scopeOpen} onToggle={setScopeOpen} />
+      <p className="study-report-kicker">Your game</p>
       <nav className="study-nav" aria-label="Practice views">
+
         {NAV_GROUPS.map((group) => <div key={group.id} className="study-nav-group">{group.label ? <p className="study-nav-label">{group.label}</p> : <p className="study-nav-label study-nav-label-spacer" aria-hidden="true"> </p>}<div className="study-nav-tabs">{group.tabs.map((tab) => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => selectView(tab.id)}>{tab.label}</button>)}</div></div>)}
       </nav>
       {!player || !report ? <section className="study-empty">Loading selected player…</section> : <div className="study-sections">
         {activeTab === "overview" && <section className="study-overview" id="player-profile">
           <article className="study-paper study-profile">
             <header className="study-profile-heading">
-              <div><span className="eyebrow">Player profile</span><h2>{player.name}</h2><p>{primaryRating ? `${primaryRating.provider === "chesscom" ? "Chess.com" : "Lichess"} · ${primaryRating.timeClass}` : "Objective analysis profile"}</p></div>
+              <div>
+                <span className="eyebrow">Player profile</span>
+                <h2>{player.name}</h2>
+                <p className="study-profile-source">
+                  {primaryRating ? (
+                    <>
+                      <ProviderMark provider={primaryRating.provider} decorative />
+                      {primaryRating.provider === "chesscom" ? "Chess.com" : "Lichess"} · {primaryRating.timeClass}
+                    </>
+                  ) : "Objective analysis profile"}
+                </p>
+              </div>
               <button type="button" className="text-button" onClick={() => selectView("ratings")}>View rating & form →</button>
             </header>
             <dl className="study-profile-facts">

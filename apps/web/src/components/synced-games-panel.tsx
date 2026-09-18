@@ -7,6 +7,8 @@ import type { SyncedGame } from "@chess-review/shared";
 import { externalGameKey } from "../lib/review-status";
 import type { LibrarySnapshot } from "../lib/library-snapshot";
 import { openSyncedGameRecord } from "./import-desk";
+import { SourceChip } from "./source-chip";
+
 
 /**
  * Games that exist in a connected account but have no review record yet. Kept
@@ -63,8 +65,9 @@ export function SyncedGamesPanel({
           const reviewId = completedReviewId(game);
           return (
             <article key={game.id}>
-              <span className={`platform-label ${game.external.provider}`}>{game.external.provider === "chesscom" ? "Chess.com" : "Lichess"}</span>
+              <SourceChip provider={game.external.provider} />
               <strong>{game.white.username} <i>vs</i> {game.black.username}</strong>
+
               <small>{game.timeClass ?? "game"} · {new Date(game.playedAt).toLocaleDateString()}</small>
               {reviewId
                 ? <Link href={`/review/${reviewId}`}>Open review →</Link>

@@ -6,7 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExternalPlatform, SyncedGame } from "@chess-review/shared";
 import { deleteReviewRecord } from "../lib/local-data";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
+import { providerKindFor } from "../lib/provider-kind";
 import { buildReviewRecordFromSyncedGame, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
+import { SourceChip } from "./source-chip";
+
 
 type ProviderFilter = "all" | "manual" | ExternalPlatform;
 type AnalysisFilter = "all" | "reviewed" | "not-reviewed";
@@ -148,15 +151,16 @@ export function HistoryPage() {
           <div className="utility-empty"><strong>{snapshot?.records.length || snapshot?.games.length ? "No matching games" : "No saved games yet"}</strong><span>{snapshot?.records.length || snapshot?.games.length ? "Change the filters to see other games." : "Import a PGN or connect an account to get started."}</span><Link href="/">Return home →</Link></div>
         ) : <>
           {visibleEntries.map((entry) => entry.kind === "pending" ? <article className="history-game ink-row pending" key={entry.game.id}>
-            <span className="record-kind">{entry.game.external.provider === "chesscom" ? "CHESS.COM" : "LICHESS"}</span>
+            <SourceChip provider={entry.game.external.provider} />
             <span><strong>{entry.game.white.username} vs {entry.game.black.username}</strong><small>{entry.game.timeClass ?? "game"} · waiting for review</small></span>
             <time>{new Date(entry.game.playedAt).toLocaleDateString()}</time>
             <button type="button" className="text-button" disabled={working !== null} onClick={() => void review(entry.game)}>{working === entry.game.id ? "Preparing…" : "Analyze →"}</button>
           </article> : <article className="ink-row" key={entry.record.id}>
-            <span className="record-kind">{entry.record.external?.provider === "chesscom" ? "CHESS.COM" : entry.record.external?.provider === "lichess" ? "LICHESS" : entry.record.kind.toUpperCase()}</span>
+            <SourceChip provider={providerKindFor(entry.record)} />
             <span><strong>{entry.record.title}</strong><small>{entry.record.subtitle} · {snapshot?.statuses.get(entry.record.id)?.label}</small></span>
             <time>{new Date(entry.record.updatedAt).toLocaleDateString()}</time>
             <Link href={entry.record.kind === "pgn" ? `/review/${entry.record.id}` : `/review/${entry.record.id}/engine`}>Open →</Link>
+
             <button type="button" className="text-button danger" disabled={working !== null} onClick={() => {
               if (!window.confirm("Delete this review and its training references? Imported source games remain available. Background work will pause.")) return;
               setWorking(entry.record.id);
