@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatMoveNotation, type MoveAnalysisV2 } from "@chess-review/shared";
 import {
   HUMAN_DIFFICULTY_META,
+  Icon,
   QualityIcon,
 } from "@chess-review/ui";
 import { useReviewRuntime } from "../review-runtime";
@@ -41,8 +42,13 @@ export function CurrentMoveVerdict({ move }: { move: MoveAnalysisV2 }) {
           <strong>{label} · {displayedMoveQualityLabel(move)}</strong>
           <p className="move-verdict-sentence">{moveEvidenceSentence(move)}</p>
           {baselineOnlyCaveat(move) !== null && <p className="move-verdict-caveat">{baselineOnlyCaveat(move)}</p>}
-          <details className="move-verdict-why">
-            <summary>Why?</summary>
+          <details className="move-verdict-why review-panel-row">
+            <summary>
+              <Icon name="question" />
+              <span className="review-row-copy"><strong>Why? · engine, win chances, search</strong></span>
+              <span className="review-row-meta">{`Depth ${move.stockfish.depth}`}</span>
+              <Icon className="review-row-chevron" name="chevron-right" />
+            </summary>
             <dl className="move-verdict-evidence">
               <div><dt>Engine</dt><dd>{engineChoiceLabel(move.classificationReason)}</dd></div>
               <div><dt>Winning chances</dt><dd>{winningChancesLabel(move.classificationReason)}</dd></div>
@@ -66,14 +72,20 @@ export function CurrentMoveVerdict({ move }: { move: MoveAnalysisV2 }) {
         </div>
       )}
       {showHuman && (
-        <details className="move-verdict human-verdict">
+        <details className="move-verdict human-verdict review-panel-row">
           <summary>
-            <span>MAIA · HUMAN FIND DIFFICULTY</span>
-            {human
-              ? `${label} · ${HUMAN_DIFFICULTY_META[human.findDifficulty.label].label} to find`
-              : runtime.humanPositionState === "running"
-                ? "Reviewing this exact move…"
-                : "Human move review not available yet"}
+            <Icon name="evidence" />
+            <span className="review-row-copy">
+              <span>Evidence</span>
+              <strong>
+                {human
+                  ? `${label} · ${HUMAN_DIFFICULTY_META[human.findDifficulty.label].label} to find`
+                  : runtime.humanPositionState === "running"
+                    ? "Reviewing this exact move…"
+                    : "Human move review not available yet"}
+              </strong>
+            </span>
+            <Icon className="review-row-chevron" name="chevron-right" />
           </summary>
           {human ? (
             <>

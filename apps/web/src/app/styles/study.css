@@ -1,15 +1,10 @@
-.study-page {
-  position: relative;
-  padding-bottom: 80px;
-  background:
-    radial-gradient(ellipse at 8% 10%, color-mix(in srgb, var(--wash-pink) 18%, transparent), transparent 34rem),
-    radial-gradient(ellipse at 94% 6%, color-mix(in srgb, var(--wash-blue) 26%, transparent), transparent 36rem),
-    radial-gradient(ellipse at 78% 58%, color-mix(in srgb, var(--wash-sage) 12%, transparent), transparent 28rem),
-    radial-gradient(ellipse at 12% 78%, color-mix(in srgb, var(--wash-cream) 24%, transparent), transparent 26rem);
-}
-.study-heading { display: flex; align-items: end; justify-content: space-between; gap: 28px; }
+.study-page { position: relative; padding-bottom: 80px; }
+/* The head is a `page-head` grid; the player selector sits beside the display
+   line rather than in a second column of its own. */
+.study-heading { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.study-heading > .study-player-select { grid-column: 2; grid-row: 3; align-self: end; }
 .study-analysis-status {
-  width: min(1060px, calc(100% - 40px));
+  width: min(1220px, calc(100% - 44px));
   margin: 0 auto 14px;
   padding: 0 0 10px;
   border-bottom: 1px solid var(--line-soft);
@@ -18,7 +13,7 @@
 }
 .study-player-select { width: min(330px, 100%); display: grid; gap: 6px; color: var(--ink-muted); font-size: var(--type-caption); }
 .study-player-select select { height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-paper); }
-.study-sections, .study-empty, .study-notice, .study-scope, .study-nav, .study-runs-only { width: min(1060px, calc(100% - 40px)); margin-inline: auto; }
+.study-sections, .study-empty, .study-notice, .study-scope, .study-nav, .study-runs-only { width: min(1220px, calc(100% - 44px)); margin-inline: auto; }
 .study-nav { margin: 0 auto 22px; padding-bottom: 6px; display: flex; flex-wrap: nowrap; align-items: end; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--line-soft); scrollbar-width: thin; }
 .study-nav-group { display: flex; flex: 0 0 auto; flex-direction: column; justify-content: flex-end; gap: 3px; padding: 0 16px 2px; border-left: 1px solid var(--line-soft); }
 .study-nav-group:first-child { padding-left: 0; border-left: 0; }
@@ -48,7 +43,7 @@
 .study-wash h3 { margin: 0 0 10px; color: var(--ink-secondary); font: 500 13px Inter, sans-serif; letter-spacing: .04em; text-transform: uppercase; }
 .study-wash dl, .study-profile-facts { margin: 0; display: grid; gap: 10px 28px; }
 .study-wash dt, .study-profile-facts dt { color: var(--ink-muted); font-size: var(--type-caption); }
-.study-wash dd, .study-profile-facts dd { margin: 2px 0 0; color: var(--ink-primary); font: 500 22px Georgia, serif; }
+.study-wash dd, .study-profile-facts dd { margin: 2px 0 0; color: var(--ink-primary); font: 500 22px var(--font-serif); }
 .study-scope { margin-bottom: 10px; border: 1px solid var(--line-soft); border-radius: 13px; background: color-mix(in srgb, var(--surface-paper) 62%, transparent); }
 .study-scope > summary { min-height: 48px; padding: 8px 13px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
 .study-scope > summary::-webkit-details-marker { display: none; }
@@ -72,14 +67,14 @@
 .empty-jobs { width: min(720px, 100%); text-align: left; }
 .study-notice { margin-bottom: 14px; padding: 10px 13px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--success-soft); color: var(--ink-secondary); font-size: var(--type-caption); }
 .study-section-heading { margin-bottom: 20px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
-.study-section-heading h2 { margin: 5px 0 0; color: var(--ink-primary); font: 500 27px Georgia, "Songti SC", serif; letter-spacing: -.03em; }
+.study-section-heading h2 { margin: 5px 0 0; color: var(--ink-primary); font: 500 27px var(--font-serif); letter-spacing: -.03em; }
 .study-section-heading > small { max-width: 450px; color: var(--muted); font-size: var(--type-caption); line-height: 1.5; text-align: right; }
 .study-ink-stats { margin: 0 0 18px; display: flex; flex-wrap: wrap; gap: 8px 28px; color: var(--ink-secondary); font-size: var(--type-caption); }
-.study-ink-stats strong { color: var(--ink-primary); font: 500 20px Georgia, serif; }
+.study-ink-stats strong { color: var(--ink-primary); font: 500 20px var(--font-serif); }
 .study-metrics { display: grid; gap: 0; }
 .study-metrics article { min-width: 0; padding: 11px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; border-bottom: 1px solid var(--line-soft); background: transparent; }
 .study-metrics span, .study-metrics small { color: var(--muted); font-size: var(--type-caption); }
-.study-metrics strong { color: var(--ink-primary); font: 500 20px Georgia, serif; grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.study-metrics strong { color: var(--ink-primary); font: 500 20px var(--font-serif); grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .study-distributions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
 .study-distributions span { color: var(--muted); font-size: var(--type-caption); }
 .study-trend-chart { height: 92px; margin: 10px 0 0; padding: 0 4px; display: flex; align-items: stretch; gap: 8px; list-style: none; }
@@ -176,7 +171,7 @@
 .study-overview { display: grid; gap: 18px; }
 .study-profile { margin: 0; }
 .study-profile-heading, .study-focus header, .study-highlights-summary header { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
-.study-profile-heading h2 { margin: 6px 0 4px; color: var(--ink-primary); font: 500 clamp(28px, 3.4vw, 40px) Georgia, "Songti SC", serif; letter-spacing: -.04em; }
+.study-profile-heading h2 { margin: 6px 0 4px; color: var(--ink-primary); font: 500 clamp(28px, 3.4vw, 40px) var(--font-serif); letter-spacing: -.04em; }
 .study-profile-heading p { margin: 0; color: var(--ink-muted); font-size: var(--type-caption); }
 .study-profile-heading > button, .study-focus header > button, .study-highlights-summary header > button { color: var(--accent-primary); font-size: var(--type-caption); font-weight: 700; }
 .study-profile-facts { margin-top: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -185,7 +180,7 @@
 .study-phase-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
 .study-phase-row .study-wash { max-width: 360px; }
 .study-phase-row .eyebrow { text-transform: capitalize; font-size: var(--type-caption); }
-.study-phase-row strong { display: block; margin: 6px 0 4px; color: var(--ink-primary); font: 500 30px Georgia, serif; letter-spacing: -.03em; }
+.study-phase-row strong { display: block; margin: 6px 0 4px; color: var(--ink-primary); font: 500 30px var(--font-serif); letter-spacing: -.03em; }
 .study-phase-row small, .study-phase-row p { margin: 0; color: var(--ink-muted); font-size: var(--type-caption); }
 .study-focus ol { margin: 14px 0 0; padding-left: 22px; display: grid; gap: 12px; }
 .study-focus li { display: grid; gap: 3px; color: var(--ink-secondary); }
@@ -194,7 +189,7 @@
 .study-focus li a { color: var(--accent-primary); font-size: var(--type-caption); }
 .study-focus p { margin: 13px 0 0; color: var(--ink-muted); font-size: var(--type-caption); }
 .study-highlights-summary p { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--ink-secondary); font-size: var(--type-caption); }
-.study-highlights-summary strong { color: var(--ink-primary); font: 500 22px Georgia, serif; }
+.study-highlights-summary strong { color: var(--ink-primary); font: 500 22px var(--font-serif); }
 .study-form-summary { padding-top: 4px; }
 .study-form-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .study-trend-legend { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--ink-muted); font-size: var(--type-caption); }
@@ -206,12 +201,12 @@
 .study-trend-chart [data-result="draw"] .trend-track i { background: color-mix(in srgb, var(--wash-blue) 70%, #647985); }
 .study-trend-chart [data-result="loss"] .trend-track i { background: color-mix(in srgb, var(--wash-pink) 70%, #a34e5b); }
 .study-rating-band { display: grid; gap: 8px; }
-.study-rating-primary { color: var(--ink-primary); font: 500 clamp(42px, 6vw, 64px) Georgia, serif; letter-spacing: -.05em; }
+.study-rating-primary { color: var(--ink-primary); font: 500 clamp(42px, 6vw, 64px) var(--font-serif); letter-spacing: -.05em; }
 .study-rating-band > p { margin: 0; color: var(--ink-muted); font-size: var(--type-caption); }
 .study-metric-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .study-metric-groups .study-wash { border-radius: 2px; }
 .study-highlight-groups { display: grid; gap: 22px; }
-.study-highlight-groups h3 { margin: 0 0 10px; color: var(--ink-primary); font: 500 20px Georgia, serif; text-transform: capitalize; }
+.study-highlight-groups h3 { margin: 0 0 10px; color: var(--ink-primary); font: 500 20px var(--font-serif); text-transform: capitalize; }
 .study-highlight-groups h3 small { margin-left: 8px; color: var(--ink-muted); font: 500 var(--type-caption) Inter, sans-serif; }
 .study-highlight-cards { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; list-style: none; }
 .study-highlight-card { min-width: 0; padding: 12px 13px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px 10px; border: 1px solid color-mix(in srgb, var(--line-soft) 88%, transparent); border-radius: 3px; }
@@ -236,7 +231,8 @@
 .history-job-list .text-button { font-size: var(--type-caption); }
 
 @media (max-width: 820px) {
-  .study-heading { align-items: stretch; flex-direction: column; }
+  .study-heading { grid-template-columns: minmax(0, 1fr); }
+  .study-heading > .study-player-select { grid-column: 1; grid-row: auto; }
   .study-nav button { min-height: 44px; }
   .study-player-select { width: 100%; }
   .study-metrics, .weakness-grid, .study-phase-row, .study-metric-groups, .study-profile-facts { grid-template-columns: 1fr; }
@@ -275,7 +271,7 @@
 /* One page column: the queue band keeps hairline rules and no card chrome, but it
    takes the same measure as the Today card above it and the report below it, so
    the page has one left edge and one right edge. */
-.training-queue-panel { width: min(1060px, calc(100% - 40px)); margin: 16px auto 24px; padding: 18px 0; border-block: 1px solid var(--line); }
+.training-queue-panel { width: min(1220px, calc(100% - 44px)); margin: 16px auto 24px; padding: 18px 0; border-block: 1px solid var(--line); }
 .training-queue-panel h2 { margin: 0 0 8px; font-size: 23px; }
 .training-queue-panel > p { color: var(--ink-secondary); font-size: 13px; line-height: 1.5; }
 .training-queue-panel .training-actions button { min-height: 44px; }
@@ -296,7 +292,7 @@
   display: grid;
   gap: var(--space-block);
   justify-items: start;
-  width: min(1060px, calc(100% - 40px));
+  width: min(1220px, calc(100% - 44px));
   margin: 0 auto var(--space-section);
   padding: 16px 18px;
   border: 1px solid var(--line);

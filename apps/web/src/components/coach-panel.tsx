@@ -99,7 +99,7 @@ const COPY: Record<CoachLanguage, StudyCopy> = {
     strengths: "Strengths",
     weaknesses: "Weaknesses",
     criticalMoments: "Key moments",
-    training: "Training recommendations",
+    training: "Practice recommendations",
     why: "Why this explanation?",
     whyWorks: "Why it works",
     whatWentWrong: "What went wrong",

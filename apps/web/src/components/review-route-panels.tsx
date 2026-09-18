@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { noLegalMoveTerminalStatus, replayUciLine } from "@chess-review/chess-core";
 import { type GameAnalysisV2 } from "@chess-review/shared";
-import { EvaluationGraph, QUALITY_META, QualityIcon } from "@chess-review/ui";
+import { EvaluationGraph, Icon, QUALITY_META, QualityIcon, type IconName } from "@chess-review/ui";
 import { CoachPanel } from "./coach-panel";
 import { AnalysisLensPanel } from "./review/analysis-lens-panel";
 import { CurrentMoveVerdict } from "./review/current-move-verdict";
 import { runDiagnosticsLine, runDiagnosticsText } from "../lib/run-diagnostics-copy";
 import { KeyMomentNavigation } from "./review/key-moment-navigation";
+import { criticalMomentPlies } from "../lib/critical-moment-navigation";
 import { OpeningExplorerPanel } from "./review/opening-explorer-panel";
 import { TablebasePanel } from "./review/tablebase-panel";
 import { ReviewMoves, ReviewOverview } from "./review-presentation";
@@ -23,6 +24,38 @@ import { selectedBranchNode } from "../lib/analysis-branch";
 import { useReviewStore } from "../store/review-store";
 import { stockfishCandidateIdentity } from "../lib/board-analysis-arrows";
 import { RetroPractice } from "./retro-practice";
+
+function engineLinesMeta(analysis: GameAnalysisV2 | null): string | null {
+  if (!analysis) return null;
+  const version = /stockfish/i.test(analysis.engine.stockfishVersion)
+    ? analysis.engine.stockfishVersion
+    : `Stockfish ${analysis.engine.stockfishVersion}`;
+  return `${version} · depth ${analysis.engine.depth}`;
+}
+
+function PanelRowSummary({
+  icon,
+  kicker,
+  label,
+  meta,
+}: {
+  icon: IconName;
+  kicker?: string;
+  label: string;
+  meta?: string | null;
+}) {
+  return (
+    <summary>
+      <Icon name={icon} />
+      <span className="review-row-copy">
+        {kicker ? <span className="eyebrow">{kicker}</span> : null}
+        <strong>{label}</strong>
+      </span>
+      {meta ? <span className="review-row-meta">{meta}</span> : null}
+      <Icon className="review-row-chevron" name="chevron-right" />
+    </summary>
+  );
+}
 
 function AnalysisGate({ section }: { section: string }) {
   const runtime = useReviewRuntime();
@@ -115,8 +148,8 @@ function PositionAnalysis({ compact = false }: { compact?: boolean } = {}) {
         // React keeps the element's current open state.
         return compact
           ? (
-            <details className="review-engine-lines" key={branch ? "branch" : "canonical"} open={branch !== null}>
-              <summary>Engine lines</summary>
+            <details className="review-engine-lines review-panel-row" key={branch ? "branch" : "canonical"} open={branch !== null}>
+              <PanelRowSummary icon="engine" label="Engine lines" meta={engineLinesMeta(analysis)} />
               {list}
             </details>
           )
@@ -155,6 +188,37 @@ export function ObjectiveRoutePanel() {
   const branch = useReviewStore((store) => store.branch);
   // Hooks first: this panel mounts without an analysis and gains one later.
   const answerWithheld = useWithheldPly() !== null;
+
+  // Bluebird Tier B: derive the cognitive mode so the contextual panel can
+  // animate when the mode changes (remount via React key) while ordinary ply
+  // stepping inside one mode does not trigger animation.
+  const keyPlies = useMemo(
+    () => (analysis ? criticalMomentPlies(analysis.criticalMoments) : []),
+    [analysis],
+  );
+  const mode: string = !analysis
+    ? "gate"
+    : runtime.retro.active
+      ? "practice"
+      : branch
+        ? "branch"
+        : currentPly === 0
+          ? "start"
+          : keyPlies.includes(currentPly)
+            ? "moment"
+            : "move";
+  // Bluebird Tier B: the contextual panel fades and travels a few pixels when the
+  // cognitive mode changes. It is a class, not a React key: remounting the panel
+  // to replay an animation threw away the visitor's opened disclosures — and
+  // stepping the game must never close a report someone is reading.
+  const [modeChanged, setModeChanged] = useState(false);
+  const lastMode = useRef(mode);
+  useEffect(() => {
+    if (lastMode.current === mode) return;
+    lastMode.current = mode;
+    setModeChanged(true);
+  }, [mode]);
+
   if (!analysis) return <div className="route-panel objective-route"><AnalysisGate section="Objective review" /><PositionAnalysis /></div>;
   const move = branch || currentPly === 0 ? null : analysis.moves[currentPly - 1] ?? null;
   const hasKeyMoments = analysis.criticalMoments.some((moment) => analysis.moves[moment.ply - 1]);
@@ -164,10 +228,31 @@ export function ObjectiveRoutePanel() {
   // halves of the first screen read this one definition.
   const atStart = !branch && currentPly === 0;
   return (
-    <div className="route-panel objective-route">
+    <div
+      className={`route-panel objective-route review-mode-panel paper-panel${modeChanged ? " mode-enter" : ""}`}
+      data-mode={mode}
+      onAnimationEnd={() => setModeChanged(false)}
+    >
+      {!practice && atStart && (
+        <header className="review-panel-head">
+          <p className="kicker">{hasKeyMoments ? "One thing at a time" : "Review"}</p>
+          <h2 className="review-panel-display">
+            {hasKeyMoments ? "Start with the first moment that mattered." : "Walk through your game"}
+          </h2>
+          {hasKeyMoments ? (
+            <p className="review-panel-lede">
+              The review stops at each key moment, asks what you would play, and only then shows the evidence.
+            </p>
+          ) : null}
+        </header>
+      )}
+      {!practice && !atStart && mode === "moment" && (
+        <header className="review-panel-head">
+          <p className="kicker">The moment</p>
+        </header>
+      )}
       {!practice && !hasKeyMoments && atStart && (
         <p className="review-next-step" role="region" aria-label="Review next step">
-          Walk through your game
           {/* A game with no key moments still has one thing to do first: the start ply
               keeps a single primary action either way. */}
           <Link className="primary-link" href={`/review/${runtime.gameId}/moves`}>Explore moves →</Link>
@@ -181,11 +266,13 @@ export function ObjectiveRoutePanel() {
       {!practice && move && !answerWithheld && <CurrentMoveVerdict move={move} />}
       <RetroPractice analysis={analysis} />
       {!practice && (atStart ? (
-        <details className="review-context-moves folded-block">
-          <summary>
-            <span className="eyebrow">THIS GAME</span>
-            <strong>Moves, quality and accuracy</strong>
-          </summary>
+        <details className="review-context-moves folded-block review-panel-row">
+          <PanelRowSummary
+            icon="moves"
+            kicker="THIS GAME"
+            label="Moves, quality and accuracy"
+            meta={`${analysis.moves.length} ${analysis.moves.length === 1 ? "move" : "moves"}`}
+          />
           <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} contextWindow={5} />
           <Link className="view-all-moments" href={`/review/${runtime.gameId}/moves`}>
             All {analysis.moves.length} moves, filters and evidence →
@@ -193,6 +280,11 @@ export function ObjectiveRoutePanel() {
         </details>
       ) : (
         <section className="review-context-moves" aria-label="Nearby moves">
+          <div className="review-row-static">
+            <Icon name="moves" />
+            <span className="review-row-copy"><strong>Nearby moves</strong></span>
+            <span className="review-row-meta">{`${Math.min(5, currentPly)} before · ${Math.min(5, Math.max(0, analysis.moves.length - currentPly))} after`}</span>
+          </div>
           <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} contextWindow={5} />
           <Link className="view-all-moments" href={`/review/${runtime.gameId}/moves`}>
             All {analysis.moves.length} moves, filters and evidence →
@@ -201,11 +293,13 @@ export function ObjectiveRoutePanel() {
       ))}
       {!runtime.retro.presentation.hideCoachAnswers && !answerWithheld && <PositionAnalysis compact />}
       {!practice && (
-        <details className="game-summary-section" id="game-summary">
-          <summary>
-            <span className="eyebrow">GAME SUMMARY</span>
-            <strong>Accuracy, phases, key moments and the timeline</strong>
-          </summary>
+        <details className="game-summary-section review-panel-row" id="game-summary">
+          <PanelRowSummary
+            icon="book"
+            kicker="GAME SUMMARY"
+            label="Game summary and timeline"
+            meta="Accuracy · phases · key moments"
+          />
           <ReviewOverview analysis={analysis} onSelectPly={runtime.navigateToPly} allMomentsHref={`/review/${runtime.gameId}/moves`} />
           <EvaluationTimeline analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} />
         </details>

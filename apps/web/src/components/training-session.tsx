@@ -79,7 +79,7 @@ export function TrainingSession({ taskId, positionKey, record }: { taskId: strin
         {reviewed && !next && item && <small role="status">{nextDueNote}</small>}
         {!state.analysis && <small>Analyze this game to restore its objective evidence before confirming.</small>}
       </>}
-      <Link className="text-button" href="/training">{item?.completionKind === "mastered" ? "Back to Training →" : "Pause and return to Training"}</Link>
+      <Link className="text-button" href="/training">{item?.completionKind === "mastered" ? "Back to Practice →" : "Pause and return to Practice"}</Link>
     </div>
     {(error || sourceError) && <p className="error" role="alert">{error ?? sourceError} <button type="button" className="text-button" onClick={() => window.location.reload()}>Reload task</button></p>}
   </section>;

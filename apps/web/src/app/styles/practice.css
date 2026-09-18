@@ -6,6 +6,14 @@
   padding: 8px 0 12px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.retro-practice.paper-panel {
+  padding: 18px 18px 16px;
+  margin-bottom: 0;
+  border-bottom: 0;
+  gap: 14px;
+  overflow-wrap: anywhere;
 }
 .retro-head {
   display: flex;
@@ -13,9 +21,33 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+.retro-head .kicker { margin: 0; }
 .retro-head strong { font-size: 15px; font-weight: 650; }
-.retro-head > span { margin-left: auto; color: var(--ink-muted); font-size: 13px; }
-/* Review practice, not a first-time find: the position's analysis was visible. */
+.retro-position {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.retro-position-nav {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+.retro-position-nav:hover:not(:disabled) { background: var(--wash-blue); color: var(--ink-primary); }
 .retro-head > .retro-exposure {
   margin-left: 0;
   padding: 2px 8px;
@@ -25,6 +57,8 @@
   color: var(--ink-primary);
   font-size: 11px;
   font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .retro-exposure-note { color: var(--ink-muted); font-size: 12px; }
 .retro-close { min-width: 44px; min-height: 44px; }
@@ -67,6 +101,7 @@
   font: inherit;
   font-weight: 650;
   cursor: pointer;
+  transition: background-color var(--motion-micro) var(--motion-ease), border-color var(--motion-micro) var(--motion-ease), color var(--motion-micro) var(--motion-ease);
 }
 .practice-side small {
   color: var(--ink-muted);
@@ -96,13 +131,62 @@
   justify-self: start;
 }
 
-
 .retro-lead { margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.4; }
 .retro-meta { margin: 0; color: var(--ink-muted); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
 
-.retro-panel { display: grid; gap: 8px; }
+.retro-panel { display: grid; gap: 8px; min-width: 0; }
 .retro-instruction { margin: 0; font-size: 15px; }
 .retro-instruction strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.retro-aside {
+  font-family: var(--font-serif);
+  font-style: italic;
+  text-align: center;
+  color: var(--ink-secondary);
+}
+.retro-aside strong { font-style: normal; }
+.retro-turn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.retro-turn-badge {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--wash-blue);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+.retro-turn-badge img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.retro-your-turn {
+  margin: 0;
+  color: var(--ink-primary);
+  font: 500 clamp(22px, 2.4vw, 30px)/1.15 var(--font-serif);
+  letter-spacing: -.03em;
+}
+.retro-commit {
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.retro-helper {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  text-align: center;
+}
 .retro-status { margin: 0; color: var(--ink-secondary); font-size: 13px; }
 .retro-hint {
   margin: 0;
@@ -118,7 +202,63 @@
 .retro-verdict.solved { color: #2f7f73; }
 .retro-choices { display: flex; gap: 8px 14px; flex-wrap: wrap; align-items: center; }
 .retro-choices .text-button { min-height: 44px; min-width: 44px; }
-.retro-choices .primary { min-height: 44px; }
+.retro-choices .primary,
+.retro-choices .secondary { min-height: 44px; }
+.retro-choices .secondary {
+  flex: 1 1 140px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.practice-active-setup {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.practice-active-setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+}
+.practice-active-setup-head strong {
+  color: var(--ink-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+.practice-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.practice-play-as {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.practice-play-as > span {
+  color: var(--ink-secondary);
+  font-size: 13px;
+}
+.practice-active-setup .practice-setup {
+  padding-top: 0;
+  border-top: 0;
+  justify-content: end;
+}
+.practice-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+}
 
 .retro-human { display: grid; gap: 4px; padding: 8px 10px; border-left: 3px solid var(--line-accent); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--wash-sage) 55%, transparent); }
 .retro-human p { margin: 0; font-size: 13px; }
@@ -129,5 +269,53 @@
 
 @media (max-width: 700px) {
   .practice-setup { gap: 10px; }
+  .practice-play-as { grid-template-columns: 1fr; }
+  .practice-active-setup .practice-setup { justify-content: start; }
   .retro-choices button { flex: 1 1 auto; }
+}
+
+/* Practice keeps its lede on short viewports: the head slot hides it for the
+   review head only (`.review-page-head`), so practice needs no override here. */
+
+@media (max-width: 560px) {
+  .retro-practice.paper-panel {
+    padding: 14px 12px 12px;
+  }
+  .retro-position {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+  .retro-head {
+    justify-content: start;
+  }
+}
+
+/* — Bluebird motion: practice entrance stagger (annex §8 example) — */
+@keyframes mode-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.retro-practice:not(.retro-idle) > .retro-head {
+  animation: mode-fade var(--motion-mode) var(--motion-ease) both;
+  animation-delay: 80ms;
+}
+.retro-practice:not(.retro-idle) > .retro-lead,
+.retro-practice:not(.retro-idle) > .retro-panel .retro-meta,
+.retro-practice:not(.retro-idle) > .retro-panel .retro-instruction {
+  animation: mode-fade var(--motion-mode) var(--motion-ease) both;
+  animation-delay: 160ms;
+}
+
+/* Answer reveal and verdict entrance — Tier B */
+.retro-verdict {
+  animation: mode-enter var(--motion-mode) var(--motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retro-practice:not(.retro-idle) > .retro-head,
+  .retro-practice:not(.retro-idle) > .retro-lead,
+  .retro-practice:not(.retro-idle) > .retro-panel .retro-meta,
+  .retro-practice:not(.retro-idle) > .retro-panel .retro-instruction {
+    animation-delay: 0ms;
+  }
 }

@@ -85,7 +85,6 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
     <section className="key-moment-nav" aria-label={atStart ? "Review next step" : "Key moments"}>
       {atStart && firstMove && (
         <p className="key-moment-lead">
-          Start with a key moment
           <strong>{formatMoveNotation({ fenBefore: firstMove.fenBefore, color: firstMove.color, san: firstMove.san })} · {displayedMoveQualityLabel(firstMove)}</strong>
           <Link href={`/review/${runtime.gameId}/coach?ply=${firstMove.ply}`}>Open in Study →</Link>
         </p>
@@ -124,6 +123,8 @@ export function KeyMomentNavigation({ analysis }: { analysis: GameAnalysisV2 }) 
 
       {withheld ? (
         <div className="key-moment-action">
+          <span className="key-moment-action-heading">Try it yourself</span>
+          <span className="key-moment-action-meta">Answer hidden</span>
           <span className="key-moment-action-fact">
             Solve this position before seeing what the engine says about it.
           </span>

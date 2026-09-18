@@ -20,7 +20,7 @@
 
 .coach-teaching-sequence > section > span {
   color: var(--ink-muted);
-  font: italic 400 11px Georgia, "Songti SC", serif;
+  font: italic 400 11px var(--font-serif);
 }
 
 .coach-teaching-sequence > section > div {

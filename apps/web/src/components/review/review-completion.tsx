@@ -119,7 +119,7 @@ export function ReviewCompletion({
 
       <div className="review-completion-actions">
         <Link className="primary-link" href={`/review/${gameId}/moves`}>Review the moves →</Link>
-        <Link className="secondary-link" href="/training">Open Training</Link>
+        <Link className="secondary-link" href="/training">Open Practice</Link>
         <Link className="secondary-link" href={`/review/${gameId}/coach`}>Study this game</Link>
         <button type="button" className="text-button" onClick={onClose}>Back to key moments</button>
       </div>
@@ -146,12 +146,12 @@ function highlightEvidence(moment: CompletionMoment): string {
 }
 
 /**
- * The handoff into Training: the exact positions this game would contribute.
+ * The handoff into Practice: the exact positions this game would contribute.
  *
  * The offer and the result state the same numbers because both come from
  * `planTrainingAddition`. The learner is the record's own account when the game
  * has one; otherwise the visitor chooses the side, which is what makes the
- * resulting task belong to a player the Training page already knows.
+ * resulting task belong to a player the Practice page already knows.
  */
 function TrainingHandoff({
   analysis,
@@ -173,7 +173,7 @@ function TrainingHandoff({
   const training = queue === null ? null : trainingGameContribution(queue, gameId);
 
   if (queue === null || addition.plan === null) {
-    return <p className="review-completion-training">Training positions load with your local library.</p>;
+    return <p className="review-completion-training">Practice positions load with your local library.</p>;
   }
 
   const planned = addition.plan.reduce((total, entry) => total + entry.add.length, 0);
@@ -187,11 +187,11 @@ function TrainingHandoff({
   const positions = addition.plan.flatMap((entry) => entry.add);
 
   return (
-    <section className="review-completion-training-block" aria-label="Add this game to Training">
+    <section className="review-completion-training-block" aria-label="Add this game to Practice">
       <p className="review-completion-training">
         {training !== null && training.positions > 0
-          ? `${training.positions} ${training.positions === 1 ? "position" : "positions"} from this game ${training.positions === 1 ? "is" : "are"} already in Training across ${training.tasks} ${training.tasks === 1 ? "task" : "tasks"}.`
-          : "No position from this game is in Training yet."}
+          ? `${training.positions} ${training.positions === 1 ? "position" : "positions"} from this game ${training.positions === 1 ? "is" : "are"} already in Practice across ${training.tasks} ${training.tasks === 1 ? "task" : "tasks"}.`
+          : "No position from this game is in Practice yet."}
       </p>
 
       {learner === null && (
@@ -214,7 +214,7 @@ function TrainingHandoff({
       {planned > 0 && (
         <>
           <p className="review-completion-offer">
-            {`${planned} ${planned === 1 ? "position" : "positions"} will join ${taskIds.length} training ${taskIds.length === 1 ? "task" : "tasks"}.`}
+            {`${planned} ${planned === 1 ? "position" : "positions"} will join ${taskIds.length} practice ${taskIds.length === 1 ? "task" : "tasks"}.`}
           </p>
           <ul className="review-completion-positions">
             {positions.map((position) => (
@@ -226,7 +226,7 @@ function TrainingHandoff({
             ))}
           </ul>
           <button type="button" className="primary" disabled={addition.busy || addition.playerKey === null} onClick={() => void addition.add()}>
-            {addition.busy ? "Adding…" : `Add ${planned === 1 ? "this position" : `these ${planned} positions`} to Training`}
+            {addition.busy ? "Adding…" : `Add ${planned === 1 ? "this position" : `these ${planned} positions`} to Practice`}
           </button>
         </>
       )}
@@ -234,7 +234,7 @@ function TrainingHandoff({
       {deferred > 0 && (
         <p className="review-completion-training">{`${deferred} ${deferred === 1 ? "position does" : "positions do"} not fit the five-position limit of a task and ${deferred === 1 ? "was" : "were"} not added.`}</p>
       )}
-      {planned === 0 && already > 0 && <p className="review-completion-training">Every position from this game is already in Training.</p>}
+      {planned === 0 && already > 0 && <p className="review-completion-training">Every position from this game is already in Practice.</p>}
       {planned === 0 && already === 0 && <p className="review-completion-training">This game recorded no position that the training queue accepts.</p>}
 
       {addition.result !== null && (

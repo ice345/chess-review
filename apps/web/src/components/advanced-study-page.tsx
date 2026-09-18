@@ -21,7 +21,6 @@ import type {
   TrainingQueueItemV3,
 } from "@chess-review/shared";
 import { QUALITY_META, QualityIcon } from "@chess-review/ui";
-import { AppHeader } from "./app-header";
 import { TrainingQueuePanel } from "./training-queue-panel";
 import { TrainingToday } from "./training-today";
 import { subscribeLocalData } from "../lib/browser-storage";
@@ -173,7 +172,7 @@ function HistoryJobCard({
       </div>
       <progress max={Math.max(1, counts.total)} value={counts.done + counts.failed} aria-label={`${counts.done + counts.failed} of ${counts.total} games processed`} />
     </div>
-    {counts.done > 0 && <p className="history-job-success">✓ {counts.done} successful analysis{counts.done === 1 ? "" : "es"} already added to Training{counts.pending > 0 ? "; more results will appear as they finish" : "."}</p>}
+    {counts.done > 0 && <p className="history-job-success">✓ {counts.done} successful analysis{counts.done === 1 ? "" : "es"} already added to Practice{counts.pending > 0 ? "; more results will appear as they finish" : "."}</p>}
     {job.error && <p className={counts.done > 0 ? "history-job-partial" : "history-job-error"}>{job.error}</p>}
     {failedItems.length > 0 && <details className="history-job-details">
       <summary>Why {failedItems.length} game{failedItems.length === 1 ? "" : "s"} failed</summary>
@@ -190,7 +189,7 @@ function HistoryJobCard({
       <summary>Successful analyses ({successfulItems.length})</summary>
       <ul>{successfulItems.slice(0, compact ? 4 : 12).map((item) => {
         const analysisId = games.find((game) => game.id === item.gameId)?.analysisId ?? item.analysisId;
-        return <li key={item.gameId}><span><strong>{gameLabel(item.gameId, games)}</strong><small>{item.status === "cached" ? "Loaded from objective cache." : "Stockfish analysis saved to Training."}</small></span>{analysisId && <Link href={`/review/${analysisId}`}>Open →</Link>}</li>;
+        return <li key={item.gameId}><span><strong>{gameLabel(item.gameId, games)}</strong><small>{item.status === "cached" ? "Loaded from objective cache." : "Stockfish analysis saved to Practice."}</small></span>{analysisId && <Link href={`/review/${analysisId}`}>Open →</Link>}</li>;
       })}</ul>
       {successfulItems.length > (compact ? 4 : 12) && <small className="history-job-more">+{successfulItems.length - (compact ? 4 : 12)} more successful games</small>}
     </details>}
@@ -584,22 +583,22 @@ export function AdvancedStudyPage() {
 
   async function removeHistoryRun(job: HistoryAnalysisJobV1) {
     if (!isHistoryAnalysisJobFinished(job)) return;
-    if (!window.confirm("Remove this run from history? Synced games, reviews, Stockfish analyses and Training data will stay.")) return;
+    if (!window.confirm("Remove this run from history? Synced games, reviews, Stockfish analyses and Practice data will stay.")) return;
     try {
       await removeHistoryAnalysisJob(job.id);
       setJobs((current) => current.filter((item) => item.id !== job.id));
-      setNotice("Analysis run removed. Synced games and Training data were kept.");
+      setNotice("Analysis run removed. Synced games and Practice data were kept.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to remove this history run.");
     }
   }
 
   async function clearFinishedRuns() {
-    if (!window.confirm("Clear finished analysis runs? This removes only run history; synced games, reviews, Stockfish analyses and Training data will stay.")) return;
+    if (!window.confirm("Clear finished analysis runs? This removes only run history; synced games, reviews, Stockfish analyses and Practice data will stay.")) return;
     try {
       const removed = await clearFinishedHistoryAnalysisJobs();
       setJobs((current) => current.filter((job) => !isHistoryAnalysisJobFinished(job)));
-      setNotice(removed === 0 ? "No finished analysis runs to clear." : `${removed} finished analysis run${removed === 1 ? "" : "s"} cleared. Training data was kept.`);
+      setNotice(removed === 0 ? "No finished analysis runs to clear." : `${removed} finished analysis run${removed === 1 ? "" : "s"} cleared. Practice data was kept.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to clear finished history runs.");
     }
@@ -678,9 +677,10 @@ export function AdvancedStudyPage() {
   const unanalyzedEligibleCount = eligibleSynced.filter((game) => !excludedGameIds.has(game.id) && !game.analyzed).length;
   const canAnalyzeHistory = accounts.length > 0 && unanalyzedEligibleCount > 0 && !hasActiveHistoryJob;
   return <main className="page-scroll study-page">
-    <AppHeader />
-    <section className="utility-heading study-heading">
-      <h1>Training</h1>
+    <section className="page-head study-heading">
+      <p className="page-kicker">Open Chess Review</p>
+      <h1 className="page-display">Practice</h1>
+      <p className="page-lede">Recurring decisions across your analysed games, and what to work on next.</p>
       {summaries && summaries.length > 0 && <label className="study-player-select"><span>Player</span><select value={playerKey} onChange={(event) => { playerSelectionTouched.current = true; setPlayerKey(event.target.value); }}>{summaries.map((summary) => <option key={summary.key} value={summary.key}>{summary.name} · {summary.gameCount} games{summary.provider ? ` · ${summary.provider === "chesscom" ? "Chess.com" : "Lichess"}` : " · manual"}</option>)}</select></label>}
     </section>
     <TrainingToday
@@ -709,7 +709,7 @@ export function AdvancedStudyPage() {
       {showRunHistory && <HistoryJobsPanel groups={historyJobGroups} games={syncedGames} onControl={controlJob} onRemove={removeHistoryRun} onClear={clearFinishedRuns} />}
     </section> : null) : <>
       <ScopeFilters filters={filters} setFilters={setFilters} timeClasses={timeClasses} openingOptions={openingOptions} gameCount={scopeGameCount} open={scopeOpen} onToggle={setScopeOpen} />
-      <nav className="study-nav" aria-label="Training views">
+      <nav className="study-nav" aria-label="Practice views">
         {NAV_GROUPS.map((group) => <div key={group.id} className="study-nav-group">{group.label ? <p className="study-nav-label">{group.label}</p> : <p className="study-nav-label study-nav-label-spacer" aria-hidden="true"> </p>}<div className="study-nav-tabs">{group.tabs.map((tab) => <button key={tab.id} type="button" aria-current={activeTab === tab.id ? "page" : undefined} onClick={() => selectView(tab.id)}>{tab.label}</button>)}</div></div>)}
       </nav>
       {!player || !report ? <section className="study-empty">Loading selected player…</section> : <div className="study-sections">

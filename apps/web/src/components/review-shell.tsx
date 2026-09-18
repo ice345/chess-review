@@ -6,9 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import { legalBoardDestinations, replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
-import type { StockfishMoveAnalysis } from "@chess-review/shared";
+import { exportAnalysisJson, exportAnnotatedPgn, formatMoveNotation, type StockfishMoveAnalysis } from "@chess-review/shared";
 import { BoardQualityBadge, QUALITY_META, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
-import { LocalDataNotice } from "./local-data-notice";
 import { TrainingSession } from "./training-session";
 import { ReviewRuntimeProvider } from "./review-runtime";
 import { ReviewSessionProvider } from "./review-session-state";
@@ -48,14 +47,39 @@ import {
 } from "../lib/board-analysis-arrows";
 import { boardMoveHintStyles, pieceMatchesTurn } from "../lib/board-move-hints";
 import { concealedAnswerPly, withheldPresentation } from "../lib/practice-presentation";
+import { criticalMomentPlies, keyMomentPosition } from "../lib/critical-moment-navigation";
+import { moveEvidenceSentence } from "../lib/move-evidence-copy";
+import { displayedMoveQualityLabel } from "../lib/move-quality-label";
 import { selectedBranchNode } from "../lib/analysis-branch";
 import { orderPlayersForBoard } from "../lib/player-identity";
 import { downloadBlob, renderDisplayedPositionCard, renderGameReviewCard, renderPositionCard, reviewFilename } from "../lib/png-export";
 import { BrandMark } from "@chess-review/ui";
 import { saveReviewRecord, type ReviewRecord } from "../lib/review-library";
-import { exportAnalysisJson, exportAnnotatedPgn } from "@chess-review/shared";
 import { useReviewStore } from "../store/review-store";
 import { buildShareUrl } from "../lib/share-link";
+
+function reviewStepTrail(
+  currentPly: number,
+  totalPlies: number,
+  keyPlies: readonly number[],
+): { label: string; current: boolean }[] {
+  const keyIndex = keyPlies.indexOf(currentPly);
+  let currentId: string;
+  if (currentPly === 0) currentId = "start";
+  else if (keyIndex !== -1) currentId = `k${keyIndex}`;
+  else if (totalPlies > 0 && currentPly >= totalPlies) currentId = "end";
+  else {
+    currentId = "start";
+    for (let i = 0; i < keyPlies.length; i++) {
+      if (keyPlies[i]! <= currentPly) currentId = `k${i}`;
+    }
+  }
+  return [
+    { label: "Start", current: currentId === "start" },
+    ...keyPlies.map((_, index) => ({ label: `Key moment ${index + 1}`, current: currentId === `k${index}` })),
+    { label: "End", current: currentId === "end" },
+  ];
+}
 
 export function ReviewShell({ children }: { children: ReactNode }) {
   const params = useParams<{ gameId: string }>();
@@ -305,14 +329,12 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   if (loadState !== "ready" || !record) {
     return (
       <main className="review-loading">
-        <LocalDataNotice />
         <div className="review-titlebar">
           <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
             <span className="brand-mark"><BrandMark decorative /></span>
           </Link>
         </div>
         <section>
-          <span className="brand-mark"><BrandMark decorative /></span>
           <h1>{loadState === "missing" ? "Review not found" : loadState === "error" ? "Unable to open review" : "Preparing workspace"}</h1>
           <p>{loadError ?? (loadState === "missing" ? "This browser has no record for that review ID." : "Loading the persisted game and analysis cache…")}</p>
           {loadState === "error" && <button type="button" className="secondary" onClick={() => window.location.reload()}>Retry opening review</button>}
@@ -568,11 +590,41 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const concealed = concealedAnswerPly({ concealedPly: state.concealedPly, currentPly: state.currentPly, practiceActive: retro.active }) !== null;
   const presentation = withheldPresentation(retro.presentation, concealed);
   const analysesHidden = presentation.hideAnalysisExports;
+  const atStartPly = !state.branch && state.currentPly === 0;
+  const keyPlies = state.analysis ? criticalMomentPlies(state.analysis.criticalMoments) : [];
+  const keyPos = state.analysis ? keyMomentPosition(state.analysis.criticalMoments, state.currentPly) : null;
+  const reviewKickerState = atStartPly
+    ? "Start"
+    : keyPos
+      ? `Key moment ${keyPos.index} of ${keyPos.total}`
+      : currentMove
+        ? `Move ${currentMove.moveNumber}`
+        : "Start";
+  const reviewDisplay = atStartPly
+    ? "Walk through this game."
+    : concealed && keyPos
+      ? `Key moment ${keyPos.index} of ${keyPos.total}`
+      : currentAnalysis
+        ? `${formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })} · ${displayedMoveQualityLabel(currentAnalysis)}`
+        : currentMove
+          ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}`
+          : "Walk through this game.";
+  const reviewLede = atStartPly
+    ? keyPlies.length > 0
+      ? "This review walks the key moments of this game, one at a time."
+      : "This review walks each move of this game and shows the evidence for the one on the board."
+    : concealed || !currentAnalysis
+      ? null
+      : moveEvidenceSentence(currentAnalysis);
+  const reviewSteps = reviewStepTrail(state.currentPly, totalPlies, keyPlies);
+  const sideToMove = state.positionFen.split(" ")[1] === "b" ? "Black" : "White";
+  const topAccuracy = state.analysis?.[orderedPlayers.top.color].accuracy;
+  const bottomAccuracy = state.analysis?.[orderedPlayers.bottom.color].accuracy;
+
 
   return (
     <ReviewRuntimeProvider value={runtime}>
       <main className="review-shell">
-        <LocalDataNotice />
         <div className="review-titlebar">
           <Link className="brand review-home" href="/" aria-label="Open Chess Review home">
             <span className="brand-mark"><BrandMark decorative /></span>
@@ -592,8 +644,8 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                 {more.map((item) => (
                   <Link aria-current={pathname === item.href ? "page" : undefined} className={pathname === item.href ? "active" : ""} href={sectionHref(item.href)} key={item.href}>{item.label}</Link>
                 ))}
-                <Link href="/history">History</Link>
-                <Link href="/training">Training</Link>
+                <Link href="/history">Library</Link>
+                <Link href="/training">Practice</Link>
                 <Link href="/settings">Settings</Link>
               </div>
             </details>
@@ -636,15 +688,44 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         </div>
 
         {exportError && <div className="review-export-error" role="alert"><p className="error">{exportError} Open Export to retry.</p><button type="button" className="text-button" onClick={() => setExportError(null)}>Dismiss export error</button></div>}
+        <div className="review-head-slot">
+        {retro.active && (
+          <section className="page-head practice-page-head">
+            <p className="page-kicker">Open Chess Review — Practice</p>
+            <h1 className="page-display">Practice this position</h1>
+            <p className="page-lede">Take your time. Look closely. Find the best move.</p>
+          </section>
+        )}
+        {!retro.active && (
+          <section className="page-head review-page-head">
+            <p className="page-kicker">{`Review — ${reviewKickerState}`}</p>
+            <h1 className="page-display">{reviewDisplay}</h1>
+            {reviewLede ? <p className="page-lede">{reviewLede}</p> : null}
+            <p className="page-steps">
+              {reviewSteps.map((step) => (
+                <span key={step.label} {...(step.current ? { "data-step": "current" as const } : {})}>{step.label}</span>
+              ))}
+            </p>
+          </section>
+        )}
+        </div>
+
+
+
+
 
         <div
           className={`review-workspace${focusBoard ? " focus-board" : ""}`}
           style={boardGeometry.size === null ? undefined : ({ "--review-board-preference": `${boardGeometry.size}px` } as CSSProperties)}
         >
           <div className="analysis-column">
-            <section className="position-workspace" aria-label="Persistent board workspace">
-              <div className="board-player-header">
+            <section className="position-workspace paper-panel board-card" aria-label="Persistent board workspace">
+              <div className={`board-player-header board-card-header${topAccuracy === undefined ? "" : " has-accuracy"}`}>
                 <PlayerStrip player={orderedPlayers.top} />
+                {topAccuracy !== undefined && (
+                  <span className="board-card-accuracy">{`${orderedPlayers.top.color === "white" ? "White" : "Black"} · ${Math.round(topAccuracy)} accuracy`}</span>
+                )}
+                <span className="board-card-turn">{`${sideToMove} to move`}</span>
                 <div className="board-toolbar">
                 <BoardControls
                   menuRef={boardControlsRef}
@@ -773,7 +854,13 @@ export function ReviewShell({ children }: { children: ReactNode }) {
                       : null)}
                 </div>
               </div>
-              <PlayerStrip player={orderedPlayers.bottom} />
+              <div className={`board-card-footer${bottomAccuracy === undefined ? "" : " has-accuracy"}`}>
+                <PlayerStrip player={orderedPlayers.bottom} />
+                {bottomAccuracy !== undefined && (
+                  <span className="board-card-accuracy">{`${orderedPlayers.bottom.color === "white" ? "White" : "Black"} · ${Math.round(bottomAccuracy)} accuracy`}</span>
+                )}
+                {record.subtitle ? <span className="board-card-meta">{record.subtitle}</span> : null}
+              </div>
 
               <div className="move-dock">
                 <div className="move-status">

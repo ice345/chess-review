@@ -1,11 +1,13 @@
 "use client";
 
 import type { GameAnalysisV2, PlayerColor } from "@chess-review/shared";
+import { Icon } from "@chess-review/ui";
 import type { RetroRuntime } from "../hooks/use-retrospect";
 import { useReviewStore } from "../store/review-store";
 import { useReviewRuntime } from "./review-runtime";
 import { learnerColorForRecord } from "../lib/player-identity";
-import { practiceEmptyCopy, practiceSetup, practiceSideName } from "../lib/practice-setup";
+import { PIECE_ASSET_DIR } from "../lib/board-piece-assets";
+import { practiceEmptyCopy, practiceSetup, practiceSideName, type PracticeSetup } from "../lib/practice-setup";
 
 export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   const runtime = useReviewRuntime();
@@ -41,24 +43,7 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
     const { startable } = setup;
     return <section className="retro-practice retro-idle" aria-label="Practice setup">
       <p className="practice-heading">Practice your mistakes</p>
-      <div className="practice-setup" role="group" aria-label="Which side to practise">
-        {setup.sides.map((side) => (
-          <button
-            key={side.color}
-            type="button"
-            className="practice-side"
-            aria-label={`${practiceSideName(side.color)}, ${side.count} ${side.count === 1 ? "position" : "positions"}`}
-            aria-pressed={side.color === setup.selected}
-            // An empty side stays in the selector and stays selectable: its
-            // explanation is the answer to "why can I not practise this side?".
-            data-empty={side.count === 0 ? "true" : undefined}
-            onClick={() => setPracticeColor(side.color)}
-          >
-            <span>{practiceSideName(side.color)}</span>
-            <small>{side.count} {side.count === 1 ? "position" : "positions"}</small>
-          </button>
-        ))}
-      </div>
+      <SideChooser setup={setup} onSelect={setPracticeColor} />
       <label className="practice-inline-check">
         <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
         Include inaccuracies
@@ -84,12 +69,35 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
   // from this panel.
   const side = practiceSideName(retro.color);
   const last = retro.currentIndex + 1 >= total;
+  const pawnKey = retro.color === "white" ? "wP" : "bP";
+  const answering = retro.status === "solving" || retro.status === "rejected";
+  const canAdvance = retro.status !== "complete" && retro.status !== "evaluating" && retro.status !== "rewinding";
 
-  return <section className="retro-practice" aria-label="Learn from your mistakes" data-status={retro.status}>
+  function selectDuringSession(nextColor: PlayerColor) {
+    setPracticeColor(nextColor);
+    const next = setup.sides.find((entry) => entry.color === nextColor);
+    if (next && next.count > 0 && nextColor !== retro.color) begin(nextColor);
+  }
+
+  function goNext() {
+    if (!canAdvance) return;
+    if (retro.status === "accepted" || retro.status === "revealed") retro.next();
+    else retro.skip();
+  }
+
+  return <section className="retro-practice paper-panel" aria-label="Learn from your mistakes" data-status={retro.status}>
     <header className="retro-head">
-      <strong>Learn from your mistakes</strong>
+      <span className="kicker">Practice</span>
+      <span className="retro-position">
+        Position {position} / {total}
+        <button type="button" className="retro-position-nav" aria-label="Previous position" disabled>
+          <Icon name="chevron-left" />
+        </button>
+        <button type="button" className="retro-position-nav" aria-label="Next position" disabled={!canAdvance} onClick={goNext}>
+          <Icon name="chevron-right" />
+        </button>
+      </span>
       {retro.answerExposed && <span className="retro-exposure" role="status">Review practice</span>}
-      <span>{position} / {total}</span>
       <button type="button" className="text-button retro-close" onClick={() => retro.stop()}>Exit</button>
     </header>
 
@@ -110,13 +118,21 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
       {!offTrack && retro.status === "evaluating" && <p className="retro-verdict" role="status">Checking this move…</p>}
       {!offTrack && retro.status === "rewinding" && <p className="retro-verdict" role="status">Returning to the position…</p>}
 
-      {!offTrack && (retro.status === "solving" || retro.status === "rejected") && <>
-        <p className="retro-meta">{side} to move</p>
-        <p className="retro-instruction">
+      {!offTrack && answering && <>
+        <div className="retro-turn">
+          <span className="retro-turn-badge" aria-hidden="true">
+            <img src={`${PIECE_ASSET_DIR}/${pawnKey}.png`} alt="" width={40} height={40} draggable={false} />
+          </span>
+          <div>
+            <p className="retro-your-turn">Your turn</p>
+            <p className="retro-meta">{side} to move</p>
+          </div>
+        </div>
+        <p className="retro-instruction retro-aside">
           <strong>{retro.current.faultLabel}</strong>
           {" "}was played.
         </p>
-        <p className="retro-lead">Find a better move on the board. The red arrow is the original mistake.</p>
+        <p className="retro-lead retro-aside">Find a better move on the board. The red arrow is the original mistake.</p>
         {retro.hintSquare && (
           <p className="retro-hint" role="status">
             Look at the piece on <strong>{retro.hintSquare}</strong>. The best move starts there — other moves can still keep the position.
@@ -132,9 +148,23 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
               : `The engine could not verify ${retro.lastOutcome.attemptedSan ?? "that move"}, so it was not marked wrong. Try again or view the answer.`}
           </p>
         )}
+        <button
+          type="button"
+          className="primary retro-commit"
+          onClick={() => document.querySelector(".board-wrap")?.scrollIntoView({ block: "nearest" })}
+        >
+          Make your move →
+        </button>
+        <p className="retro-helper">Select a piece and a square on the board</p>
         <div className="retro-choices">
-          {retro.hintSquare === null && <button type="button" className="text-button" onClick={retro.useHint}>Hint</button>}
-          <button type="button" className="text-button" onClick={() => retro.viewSolution()}>View the solution</button>
+          {retro.hintSquare === null && (
+            <button type="button" className="secondary" onClick={retro.useHint}>
+              <Icon name="hint" /> Hint
+            </button>
+          )}
+          <button type="button" className="secondary" aria-label="View the solution" onClick={() => retro.viewSolution()}>
+            <Icon name="answer" /> Show answer
+          </button>
           <button type="button" className="text-button" onClick={() => retro.skip()}>Skip</button>
         </div>
       </>}
@@ -169,9 +199,73 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
         </div>
       </>}
     </div>}
+
+    <ActiveSetup
+      setup={setup}
+      includeInaccuracies={retro.includeInaccuracies}
+      onIncludeInaccuracies={retro.setIncludeInaccuracies}
+      onSelect={selectDuringSession}
+      onReset={() => retro.reset()}
+    />
   </section>;
 }
 
+
+function SideChooser({ setup, onSelect }: { setup: PracticeSetup; onSelect: (color: PlayerColor) => void }) {
+  return (
+    <div className="practice-setup" role="group" aria-label="Which side to practise">
+      {setup.sides.map((side) => (
+        <button
+          key={side.color}
+          type="button"
+          className="practice-side"
+          aria-label={`${practiceSideName(side.color)}, ${side.count} ${side.count === 1 ? "position" : "positions"}`}
+          aria-pressed={side.color === setup.selected}
+          // An empty side stays in the selector and stays selectable: its
+          // explanation is the answer to "why can I not practise this side?".
+          data-empty={side.count === 0 ? "true" : undefined}
+          onClick={() => onSelect(side.color)}
+        >
+          <span>{practiceSideName(side.color)}</span>
+          <small>{side.count} {side.count === 1 ? "position" : "positions"}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ActiveSetup({
+  setup,
+  includeInaccuracies,
+  onIncludeInaccuracies,
+  onSelect,
+  onReset,
+}: {
+  setup: PracticeSetup;
+  includeInaccuracies: boolean;
+  onIncludeInaccuracies: (value: boolean) => void;
+  onSelect: (color: PlayerColor) => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="practice-active-setup">
+      <div className="practice-active-setup-head">
+        <strong>Practice setup</strong>
+        <button type="button" className="text-button practice-reset" onClick={onReset}>
+          <Icon name="reset" /> Reset
+        </button>
+      </div>
+      <div className="practice-play-as">
+        <span>Play as</span>
+        <SideChooser setup={setup} onSelect={onSelect} />
+      </div>
+      <label className="practice-inline-check practice-option-row">
+        Include inaccuracies
+        <input type="checkbox" checked={includeInaccuracies} onChange={(event) => onIncludeInaccuracies(event.target.checked)} />
+      </label>
+    </div>
+  );
+}
 
 function CompletePanel({ retro, side }: { retro: RetroRuntime; side: string }) {
   const { tally } = retro;
