@@ -6,9 +6,27 @@ import type { GameAnalysisV2, SyncedGame } from "@chess-review/shared";
 import { BrowserStockfishPool } from "@chess-review/stockfish";
 import { getCachedAnalysis, putCachedAnalysis } from "./analysis-cache";
 import { analysisScheduler } from "./analysis-scheduler";
+import { loadAppSettings } from "./app-settings";
 import { markSyncedGameAnalyzed } from "./platform-library";
+import type { PlatformSyncMode } from "./platform-sync";
 import { analyzeObjectiveGame } from "./objective-game-analysis";
 import { buildReviewRecordFromSyncedGame, saveReviewRecord } from "./review-library";
+
+/**
+ * What happens to freshly synced games, on both the landing desk and the import
+ * desk: an incremental sync may auto-analyse the newest few, a full import never
+ * starts work on its own. The caller refreshes its library afterwards.
+ */
+export async function applySyncedAnalysisPolicy(
+  games: SyncedGame[],
+  mode: PlatformSyncMode,
+  complete = true,
+): Promise<void> {
+  if (mode !== "incremental" || !complete) return;
+  const settings = loadAppSettings();
+  const selected = games.slice(0, settings.autoAnalyzeImported);
+  if (selected.length > 0) await autoAnalyzeSyncedGames(selected, { depth: settings.reviewDepth, multiPv: settings.reviewMultiPv });
+}
 
 /**
  * Optional conservative account-sync policy. Games are analyzed strictly in

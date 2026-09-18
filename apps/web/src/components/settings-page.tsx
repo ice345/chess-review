@@ -5,7 +5,6 @@ import { DEPLOYMENT_MODE } from "../lib/deployment";
 import { useEffect, useRef, useState } from "react";
 import type { CoachLanguage, UiLanguage } from "@chess-review/shared";
 import { LOCAL_DATA_RETENTION } from "../lib/local-data";
-import { AppHeader } from "./app-header";
 import { LibraryBackupPanel } from "./library-backup-panel";
 import { DEFAULT_APP_SETTINGS, loadAppSettings, saveAppSettings, type AppSettings } from "../lib/app-settings";
 import { downloadMaiaModel, type CoachRequestProvider, type MaiaModel } from "../lib/local-ai";
@@ -74,8 +73,12 @@ export function SettingsPage() {
 
   return (
     <main className="page-scroll utility-page">
-      <AppHeader />
-      <section className="utility-heading"><h1>Settings</h1><p>{enhanced ? "Enhanced Local" : "Browser Core"} · Your games and review progress are saved in this browser.</p><Link className="text-button" href="/help">Help, capabilities and data privacy →</Link></section>
+      <section className="page-head">
+        <p className="page-kicker">Open Chess Review</p>
+        <h1 className="page-display">Settings</h1>
+        <p className="page-lede">{enhanced ? "Enhanced Local" : "Browser Core"} · Your games and review progress are saved in this browser.</p>
+        <Link className="text-button" href="/help">Help, capabilities and data privacy →</Link>
+      </section>
       <div className={`settings-grid${enhanced ? "" : " browser-core-settings"}`}>
         <section className="settings-card">
           <div><span className="kicker">This interface</span><h2>Language</h2></div>

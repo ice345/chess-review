@@ -57,6 +57,6 @@ export function LibraryBackupPanel({ disabled, onBusyChange }: { disabled: boole
         setNotice(result.preferencesError ?? "Library restored. Reload to continue with your games and saved progress.");
       })}>Restore this backup</button><button type="button" className="secondary" disabled={locked} onClick={() => void run(async () => setPreview(await previewLibraryRestore(preview.backup)))}>Refresh preview</button><button type="button" className="text-button" disabled={locked} onClick={() => setPreview(null)}>Cancel</button></div>
     </section>}
-    {restored && <button type="button" className="primary" onClick={() => window.location.assign("/training")}>Reload and open Training</button>}
+    {restored && <button type="button" className="primary" onClick={() => window.location.assign("/training")}>Reload and open Practice</button>}
   </section>;
 }

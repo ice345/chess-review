@@ -201,11 +201,11 @@ export function ConnectedAccounts({
         try {
           const queued = await queueAutomaticHistoryAnalysis(account.id, loadAppSettings().reviewDepth);
           if (queued.job?.status === "paused") {
-            analysisNotice = " An existing analysis is paused; resume it from Training.";
+            analysisNotice = " An existing analysis is paused; resume it from Practice.";
           } else if (queued.queuedCount > 0) {
-            analysisNotice = ` Background Stockfish analysis started for ${queued.queuedCount} game${queued.queuedCount === 1 ? "" : "s"} (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
+            analysisNotice = ` Background Stockfish analysis started for ${queued.queuedCount} game${queued.queuedCount === 1 ? "" : "s"} (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Practice to follow progress.`;
           } else if (queued.job?.status === "running" || queued.job?.status === "queued") {
-            analysisNotice = ` Background Stockfish analysis is already running (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Training to follow progress.`;
+            analysisNotice = ` Background Stockfish analysis is already running (up to ${HISTORY_ANALYSIS_CONCURRENCY} at once); open Practice to follow progress.`;
           } else if (queued.reused) {
             analysisNotice = " All imported games already have current objective analysis.";
           }
@@ -283,9 +283,9 @@ export function ConnectedAccounts({
   }
 
   return (
-    <section className={`connected-accounts ${compact ? "compact" : ""}`} id="connected-accounts">
+    <section className={`connected-accounts ${compact ? "compact paper-panel" : ""}`} id="connected-accounts">
       <header>
-        <div><span className="kicker">Connected games</span><h2>{compact ? "Your chess identities" : "Accounts"}</h2></div>
+        <div><span className="kicker">Connected games</span><h2>{compact ? "Connected accounts" : "Accounts"}</h2></div>
         <p>{compact ? "Link Chess.com or Lichess here, then sync recent games. Full-history tools stay in Settings." : "Sync metadata stays separate from analysis. Full-history imports queue objective Stockfish work after syncing, and every batch has a persistent, resumable checkpoint."}</p>
       </header>
       <div className="account-link-grid">

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExternalPlatform, SyncedGame } from "@chess-review/shared";
-import { AppHeader } from "./app-header";
 import { deleteReviewRecord } from "../lib/local-data";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import { buildReviewRecordFromSyncedGame, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
@@ -115,30 +114,35 @@ export function HistoryPage() {
 
   return (
     <main className="page-scroll utility-page">
-      <AppHeader />
-      <section className="utility-heading"><h1>Games and reviews</h1></section>
-      {snapshot && <p className="history-summary study-ink-stats" aria-label="History summary">
-        <span><strong>{libraryEntries.length}</strong> All records</span>
-        <span><strong>{listedAnalyzed}</strong> Analyzed</span>
-        <span><strong>{listedPending}</strong> Pending</span>
-        <span><strong>{sourceLabel}</strong> Sources</span>
-      </p>}
-      <details className="study-scope history-scope" open={filterOpen} onToggle={(event) => setFilterOpen(event.currentTarget.open)}>
-        <summary>
-          <span>Filter</span>
-          <strong>{historyFilterLabel(provider, analysisState, timeClass, result, query, libraryEntries.length)}</strong>
-          <span className="study-scope-change">{filterOpen ? "Hide filters" : "Change filters"}</span>
-        </summary>
-        <div className="history-filters" aria-label="History filters">
-          <label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Player or event" /></label>
-          <label><span>Source</span><select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)}><option value="all">All sources</option><option value="manual">Manual import</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select></label>
-          <label><span>Status</span><select value={analysisState} onChange={(event) => setAnalysisState(event.target.value as AnalysisFilter)}><option value="all">All</option><option value="reviewed">Analyzed</option><option value="not-reviewed">Not analyzed</option></select></label>
-          <label><span>Time control</span><select value={timeClass} onChange={(event) => setTimeClass(event.target.value)}><option value="all">All</option>{timeClasses.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><span>Result</span><select value={result} onChange={(event) => setResult(event.target.value)}><option value="all">All results</option><option value="win">Win</option><option value="loss">Loss</option><option value="draw">Draw</option></select></label>
-        </div>
-      </details>
+      <section className="page-head">
+        <p className="page-kicker">Open Chess Review</p>
+        <h1 className="page-display">Games and reviews</h1>
+        <p className="page-lede">Everything you have imported, and the reviews built from it. Filter it down, open one, or remove something you no longer need.</p>
+      </section>
       {(libraryError || actionError) && <p className="error" role="alert">{actionError ?? libraryError} <button type="button" className="text-button" disabled={refreshing} onClick={() => { setActionError(null); void refresh(); }}>Retry loading games</button></p>}
-      <section className="history-list">
+      {/* The panel holds the summary, the filters and the rows: one surface, the
+          way the reference groups a list, instead of loose rows on the room. */}
+      <section className="history-list paper-panel">
+        {snapshot && <p className="history-summary study-ink-stats" aria-label="History summary">
+          <span><strong>{libraryEntries.length}</strong> All records</span>
+          <span><strong>{listedAnalyzed}</strong> Analyzed</span>
+          <span><strong>{listedPending}</strong> Pending</span>
+          <span><strong>{sourceLabel}</strong> Sources</span>
+        </p>}
+        <details className="study-scope history-scope" open={filterOpen} onToggle={(event) => setFilterOpen(event.currentTarget.open)}>
+          <summary>
+            <span>Filter</span>
+            <strong>{historyFilterLabel(provider, analysisState, timeClass, result, query, libraryEntries.length)}</strong>
+            <span className="study-scope-change">{filterOpen ? "Hide filters" : "Change filters"}</span>
+          </summary>
+          <div className="history-filters" aria-label="History filters">
+            <label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Player or event" /></label>
+            <label><span>Source</span><select value={provider} onChange={(event) => setProvider(event.target.value as ProviderFilter)}><option value="all">All sources</option><option value="manual">Manual import</option><option value="chesscom">Chess.com</option><option value="lichess">Lichess</option></select></label>
+            <label><span>Status</span><select value={analysisState} onChange={(event) => setAnalysisState(event.target.value as AnalysisFilter)}><option value="all">All</option><option value="reviewed">Analyzed</option><option value="not-reviewed">Not analyzed</option></select></label>
+            <label><span>Time control</span><select value={timeClass} onChange={(event) => setTimeClass(event.target.value)}><option value="all">All</option>{timeClasses.map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label><span>Result</span><select value={result} onChange={(event) => setResult(event.target.value)}><option value="all">All results</option><option value="win">Win</option><option value="loss">Loss</option><option value="draw">Draw</option></select></label>
+          </div>
+        </details>
         {loading ? <p className="utility-empty" role="status">{indexing ? `Preparing saved games… ${indexing.completed} / ${indexing.total}. This one-time update keeps future visits fast.` : "Loading history…"}</p> : empty ? (
           <div className="utility-empty"><strong>{snapshot?.records.length || snapshot?.games.length ? "No matching games" : "No saved games yet"}</strong><span>{snapshot?.records.length || snapshot?.games.length ? "Change the filters to see other games." : "Import a PGN or connect an account to get started."}</span><Link href="/">Return home →</Link></div>
         ) : <>

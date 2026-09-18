@@ -1,0 +1,57 @@
+/* The import desk: the reference's two-column arrangement, one column of tools
+   beside the form the landing page also uses. */
+
+.import-page { padding-bottom: 46px; }
+
+.import-stage {
+  width: min(1220px, calc(100% - 44px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(330px, .8fr);
+  gap: clamp(18px, 2.4vw, 32px);
+  align-items: start;
+}
+
+.import-stage-main { min-width: 0; display: grid; gap: 14px; align-content: start; }
+.import-stage-aside { min-width: 0; display: grid; gap: 14px; align-content: start; }
+.import-stage-aside > * { min-width: 0; }
+
+/* The desk's own copy of the panel rules `.home-aside` carries on the landing
+   page: both columns are the same paper on the same room. */
+.import-stage-aside .connected-accounts.compact {
+  width: auto;
+  margin: 0;
+  padding: 18px;
+  border-top: 0;
+}
+.import-stage-aside .connected-accounts > header { grid-template-columns: minmax(0, 1fr); gap: 4px; align-items: start; }
+.import-stage-aside .connected-accounts h2 { margin: 2px 0 0; font-size: 20px; }
+.import-stage-aside .account-link-grid { margin-top: 12px; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.import-stage-aside .account-link-card { min-height: 0; padding: 12px 13px; flex-wrap: wrap; gap: 10px; }
+.import-stage-aside .account-link-card input { width: 100%; }
+.import-stage-aside .compact-account-empty { margin-top: 12px; flex-wrap: wrap; gap: 10px; }
+.import-stage-aside .connected-accounts,
+.import-stage-aside .connected-accounts > *,
+.import-stage-aside textarea,
+.import-stage-aside select { min-width: 0; }
+
+.import-stage-aside .synced-games-section,
+.import-stage-aside .recent-section { width: auto; margin: 0; padding: 18px; border-top: 0; }
+.import-stage-aside .synced-games-section > div:first-child { grid-template-columns: minmax(0, 1fr); gap: 4px; align-items: start; }
+.import-stage-aside .synced-games-section h2 { margin: 0; font-size: 20px; }
+
+/* The form takes the width it is given here rather than the landing page's
+   narrower aside column. */
+.import-stage-main .import-card { padding: 20px 22px 18px; }
+.import-stage-main .import-field textarea { min-height: 190px; }
+
+@media (max-width: 1080px) {
+  .import-stage { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .import-stage { width: min(100% - 24px, 1220px); }
+  .import-stage-main .import-card,
+  .import-stage-aside .synced-games-section,
+  .import-stage-aside .recent-section { padding: 16px; }
+}
