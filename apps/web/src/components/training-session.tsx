@@ -7,7 +7,6 @@ import { subscribeLocalData } from "../lib/browser-storage";
 import type { ReviewRecord } from "../lib/review-library";
 import { dueTrainingPositions } from "../lib/training-mastery";
 import { listTrainingQueue, nextTrainingPosition, reviewTrainingPosition, trainingPositionKey, trainingReviewHref, validateTrainingSource } from "../lib/training-queue";
-import type { TrainingAttemptOutcome } from "@chess-review/shared";
 import { useReviewStore } from "../store/review-store";
 import { TRAINING_TITLES } from "./training-queue-panel";
 
@@ -51,29 +50,24 @@ export function TrainingSession({ taskId, positionKey, record }: { taskId: strin
   const nextDueNote = savedReview?.dueAt === undefined
     ? "This position is not due again yet."
     : `This position is not due again until ${new Date(savedReview.dueAt).toLocaleDateString()}.`;
-  async function confirm(outcome: TrainingAttemptOutcome) {
+  async function confirm() {
     if (!item || !source || !onSource || !state.analysis || sourceError || saving.current) return;
     saving.current = true; setBusy(true); setError(null);
-    try { setItem(await reviewTrainingPosition(item.id, source, outcome)); }
+    try { setItem(await reviewTrainingPosition(item.id, source, "exposed")); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Progress could not be saved. Try again."); }
     finally { saving.current = false; setBusy(false); }
   }
   return <section className="training-session" aria-label="Position review task">
     <div><span className="kicker">Position review</span><h2>{item ? TRAINING_TITLES[item.weaknessKind] : "Loading task…"}</h2>
       {item && <p role="status">{item.progress.reviewedPositionCount} / {item.progress.totalPositionCount} positions reviewed{item.completionKind === "mastered" ? " · Every position mastered" : reviewed ? ` · ${savedSummary ?? "This position is saved"}` : ""}</p>}
-      <p>Compare the played move with its objective evidence, explore the continuation, then say what happened: reviewed means looked at, and only a move you produced unaided, on a day the position came due, counts towards mastery.</p>
+      <p>Start before the decision. Inspect the played move and its continuation when you are ready. This is an open-book review: saving it does not count as an unaided solve.</p>
     </div>
     <div className="training-session-actions">
       {!sourceError && source && <>
-        {!onSource && <button type="button" className="secondary" onClick={() => { state.returnToGame(); state.goToPly(source.ply); }}>Return to task position</button>}
+        <button type="button" className="secondary" onClick={() => { state.returnToGame(); state.goToPly(Math.max(0, source.ply - 1)); }}>Before the decision</button>
+        {!onSource && <button type="button" className="secondary" onClick={() => { state.returnToGame(); state.goToPly(source.ply); }}>Show played move · {source.san}</button>}
         {reviewable && <>
-          {/* One action, three honest outcomes. The schedule is built from what the
-              visitor actually did: produced the move, got there with help, or read the
-              evidence that was on screen. "Reviewed" makes no claim about recall, and a
-              position that has come round again is reviewed again — that is the ladder. */}
-          <button type="button" className="primary" disabled={busy || !onSource || !state.analysis} onClick={() => void confirm("exposed")}>{busy ? "Saving…" : reviewed ? "Mark position reviewed again" : "Mark position reviewed"}</button>
-          <button type="button" className="secondary" disabled={busy || !onSource || !state.analysis} onClick={() => void confirm("unaided")}>I knew this move</button>
-          <button type="button" className="secondary" disabled={busy || !onSource || !state.analysis} onClick={() => void confirm("hinted")}>I guessed</button>
+          <button type="button" className="primary" disabled={busy || !onSource || !state.analysis} onClick={() => void confirm()}>{busy ? "Saving…" : reviewed ? "Mark position reviewed again" : "Mark position reviewed"}</button>
         </>}
         {reviewed && next && nextPositionKey !== positionKey && <Link className="primary-link" href={trainingReviewHref(item!, next)}>Next position →</Link>}
         {reviewed && !next && item && <small role="status">{nextDueNote}</small>}

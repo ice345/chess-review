@@ -8,12 +8,23 @@
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
-.retro-practice.paper-panel {
-  padding: 18px 18px 16px;
-  margin-bottom: 0;
-  border-bottom: 0;
-  gap: 14px;
+/* F-P0-05: active practice is an open section inside the Review scene-sheet — not a nested card. */
+.retro-practice.retro-active {
+  padding: 12px 0 16px;
+  margin: 0 0 8px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  gap: 12px;
   overflow-wrap: anywhere;
+}
+.objective-route.paper-panel .retro-practice.retro-active {
+  /* stay inside the parent scene-sheet */
+  box-shadow: none;
+  background: transparent;
 }
 .retro-head {
   display: flex;
@@ -46,6 +57,7 @@
   background: transparent;
   color: var(--ink-secondary);
   cursor: pointer;
+  transition: background-color var(--motion-micro) var(--motion-ease), color var(--motion-micro) var(--motion-ease);
 }
 .retro-position-nav:hover:not(:disabled) { background: var(--wash-blue); color: var(--ink-primary); }
 .retro-head > .retro-exposure {
@@ -151,6 +163,15 @@
   color: var(--ink-secondary);
 }
 .retro-aside strong { font-style: normal; }
+/* One quiet line under the turn state — not a second paragraph of coaching. */
+.retro-quiet {
+  margin: 0;
+  max-width: 28ch;
+  justify-self: center;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-secondary);
+}
 .retro-turn {
   display: flex;
   align-items: center;
@@ -164,8 +185,9 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--wash-blue);
-  box-shadow: inset 0 0 0 1px var(--line-soft);
+  background: var(--surface-paper);
+  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--wash-sage) 55%, var(--line-soft));
 }
 .retro-turn-badge img {
   width: 40px;
@@ -177,8 +199,18 @@
 .retro-your-turn {
   margin: 0;
   color: var(--ink-primary);
-  font: 500 clamp(22px, 2.4vw, 30px)/1.15 var(--font-serif);
+  font: 500 clamp(26px, 2.8vw, 34px)/1.12 var(--font-serif);
   letter-spacing: -.03em;
+}
+.retro-choices-secondary {
+  gap: 6px 16px;
+}
+.retro-choices-secondary .text-button {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.retro-choices-secondary .text-button:hover {
+  color: var(--ink-primary);
 }
 .retro-commit {
   width: 100%;
@@ -291,7 +323,7 @@
    review head only (`.review-page-head`), so practice needs no override here. */
 
 @media (max-width: 560px) {
-  .retro-practice.paper-panel {
+  .retro-practice.retro-active {
     padding: 14px 12px 12px;
   }
   .retro-position {

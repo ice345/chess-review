@@ -28,6 +28,8 @@ export interface ReviewRecord {
   orientationOverride?: "white" | "black";
   sourceTimeClass?: string;
   sourceResult?: string;
+  /** PGN Result header (game outcome), not a learner's win/loss. */
+  pgnResult?: "1-0" | "0-1" | "1/2-1/2";
 }
 
 export async function buildReviewRecordFromSyncedGame(game: SyncedGame): Promise<ReviewRecord> {
@@ -58,6 +60,12 @@ function cleanSubtitle(subtitle: string): string {
 
 function meaningfulHeader(value: string | undefined): string | undefined {
   return value && /[\p{L}\p{N}]/u.test(value) ? value : undefined;
+}
+
+function pgnGameResult(header: string | undefined, original: string): "1-0" | "0-1" | "1/2-1/2" | undefined {
+  if (header === "1-0" || header === "0-1" || header === "1/2-1/2") return header;
+  const match = /\[Result\s+"\s*(1-0|0-1|1\/2-1\/2)\s*"\]/i.exec(original);
+  return match?.[1] === "1-0" || match?.[1] === "0-1" || match?.[1] === "1/2-1/2" ? match[1] : undefined;
 }
 
 async function reviewId(identity: string): Promise<string> {
@@ -93,7 +101,11 @@ export async function buildReviewRecord(kind: ReviewRecordKind, input: string): 
   const white = meaningfulHeader(game.headers.White) ?? "White";
   const black = meaningfulHeader(game.headers.Black) ?? "Black";
   const event = meaningfulHeader(game.headers.Event);
+  const opening = meaningfulHeader(game.headers.Opening);
+  const eco = meaningfulHeader(game.headers.ECO);
+  const openingLabel = opening && eco ? `${eco} ${opening}` : opening ?? eco;
   const date = game.headers.Date && /\d/.test(game.headers.Date) ? game.headers.Date : undefined;
+  const pgnResult = pgnGameResult(game.headers.Result, input);
   return {
     id: await reviewId(`pgn\u0000${game.initialFen}\u0000${game.pgn}`),
     kind,
@@ -101,11 +113,12 @@ export async function buildReviewRecord(kind: ReviewRecordKind, input: string): 
     identity: buildReviewIdentity(game.pgn, game),
     originalPgn: input,
     title: `${white} vs ${black}`,
-    subtitle: [event, date, `${game.plies.length} ${game.plies.length === 1 ? "ply" : "plies"}`].filter(Boolean).join(" · "),
+    subtitle: [openingLabel ?? event, date, `${game.plies.length} ${game.plies.length === 1 ? "ply" : "plies"}`].filter(Boolean).join(" · "),
     initialFen: game.initialFen,
     totalPlies: game.plies.length,
     createdAt: now,
     updatedAt: now,
+    ...(pgnResult ? { pgnResult } : {}),
   };
 }
 

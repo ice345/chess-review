@@ -133,6 +133,7 @@ async function review(value: unknown): Promise<ReviewRecord> {
     ...field("preferredOrientation", optional(v.preferredOrientation, (v) => choice(v, ["white", "black"] as const, "orientation"))),
     ...field("orientationOverride", optional(v.orientationOverride, (v) => choice(v, ["white", "black"] as const, "orientation"))),
     ...field("sourceTimeClass", optional(v.sourceTimeClass, (v) => text(v, "time class"))), ...field("sourceResult", optional(v.sourceResult, (v) => text(v, "result"))),
+    ...(canonical.pgnResult ? { pgnResult: canonical.pgnResult } : {}),
   };
 }
 function player(value: unknown): SyncedGamePlayer {

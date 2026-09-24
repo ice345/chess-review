@@ -39,6 +39,8 @@ export interface StudyPlayerSummary extends StudyPlayerIdentity {
   key: string;
   name: string;
   gameCount: number;
+  /** Set when every game in this population was played as that side. */
+  color?: PlayerColor;
 }
 
 export interface StudyPlayerLibrary extends StudyPlayerIdentity {
@@ -478,11 +480,14 @@ export async function loadStudyPlayerSummaries(): Promise<StudyPlayerSummary[]> 
       const identified = identityForRecord(record, shape, color, accountsById);
       if (!identified) continue;
       const existing = summaries.get(identified.key);
-      if (existing) existing.gameCount += 1;
-      else summaries.set(identified.key, {
+      if (existing) {
+        existing.gameCount += 1;
+        if (existing.color && existing.color !== color) delete existing.color;
+      } else summaries.set(identified.key, {
         key: identified.key,
         name: identified.name,
         gameCount: 1,
+        color,
         ...identified.identity,
       });
     }
@@ -505,6 +510,7 @@ export async function loadStudyPlayerSummaries(): Promise<StudyPlayerSummary[]> 
   }
   return [...summaries.values()].sort((left, right) => right.gameCount - left.gameCount
     || Number(right.kind === "connected-account") - Number(left.kind === "connected-account")
+    || Number(right.color === "white") - Number(left.color === "white")
     || left.name.localeCompare(right.name));
 }
 

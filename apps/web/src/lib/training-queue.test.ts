@@ -150,3 +150,24 @@ describe("today's training task", () => {
     expect(todaysTrainingTask([started, later], now)?.status).toBe("in-progress");
   });
 });
+
+// The evidence id stays on the fault; the board opens before that move.
+describe("decision navigation", () => {
+  it.each([1, 2, 7])("opens the decision before ply %i without shifting evidence identity", async (ply) => {
+    const { decisionReviewHref, trainingReviewHref } = await import("./training-queue");
+    const { parsePgn } = await import("@chess-review/chess-core");
+    const { useReviewStore } = await import("../store/review-store");
+    const game = parsePgn("1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 *");
+    const source = evidence("game", ply, game.plies[ply - 1]!.san);
+    const task = createTrainingQueueItem("ada", profile("opening-decisions", [source]));
+    for (const href of [decisionReviewHref(source), trainingReviewHref(task, source)]) {
+      const url = new URL(href, "http://localhost");
+      useReviewStore.setState({ game });
+      useReviewStore.getState().goToPly(Number(url.searchParams.get("ply")));
+      expect(useReviewStore.getState().positionFen).toBe(game.plies[ply - 1]!.fenBefore);
+    }
+    const url = new URL(trainingReviewHref(task, source), "http://localhost");
+    expect(url.searchParams.get("position")).toBe(`game:${ply}`);
+    expect(url.searchParams.get("training")).toBe(task.id);
+  });
+});

@@ -27,6 +27,13 @@ describe("review library records", () => {
     expect(left.title).toBe("Ada vs Mikhail");
     expect(left.subtitle).toContain("Casual game");
     expect(left.totalPlies).toBe(4);
+    expect(left.pgnResult).toBeUndefined();
+  });
+
+  it("records a decisive PGN Result as game outcome, not a learner win", async () => {
+    const record = await buildReviewRecord("pgn", `[White "Ada"]\n[Black "Mikhail"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 *`);
+    expect(record.pgnResult).toBe("1-0");
+    expect(record.sourceResult).toBeUndefined();
   });
 
   it("rejects a header-only PGN", async () => {

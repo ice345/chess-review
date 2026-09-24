@@ -235,9 +235,14 @@ export function nextTrainingPosition(item: TrainingQueueItemV3, now = new Date()
   return item.evidence.find((source) => !reviewed.has(trainingPositionKey(source)));
 }
 
+/** Evidence identifies the played move; the decision board is one ply earlier. */
+export function decisionReviewHref(source: Pick<TrainingEvidenceReference, "gameId" | "ply">): string {
+  return `/review/${encodeURIComponent(source.gameId)}/moves?ply=${Math.max(0, source.ply - 1)}&decision=${source.ply}`;
+}
+
 export function trainingReviewHref(item: TrainingQueueItemV3, source = nextTrainingPosition(item) ?? item.evidence[0]): string {
   if (!source) return "/training";
-  const query = new URLSearchParams({ training: item.id, position: trainingPositionKey(source), ply: String(source.ply) });
+  const query = new URLSearchParams({ training: item.id, position: trainingPositionKey(source), ply: String(Math.max(0, source.ply - 1)) });
   return `/review/${encodeURIComponent(source.gameId)}/moves?${query}`;
 }
 

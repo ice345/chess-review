@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { RecurringWeakness } from "@chess-review/analysis";
 import type { TrainingQueueItemV3 } from "@chess-review/shared";
+import type { PracticeEmptyKind } from "../lib/practice-chapter";
 import { nextTrainingPosition, startTrainingTask, trainingReviewHref } from "../lib/training-queue";
 import { TRAINING_TITLES } from "./training-queue-panel";
 
@@ -29,6 +30,8 @@ export function TrainingToday({
   onRetry,
   disabled,
   lastReviewHref,
+  emptyKind = "no-due-tasks",
+  mistakeCount = 0,
 }: {
   /** What the page knows: the queue is still being read, unreadable, or read. */
   state: "loading" | "ready" | "failed";
@@ -43,7 +46,15 @@ export function TrainingToday({
   /** Re-read the data this block needs; the queue panel cannot clear this state. */
   onRetry: () => void;
   disabled: boolean;
+  /**
+   * Link into an already-analyzed review only. Never invent a ply continue for
+   * an unanalyzed game (atmosphere-practice §C / Batch C).
+   */
   lastReviewHref?: string;
+  /** Honest empty kind from practiceChapterProgress. */
+  emptyKind?: PracticeEmptyKind;
+  /** Single-game mistakes available when recurring weakness is not. */
+  mistakeCount?: number;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -94,11 +105,57 @@ export function TrainingToday({
   }
 
   if (!task) {
+    if (emptyKind === "no-import") {
+      return (
+        <section className="training-today" aria-label="Today's training">
+          <header>
+            <span className="eyebrow">Today</span>
+            <h2>Nothing imported yet</h2>
+          </header>
+          <p className="training-today-note">
+            Import a game to begin this chapter. Practice returns to decisions from your own games.
+          </p>
+          <Link className="primary-link" href="/import">Import a game →</Link>
+        </section>
+      );
+    }
+    if (emptyKind === "no-analysis") {
+      return (
+        <section className="training-today" aria-label="Today's training">
+          <header>
+            <span className="eyebrow">Today</span>
+            <h2>Games are waiting to be observed</h2>
+          </header>
+          <p className="training-today-note">
+            Imported games need objective analysis before practice can open a decision. Unanalyzed
+            games do not offer a ply to continue.
+          </p>
+          <Link className="primary-link" href="/history">Open library / analyse →</Link>
+        </section>
+      );
+    }
+    if (emptyKind === "mistakes-without-weakness") {
+      return (
+        <section className="training-today" aria-label="Today's training">
+          <header>
+            <span className="eyebrow">Today</span>
+            <h2>Single-game mistakes are ready</h2>
+          </header>
+          <p className="training-today-note">
+            There {mistakeCount === 1 ? "is 1 recorded mistake" : `are ${mistakeCount} recorded mistakes`} in
+            this population. Recurring-weakness conclusions need more games, but one game's mistakes are still practiceable in Review.
+          </p>
+          {lastReviewHref
+            ? <Link className="primary-link" href={lastReviewHref}>Open last analyzed review →</Link>
+            : <Link className="primary-link" href="/review">Choose a game →</Link>}
+        </section>
+      );
+    }
     return (
       <section className="training-today" aria-label="Today's training">
         <header>
           <span className="eyebrow">Today</span>
-          <h2>{topWeakness ? TRAINING_TITLES[topWeakness.kind] : "Nothing to train yet"}</h2>
+          <h2>{topWeakness ? TRAINING_TITLES[topWeakness.kind] : "No due tasks today"}</h2>
         </header>
         {topWeakness ? (
           <>
@@ -113,9 +170,9 @@ export function TrainingToday({
           </>
         ) : (
           <p className="training-today-note">
-            Analyse more games in this population and a recurring weakness will appear here, with the
-            positions that show it.
-            {lastReviewHref ? <>{" "}<Link href={lastReviewHref}>Continue last review →</Link></> : null}
+            Nothing is due now. Analyse more games if you want a recurring focus, or revisit a saved
+            task when its schedule says so.
+            {lastReviewHref ? <>{" "}<Link href={lastReviewHref}>Open last analyzed review →</Link></> : null}
           </p>
         )}
       </section>
@@ -131,7 +188,7 @@ export function TrainingToday({
   // The position the start button will actually open: the one that has been waiting
   // longest, then the first never reviewed. A second hand-rolled rule here is how the
   // label and the button can disagree.
-  const next = nextTrainingPosition(task) ?? task.evidence[0];
+  const next = nextTrainingPosition(task);
   const positions = task.evidence.map((source) => source.san);
   return (
     <section className="training-today" aria-label="Today's training">
@@ -151,11 +208,11 @@ export function TrainingToday({
         </p>
       )}
       <p className="training-today-facts">{positions.join(" · ")}</p>
-      <button type="button" className="primary" disabled={disabled} onClick={() => void start(task.id)}>
-        {task.status === "in-progress" ? "Continue today's review" : "Start today's review"}
+      <button type="button" className="primary" disabled={disabled || !next} onClick={() => void start(task.id)}>
+        {!next ? "No positions due now" : task.status === "in-progress" ? "Continue today's review" : "Start today's review"}
       </button>
       {error !== null && <p className="training-today-error" role="alert">{error}</p>}
-      <p className="training-today-note">Reviewed means looked at, not mastered. A position comes round again on its due date until it is mastered.</p>
+      <p className="training-today-note">Reviewed means looked at, not mastered. The next due date tells you when to return.</p>
     </section>
   );
 }

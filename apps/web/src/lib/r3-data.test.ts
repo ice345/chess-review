@@ -53,7 +53,8 @@ describe("position review ledger", () => {
     expect(queue.nextTrainingPosition(resumed)?.ply).toBe(3);
     const url = new URL(queue.trainingReviewHref(resumed), "http://localhost");
     expect(url.searchParams.get("training")).toBe(task.id);
-    expect(url.searchParams.get("ply")).toBe("3");
+    expect(url.searchParams.get("ply")).toBe("2");
+    expect(url.searchParams.get("position")).toBe(`${task.evidence[1]!.gameId}:3`);
     const opened = await (await import("./training-queue")).reviewTrainingPosition(task.id, task.evidence[1]!, "exposed");
     // Every position reviewed, none mastered: the task stays open so the positions can
     // come round again, which is the only way mastery is ever earned.

@@ -11,7 +11,7 @@ import { listTrainingQueue, removeTrainingQueueItem, startTrainingTask, training
 export const TRAINING_TITLES = { "opening-decisions": "Opening decisions", "middlegame-decisions": "Middlegame decisions", "endgame-decisions": "Endgame decisions", "missed-opportunities": "Missed opportunities" };
 
 /** Independent of analysis availability, so restored tasks survive an empty cache. */
-export function TrainingQueuePanel() {
+export function TrainingQueuePanel({ playerKey }: { playerKey?: string }) {
   const router = useRouter();
   const [items, setItems] = useState<TrainingQueueItemV3[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -20,16 +20,16 @@ export function TrainingQueuePanel() {
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     let active = true;
-    const refresh = () => { void listTrainingQueue().then((value) => { if (active) { setItems(value); setError(null); } }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Unable to load review tasks."); }); };
+    const refresh = () => { void listTrainingQueue(playerKey).then((value) => { if (active) { setItems(value); setError(null); } }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "Unable to load review tasks."); }); };
     refresh();
     const unsubscribe = subscribeLocalData(refresh);
     return () => { active = false; unsubscribe(); };
-  }, []);
+  }, [playerKey]);
   async function act(item: TrainingQueueItemV3, action: "start" | "remove") {
     if (working.current) return;
     working.current = true; setBusy(true); setError(null);
     try {
-      if (action === "remove") { await removeTrainingQueueItem(item.id); setItems(await listTrainingQueue()); }
+      if (action === "remove") { await removeTrainingQueueItem(item.id); setItems(await listTrainingQueue(playerKey)); }
       else router.push(trainingReviewHref(await startTrainingTask(item.id)));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to update this task. Try again."); }
     finally { working.current = false; setBusy(false); }
@@ -37,8 +37,8 @@ export function TrainingQueuePanel() {
   if (!items.length && !error) return null;
   return <section className="training-queue-panel" aria-label="Saved review tasks">
     <h2>Your review tasks</h2>
-    <p>Review each source decision, then say what happened. A review is not mastery: only a move you produced unaided advances the schedule, and a task is due again when its next review date arrives.</p>
-    {error && <p className="error" role="alert">{error} <button type="button" className="text-button" onClick={() => { void listTrainingQueue().then((value) => { setItems(value); setError(null); }).catch((cause) => setError(String(cause))); }}>Retry</button></p>}
+    <p>Return to the position before each decision, then inspect the played move. These open-book reviews are saved separately from mastery.</p>
+    {error && <p className="error" role="alert">{error} <button type="button" className="text-button" onClick={() => { void listTrainingQueue(playerKey).then((value) => { setItems(value); setError(null); }).catch((cause) => setError(String(cause))); }}>Retry</button></p>}
     <div className="training-list">{(expanded ? items : items.slice(0, 3)).map((item) => {
       // Per row: only unaided reviews advance mastery, so a task cannot claim it.
       const mastery = masterySummary(item, new Date());
