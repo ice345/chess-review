@@ -15,8 +15,18 @@ import { useReviewRuntime } from "../review-runtime";
  * board would do it. A promotion must name its piece, because the board asks the
  * same question with its chooser instead of guessing.
  */
-export function MoveEntry({ compact = false }: { compact?: boolean } = {}) {
+type PlayMove = (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
+
+export function MoveEntry({
+  compact = false,
+  playMove,
+}: {
+  compact?: boolean;
+  /** Prefer the board-owned play path when rendered inside ReviewBoardSurface. */
+  playMove?: PlayMove;
+} = {}) {
   const runtime = useReviewRuntime();
+  const play = playMove ?? runtime.playMove;
   const positionFen = useReviewStore((store) => store.positionFen);
   const [value, setValue] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -33,7 +43,7 @@ export function MoveEntry({ compact = false }: { compact?: boolean } = {}) {
       return;
     }
     setError(null);
-    const played = runtime.playMove(resolved.from, resolved.to, resolved.promotion);
+    const played = play(resolved.from, resolved.to, resolved.promotion);
     if (!played) {
       setError(`“${resolved.san}” could not be played from this position.`);
       return;

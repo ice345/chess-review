@@ -38,7 +38,7 @@ export function CurrentMoveVerdict({ move }: { move: MoveAnalysisV2 }) {
     <section className={"dual-verdict dual-verdict-" + runtime.analysisMode} aria-label={"Current move " + label + " verdicts"}>
       {showObjective && (
         <div className="move-verdict objective-verdict">
-          <QualityIcon classification={move.classification} size={24} />
+          <QualityIcon classification={move.classification} size={16} />
           <strong>{label} · {displayedMoveQualityLabel(move)}</strong>
           <p className="move-verdict-sentence">{moveEvidenceSentence(move)}</p>
           {baselineOnlyCaveat(move) !== null && <p className="move-verdict-caveat">{baselineOnlyCaveat(move)}</p>}

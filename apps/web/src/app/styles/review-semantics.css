@@ -110,7 +110,7 @@
   margin: 0 0 12px;
   display: grid;
   gap: 4px;
-  animation: mode-enter var(--motion-mode) var(--motion-ease) both;
+  overflow-anchor: none;
 }
 
 .dual-verdict-compare {
@@ -474,4 +474,43 @@
   .quality-fixture-grid article { grid-template-columns: minmax(0, 1fr) repeat(4, 28px); }
   .piece-fixture-row { grid-template-columns: 26px minmax(0, 1fr); }
   .piece-fixture-board-wrap { width: 100%; }
+}
+
+
+/* F-P1-10 Key Moment: verdict reads as a quiet badge line, not a dense card. */
+.objective-route[data-mode="moment"] .dual-verdict {
+  margin: 0 0 8px;
+  gap: 2px;
+}
+.objective-route[data-mode="moment"] .objective-verdict {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 4px 0;
+  border-top: 0;
+  align-items: center;
+}
+.objective-route[data-mode="moment"] .objective-verdict > strong {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.objective-route[data-mode="moment"] .move-verdict-sentence {
+  display: none;
+}
+.objective-route[data-mode="moment"] .move-verdict-caveat {
+  display: none;
+}
+.objective-route[data-mode="moment"] .objective-verdict .move-verdict-why {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+.objective-route[data-mode="moment"] .human-verdict {
+  background: transparent;
+}
+.objective-route[data-mode="moment"] .explain-move-action {
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .eval-readout { font-size: 10px; word-break: normal; overflow-wrap: normal; }
+  .eval-source-label { font-size: 9px; letter-spacing: 0; }
 }

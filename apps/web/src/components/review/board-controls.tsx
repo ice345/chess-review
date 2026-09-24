@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode, Ref } from "react";
+import { Icon } from "@chess-review/ui";
 import { BOARD_SIZE_MAX, BOARD_SIZE_MIN, BOARD_SIZE_STEP } from "../../lib/board-geometry";
 import type { BoardGeometryPreference } from "../../hooks/use-board-geometry-preference";
 
@@ -33,11 +34,7 @@ export function BoardControls({
   return (
     <details className="board-controls" ref={menuRef}>
       <summary aria-label="Board settings" title="Board settings">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M4 8.5h16M4 15.5h16" />
-          <circle cx="9.5" cy="8.5" r="2.2" />
-          <circle cx="14.5" cy="15.5" r="2.2" />
-        </svg>
+        <Icon name="settings" size={16} />
       </summary>
       <div className="action-menu board-controls-menu">
         <button
@@ -46,6 +43,7 @@ export function BoardControls({
           aria-pressed={!soundEnabled}
           onClick={onToggleSound}
         >
+          <Icon name={soundEnabled ? "sound" : "sound-off"} size={16} />
           {soundEnabled ? "Mute sounds" : "Unmute sounds"}
         </button>
         <button
@@ -54,6 +52,7 @@ export function BoardControls({
           aria-pressed={focusBoard}
           onClick={onToggleFocus}
         >
+          <Icon name={focusBoard ? "focus-exit" : "focus"} size={16} />
           {focusBoard ? "Exit focus board (Z)" : "Focus board (Z)"}
         </button>
         <label className="board-size-row">

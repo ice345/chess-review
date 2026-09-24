@@ -52,9 +52,10 @@ export function ReviewCompletion({
   const addition = useTrainingAddition(analysis, record, gameId, side, queue, reloadQueue);
 
   return (
-    <section className="review-completion" aria-label="Review complete">
+    <section className="review-completion" aria-label={counts.browsedEverything ? "Review complete" : "Review summary"}>
       <header>
-        <span className="kicker">Review complete</span>
+        <span className="review-completion-staff" aria-hidden="true" />
+        <span className="kicker">{counts.browsedEverything ? "Review complete" : "Review summary"}</span>
         <h2>{reviewCompletionHeadline(counts)}</h2>
         <p className="review-completion-detail">{reviewCompletionDetail(counts)}</p>
         {counts.attempted > 0 && (
@@ -71,6 +72,8 @@ export function ReviewCompletion({
           </p>
         )}
       </header>
+
+      {facts.lesson && <p className="review-completion-lesson">{facts.lesson}</p>}
 
       <dl className="review-completion-facts">
         {facts.mostImportantMistake && (
@@ -99,13 +102,14 @@ export function ReviewCompletion({
             </dd>
           </div>
         )}
-        {facts.lesson && (
-          <div>
-            <dt>This game</dt>
-            <dd><span><strong>{facts.lesson}</strong></span></dd>
-          </div>
-        )}
       </dl>
+
+      <div className="review-completion-actions">
+        <Link className="primary-link" href={`/review/${gameId}/moves`}>Review the moves →</Link>
+        <Link className="text-button" href="/training">Open Practice</Link>
+        <Link className="text-button" href={`/review/${gameId}/coach`}>Study this game</Link>
+        <button type="button" className="text-button" onClick={onClose}>Back to key moments</button>
+      </div>
 
       <TrainingHandoff
         analysis={analysis}
@@ -116,13 +120,6 @@ export function ReviewCompletion({
         queue={queue}
         addition={addition}
       />
-
-      <div className="review-completion-actions">
-        <Link className="primary-link" href={`/review/${gameId}/moves`}>Review the moves →</Link>
-        <Link className="secondary-link" href="/training">Open Practice</Link>
-        <Link className="secondary-link" href={`/review/${gameId}/coach`}>Study this game</Link>
-        <button type="button" className="text-button" onClick={onClose}>Back to key moments</button>
-      </div>
     </section>
   );
 }
@@ -141,8 +138,11 @@ function HighlightIcon({ moment }: { moment: CompletionMoment }) {
 
 /** Why this move was selected, from its own canonical evidence. */
 function highlightEvidence(moment: CompletionMoment): string {
-  const labels = moment.annotations.map((annotation) => ANNOTATION_LABEL[annotation]);
-  return `${labels.length > 0 ? `${labels.join(", ")} · ` : ""}${displayedMoveQualityLabel(moment)} · Accuracy ${moment.accuracy.toFixed(1)}`;
+  const quality = displayedMoveQualityLabel(moment);
+  const labels = moment.annotations
+    .map((annotation) => ANNOTATION_LABEL[annotation])
+    .filter((label) => label !== quality);
+  return `${labels.length > 0 ? `${labels.join(", ")} · ` : ""}${quality} · Accuracy ${moment.accuracy.toFixed(1)}`;
 }
 
 /**
@@ -216,16 +216,19 @@ function TrainingHandoff({
           <p className="review-completion-offer">
             {`${planned} ${planned === 1 ? "position" : "positions"} will join ${taskIds.length} practice ${taskIds.length === 1 ? "task" : "tasks"}.`}
           </p>
-          <ul className="review-completion-positions">
-            {positions.map((position) => (
-              <li key={`${position.gameId}:${position.ply}`}>
-                <QualityIcon classification={position.classification} size={18} decorative />
-                <span>{formatMoveNotation({ fenBefore: fenBeforeFor(analysis, position.ply), color: analysis.moves[position.ply - 1]?.color ?? "white", san: position.san })}</span>
-                <small>−{position.winPercentLoss.toFixed(1)} Win%</small>
-              </li>
-            ))}
-          </ul>
-          <button type="button" className="primary" disabled={addition.busy || addition.playerKey === null} onClick={() => void addition.add()}>
+          <details className="review-completion-which">
+            <summary>Which positions</summary>
+            <ul className="review-completion-positions">
+              {positions.map((position) => (
+                <li key={`${position.gameId}:${position.ply}`}>
+                  <QualityIcon classification={position.classification} size={18} decorative />
+                  <span>{formatMoveNotation({ fenBefore: fenBeforeFor(analysis, position.ply), color: analysis.moves[position.ply - 1]?.color ?? "white", san: position.san })}</span>
+                  <small>−{position.winPercentLoss.toFixed(1)} Win%</small>
+                </li>
+              ))}
+            </ul>
+          </details>
+          <button type="button" className="text-button" disabled={addition.busy || addition.playerKey === null} onClick={() => void addition.add()}>
             {addition.busy ? "Adding…" : `Add ${planned === 1 ? "this position" : `these ${planned} positions`} to Practice`}
           </button>
         </>

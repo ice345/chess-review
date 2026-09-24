@@ -813,11 +813,16 @@
 
 .key-moment-step:not(:disabled):hover { border-color: var(--line-accent); background: var(--wash-blue); color: var(--ink-primary); }
 .key-moment-step.primary {
-  border: 0;
-  background: var(--accent-primary);
-  color: var(--accent-ink);
+  /* Quiet Batch 2 primary — pale bluebird wash, not navy brick */
+  border: 1px solid color-mix(in srgb, var(--bluebird-ink) 42%, var(--line));
+  background: color-mix(in srgb, var(--bluebird-wash) 90%, #fff);
+  color: var(--bluebird-ink);
 }
-.key-moment-step.primary:not(:disabled):hover { background: var(--accent-hover); color: var(--accent-ink); }
+.key-moment-step.primary:not(:disabled):hover {
+  background: var(--bluebird-wash);
+  border-color: var(--bluebird-ink);
+  color: var(--ink-primary);
+}
 .key-moment-step:disabled { opacity: .42; cursor: default; }
 .key-moment-progress { color: var(--ink-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
 
@@ -869,59 +874,130 @@
 /* The Training handoff: what will be added, and to which tasks. */
 .review-completion-training-block {
   display: grid;
-  gap: var(--space-block);
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--wash-cream);
+  gap: 8px;
+  padding: 14px 0 4px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   text-align: left;
 }
-.review-completion-side { display: flex; align-items: center; gap: var(--space-row); border: 0; margin: 0; padding: 0; }
+.review-completion-side { display: flex; align-items: center; gap: 4px 12px; border: 0; margin: 0; padding: 0; }
 .review-completion-side legend { padding: 0; color: var(--ink-muted); font-size: 12px; }
-.review-completion-side button { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-paper); color: var(--ink-secondary); font-size: 12px; cursor: pointer; transition: background-color var(--motion-micro) var(--motion-ease), border-color var(--motion-micro) var(--motion-ease), color var(--motion-micro) var(--motion-ease); }
-.review-completion-side button.active { border-color: var(--line-accent); background: var(--wash-blue); color: var(--ink-primary); font-weight: 650; }
-.review-completion-offer { margin: 0; color: var(--ink-secondary); font-size: 12px; }
-.review-completion-positions { display: grid; gap: var(--space-row); margin: 0; padding: 0; list-style: none; }
+.review-completion-side button {
+  min-height: 36px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color var(--motion-micro) var(--motion-ease), border-color var(--motion-micro) var(--motion-ease);
+}
+.review-completion-side button.active {
+  border-bottom-color: var(--accent-primary);
+  background: transparent;
+  color: var(--ink-primary);
+  font-weight: 650;
+}
+.review-completion-offer { margin: 0; color: var(--ink-secondary); font-size: 13px; }
+.review-completion-which { margin: 0; }
+.review-completion-which summary {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--ink-secondary);
+  font-size: 12px;
+}
+.review-completion-positions { display: grid; gap: var(--space-row); margin: 8px 0 0; padding: 0; list-style: none; }
 .review-completion-positions li { display: flex; align-items: center; gap: var(--space-row); color: var(--ink-secondary); font-size: 12px; }
 .review-completion-positions small { color: var(--ink-muted); }
-.review-completion-training-block .primary { min-height: 40px; justify-self: start; }
+.review-completion-training-block .text-button { min-height: 40px; justify-self: start; padding-inline: 0; }
 
-/* End-of-review state. Facts and counts only — never a generated chess claim. */
+/* End-of-review state: a lesson sheet on the same paper, not a nested card. */
 .review-completion {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   margin: 0 0 14px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-paper);
-  box-shadow: var(--shadow-paper);
+  padding: 4px 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
-
-.review-completion h2 { margin: 2px 0 0; color: var(--ink-primary); font: 500 20px var(--font-serif); }
-.review-completion header p { margin: 4px 0 0; color: var(--ink-secondary); font-size: 12px; }
-.review-completion-facts { margin: 0; display: grid; gap: 2px; }
+.review-completion header { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--line-soft); }
+.review-completion-staff {
+  width: 96px;
+  height: 17px;
+  margin-bottom: 4px;
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bluebird-ink) 34%, var(--line)) 0 1px,
+    transparent 1px 4px
+  );
+  border-right: 2px double var(--accent-brass);
+}
+.review-completion .kicker { color: var(--accent-brass); }
+.review-completion h2 {
+  margin: 0;
+  max-width: 22ch;
+  color: var(--ink-primary);
+  font: 400 26px/1.22 var(--font-serif);
+}
+.review-completion-detail { margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.55; }
+.review-completion-tally { margin: 0; max-width: 46ch; color: var(--ink-muted); font-size: 12px; line-height: 1.55; }
+.review-completion-lesson {
+  margin: 0;
+  max-width: 38ch;
+  color: var(--ink-primary);
+  font: 400 17px/1.55 var(--font-serif);
+}
+.review-completion-facts { margin: 0; display: grid; gap: 0; }
 .review-completion-facts > div {
-  min-height: 44px;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
+  gap: 6px;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line-soft);
 }
-.review-completion-facts dt { color: var(--ink-muted); font-size: 12px; }
-.review-completion-facts dd { margin: 0; display: flex; align-items: center; gap: 8px; }
-.review-completion-facts dd span { min-width: 0; display: grid; gap: 1px; }
-.review-completion-facts strong { color: var(--ink-primary); font-size: 12px; }
-.review-completion-facts small { color: var(--ink-muted); font-size: 12px; }
-.review-completion-training { margin: 0; color: var(--ink-secondary); font-size: 12px; }
+.review-completion-facts dt {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.review-completion-facts dd { margin: 0; display: flex; align-items: center; gap: 10px; }
+.review-completion-facts dd > span { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.review-completion-facts strong { color: var(--ink-primary); font: 500 16px/1.3 var(--font-serif); }
+.review-completion-facts small { flex-basis: 100%; color: var(--ink-muted); font-size: 12px; }
+.review-completion-color { color: var(--ink-muted); font: 400 12px var(--font-sans); }
+.objective-route:has(.review-completion) > .review-panel-head,
+.objective-route:has(.review-completion) > .review-other-paths {
+  display: none;
+}
+.review-completion-training { margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.55; }
 
-.review-completion-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.review-completion-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding-top: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 .review-completion-actions .primary-link,
 .review-completion-actions .secondary-link,
-.review-completion-actions .text-button { min-height: 44px; display: inline-flex; align-items: center; }
-.review-completion-actions .primary-link { padding-inline: 16px; }
-.review-completion-actions .secondary-link { padding-inline: 12px; border: 1px solid var(--line); border-radius: 9px; }
+.review-completion-actions .text-button {
+  flex: none;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.review-completion-actions .primary-link { padding-inline: 12px; }
+.review-completion-actions .text-button { padding-inline: 0; }
 
 /* — Bluebird motion: Tier A micro transitions for remaining interactive rows — */
 .review-move-list button { transition: background-color var(--motion-micro) var(--motion-ease); }
@@ -1137,6 +1213,7 @@
   border-radius: 50%;
   background: var(--surface-paper);
   cursor: pointer;
+  transition: background-color var(--motion-micro) var(--motion-ease), border-color var(--motion-micro) var(--motion-ease);
 }
 .key-moment-dots button[data-seen="true"] {
   background: var(--accent-primary);
@@ -1144,22 +1221,146 @@
 }
 
 .review-other-paths {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 10px;
+  padding-top: 6px;
   border-top: 1px solid var(--line-soft);
-  opacity: .84;
+  opacity: .72;
 }
 .review-other-paths .review-panel-row > summary,
 .review-other-paths .review-row-static {
   min-height: 40px;
   gap: 10px;
+  color: var(--ink-muted);
+  font-weight: 500;
 }
-.review-other-paths svg { width: 14px; height: 14px; }
+.review-other-paths .review-row-copy strong {
+  color: var(--ink-secondary);
+  font-weight: 550;
+}
+.review-other-paths svg { width: 14px; height: 14px; opacity: .85; }
 .review-other-paths .review-row-meta { color: var(--ink-faint); }
 .review-other-paths .retro-idle {
   margin: 0;
-  padding: 6px 0 8px;
+  padding: 4px 0 6px;
+  border: 0;
   border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+/* Start sheet: primary invite stays loud; secondary paths stay open rows. */
+.objective-route.review-mode-panel[data-mode="start"] .key-moment-invite {
+  gap: 18px;
+  padding-bottom: 18px;
+}
+.objective-route.review-mode-panel[data-mode="start"] .key-moment-invite .primary.key-moment-step {
+  min-width: 220px;
+  min-height: 44px;
+}
+.objective-route.review-mode-panel[data-mode="start"] .review-other-paths .review-panel-row.folded-block,
+.objective-route.review-mode-panel[data-mode="start"] .review-other-paths .review-panel-row.game-summary-section {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 
+
+
+/* Start OTHER PATHS: Practice folds like Moves / Summary / Engine. */
+.review-other-paths details.retro-idle.review-panel-row {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+}
+.review-other-paths .review-open-row-body {
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 12px 28px;
+}
+.review-other-paths .retro-idle .practice-heading { display: none; }
+.review-other-paths .side-chooser,
+.review-other-paths .practice-side-chooser {
+  /* keep existing chooser styles; slightly quieter */
+  opacity: .95;
+}
+
+
+/* F-P1-10: Try-it is a section, not a nested card. */
+.objective-route[data-mode="moment"] .key-moment-action {
+  margin: 0 0 10px;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.objective-route[data-mode="moment"] .key-moment-nav {
+  margin-bottom: 8px;
+}
+
+/* Evidence (in verdict) + Engine + Nearby share one quiet disclosure band. */
+.key-moment-disclosure-row {
+  display: grid;
+  gap: 0;
+  margin: 0 0 8px;
+  border-top: 1px solid var(--line-soft);
+}
+.key-moment-disclosure-row .position-analysis,
+.key-moment-disclosure-row .review-context-moves {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  background: transparent;
+}
+.key-moment-disclosure-row .review-engine-lines.review-panel-row,
+.key-moment-disclosure-row .review-panel-row {
+  border-top: 1px solid var(--line-soft);
+}
+@media (min-width: 1200px) {
+  .key-moment-disclosure-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+    align-items: start;
+  }
+  .key-moment-disclosure-row > * {
+    border-top: 0 !important;
+  }
+  .objective-route[data-mode="moment"] .dual-verdict {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 0 12px;
+    align-items: start;
+  }
+  .objective-route[data-mode="moment"] .objective-verdict .move-verdict-why {
+    /* Why joins the disclosure grammar as a row under the badge on narrow; on wide it sits with evidence */
+  }
+}
+
+.review-other-paths-moment {
+  opacity: .78;
+  margin-top: 4px;
+}
+
+/* Bluebird desk — batch one. */
+.key-moment-disclosure-row { grid-template-columns: minmax(0, 1fr); }
+.review-panel-row > summary strong, .review-row-static strong, .review-row-copy strong { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.4; }
+.review-row-meta { white-space: normal; max-width: 18ch; }
+.review-panel-row > summary { padding-block: 9px; }
+.objective-route[data-mode="moment"] .dual-verdict { grid-template-columns: minmax(0, 1fr); }
+
+.review-mode-panel[data-mode="practice"] { border-top: 2px solid var(--line-accent); }
+@media (max-width: 560px) { .review-panel-row > summary { gap: 6px; } }
+
+@media (max-width: 560px) {
+  .review-completion h2 { font-size: 22px; }
+  .review-completion-facts dd { min-width: 0; flex-wrap: wrap; }
+  .review-completion-facts dd > span:last-child { flex: 1 1 140px; }
+  .review-completion-facts dd > svg { flex-shrink: 0; }
+}

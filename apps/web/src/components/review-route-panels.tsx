@@ -10,8 +10,8 @@ import { CoachPanel } from "./coach-panel";
 import { AnalysisLensPanel } from "./review/analysis-lens-panel";
 import { CurrentMoveVerdict } from "./review/current-move-verdict";
 import { runDiagnosticsLine, runDiagnosticsText } from "../lib/run-diagnostics-copy";
-import { KeyMomentNavigation } from "./review/key-moment-navigation";
 import { criticalMomentPlies } from "../lib/critical-moment-navigation";
+import { KeyMomentNavigation } from "./review/key-moment-navigation";
 import { OpeningExplorerPanel } from "./review/opening-explorer-panel";
 import { TablebasePanel } from "./review/tablebase-panel";
 import { ReviewMoves, ReviewOverview } from "./review-presentation";
@@ -91,9 +91,10 @@ function PositionAnalysis({ compact = false }: { compact?: boolean } = {}) {
   const branchNode = branch ? selectedBranchNode(branch) : null;
   const branchQuality = branchNode?.moveQuality;
 
+  const hideLens = compact && branch === null;
   return (
     <section className="position-analysis">
-      <AnalysisLensPanel objective={result} />
+      {!hideLens && <AnalysisLensPanel objective={result} />}
       {branch && (
         <div className="variation-banner">
           <span>Analysis branch · root ply {branch.rootPly} · {branch.selectedIndex}/{branch.activePath.length - 1}</span>
@@ -190,9 +191,6 @@ export function ObjectiveRoutePanel() {
   // Hooks first: this panel mounts without an analysis and gains one later.
   const answerWithheld = useWithheldPly() !== null;
 
-  // Bluebird Tier B: derive the cognitive mode so the contextual panel can
-  // animate when the mode changes (remount via React key) while ordinary ply
-  // stepping inside one mode does not trigger animation.
   const keyPlies = useMemo(
     () => (analysis ? criticalMomentPlies(analysis.criticalMoments) : []),
     [analysis],
@@ -208,16 +206,20 @@ export function ObjectiveRoutePanel() {
           : keyPlies.includes(currentPly)
             ? "moment"
             : "move";
-  // Bluebird Tier B: the contextual panel fades and travels a few pixels when the
-  // cognitive mode changes. It is a class, not a React key: remounting the panel
-  // to replay an animation threw away the visitor's opened disclosures — and
-  // stepping the game must never close a report someone is reading.
-  const [modeChanged, setModeChanged] = useState(false);
+  // Animate only the contextual paper. Cancelling the previous animation keeps
+  // rapid mode changes responsive without remounting disclosures or the board.
+  const panelRef = useRef<HTMLDivElement>(null);
   const lastMode = useRef(mode);
   useEffect(() => {
     if (lastMode.current === mode) return;
     lastMode.current = mode;
-    setModeChanged(true);
+    const panel = panelRef.current;
+    if (!panel || typeof panel.animate !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = panel.animate([
+      { opacity: 0, transform: "translateY(4px)" },
+      { opacity: 1, transform: "none" },
+    ], { duration: 240, easing: "cubic-bezier(.22, .68, .2, 1)" });
+    return () => animation.cancel();
   }, [mode]);
 
   if (!analysis) return <div className="route-panel objective-route"><AnalysisGate section="Objective review" /><PositionAnalysis /></div>;
@@ -230,9 +232,9 @@ export function ObjectiveRoutePanel() {
   const atStart = !branch && currentPly === 0;
   return (
     <div
-      className={`route-panel objective-route review-mode-panel paper-panel${modeChanged ? " mode-enter" : ""}`}
+      ref={panelRef}
+      className="route-panel objective-route review-mode-panel paper-panel"
       data-mode={mode}
-      onAnimationEnd={() => setModeChanged(false)}
     >
       {!practice && atStart && (
         <header className="review-panel-head">
@@ -268,14 +270,30 @@ export function ObjectiveRoutePanel() {
           the whole-game report stay folded so the first screen has one job. */}
       {!practice && <KeyMomentNavigation analysis={analysis} />}
       {!practice && move && !answerWithheld && <CurrentMoveVerdict move={move} />}
-      <div className={atStart ? "review-other-paths" : undefined}>
-      <RetroPractice analysis={analysis} />
+      {mode === "moment" && !practice && !answerWithheld ? (
+        <div className="key-moment-disclosure-row" aria-label="Moment details">
+          {/* Evidence lives inside CurrentMoveVerdict; Engine + Nearby share this row band. */}
+          <PositionAnalysis compact />
+          <details className="review-context-moves folded-block review-panel-row">
+            <PanelRowSummary
+              icon="moves"
+              label="Nearby moves"
+              meta={`${Math.min(5, currentPly)} before · ${Math.min(5, Math.max(0, analysis.moves.length - currentPly))} after`}
+            />
+            <ReviewMoves analysis={analysis} currentPly={currentPly} onSelectPly={runtime.navigateToPly} contextWindow={5} />
+            <Link className="view-all-moments" href={`/review/${runtime.gameId}/moves`}>
+              All {analysis.moves.length} moves, filters and evidence →
+            </Link>
+          </details>
+        </div>
+      ) : null}
+      <div className={atStart ? "review-other-paths" : mode === "moment" ? "review-other-paths review-other-paths-moment" : undefined}>
+      <RetroPractice analysis={analysis} foldIdle={!runtime.retro.active} />
 
-      {!practice && (atStart ? (
+      {!practice && mode !== "moment" && (atStart ? (
         <details className="review-context-moves folded-block review-panel-row">
           <PanelRowSummary
             icon="moves"
-            kicker="THIS GAME"
             label="Moves, quality and accuracy"
             meta={`${analysis.moves.length} ${analysis.moves.length === 1 ? "move" : "moves"}`}
           />
@@ -297,12 +315,11 @@ export function ObjectiveRoutePanel() {
           </Link>
         </section>
       ))}
-      {!runtime.retro.presentation.hideCoachAnswers && !answerWithheld && <PositionAnalysis compact />}
+      {mode !== "moment" && !runtime.retro.presentation.hideCoachAnswers && !answerWithheld && <PositionAnalysis compact />}
       {!practice && (
         <details className="game-summary-section review-panel-row" id="game-summary">
           <PanelRowSummary
             icon="book"
-            kicker="GAME SUMMARY"
             label="Game summary and timeline"
             meta="Accuracy · phases · key moments"
           />

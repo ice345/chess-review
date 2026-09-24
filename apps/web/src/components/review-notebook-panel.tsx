@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BluebirdMotif } from "@chess-review/ui";
 import { useMemo, useState } from "react";
 import { selectedBranchMoves } from "../lib/analysis-branch";
 import { MAX_NOTE_LENGTH, MAX_NOTE_TITLE_LENGTH, MAX_NOTEBOOK_LINE_PLIES, notebookPositionKey, notebookPositionLabel, notebookSource, type NotebookPosition } from "../lib/review-notebook";
@@ -43,7 +44,7 @@ export function ReviewNotebookPanel() {
         {saved && <button type="button" className="secondary" disabled={locked} onClick={() => void notebook.save(position, true)}>Remove saved entry</button>}
         {dirty && <button type="button" className="text-button" disabled={locked} onClick={() => void notebook.reloadEntry(position)}>Discard draft and reload saved entry</button>}
       </div>
-      {notebook.notice?.key === key && <p role="status">{notebook.notice.text}</p>}
+      {notebook.notice?.key === key && <p role="status" className="notebook-save-feedback">{saved && !dirty && <BluebirdMotif kind="feather" className="saved-feather" key={saved.updatedAt} />}{notebook.notice.text}</p>}
       {!dirty && saved && <small>Saved {new Date(saved.updatedAt).toLocaleString()}</small>}
     </section>
     <section className="notebook-entries" aria-label="Saved notebook entries">
@@ -53,7 +54,7 @@ export function ReviewNotebookPanel() {
         <button type="button" className="notebook-entry-open" onClick={() => {
           try { runtime.openNotebookPosition(entry.rootPly, entry.line); setActionError(null); }
           catch (cause) { setActionError(cause instanceof Error ? cause.message : "Unable to open this entry."); }
-        }}><strong>{entry.bookmarked ? "★ " : ""}{entry.title || labels.get(entry.id)}</strong><small>{entry.line.length ? `Saved line · ${entry.line.length} plies · from mainline ply ${entry.rootPly}` : entry.title ? labels.get(entry.id) : "Saved position"}</small></button>
+        }}><strong>{entry.bookmarked && <><BluebirdMotif kind="feather" className="entry-feather" /><span className="sr-only">Bookmarked: </span></>}{entry.title || labels.get(entry.id)}</strong><small>{entry.line.length ? `Saved line · ${entry.line.length} plies · from mainline ply ${entry.rootPly}` : entry.title ? labels.get(entry.id) : "Saved position"}</small></button>
         {entry.note && <p>{entry.note}</p>}
       </li>)}</ol>
     </section>

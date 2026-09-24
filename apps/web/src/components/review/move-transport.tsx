@@ -1,11 +1,4 @@
-function TransportIcon({ kind }: { kind: "first" | "previous" | "play" | "pause" | "next" | "last" }) {
-  if (kind === "play") return <path d="m9 6 9 6-9 6Z" />;
-  if (kind === "pause") return <path d="M8 6h3v12H8zM14 6h3v12h-3z" />;
-  if (kind === "previous") return <path d="m15.5 6-7 6 7 6Z" />;
-  if (kind === "next") return <path d="m8.5 6 7 6-7 6Z" />;
-  if (kind === "first") return <path d="M6 6h2v12H6zM17 6l-7 6 7 6Z" />;
-  return <path d="M16 6h2v12h-2zM7 6l7 6-7 6Z" />;
-}
+import { Icon, type IconName } from "@chess-review/ui";
 
 export function MoveTransport({
   isPlaying,
@@ -30,12 +23,12 @@ export function MoveTransport({
   onNext: () => void;
   onLast: () => void;
 }) {
-  const controls = [
-    { label: inVariation ? "Variation start" : "First position", icon: "first" as const, disabled: atStart, action: onFirst },
-    { label: "Previous move", icon: "previous" as const, disabled: atStart, action: onPrevious },
-    { label: isPlaying ? "Pause playback" : inVariation ? "Playback pauses during variation" : atEnd ? "Replay game" : "Play game", icon: (isPlaying ? "pause" : "play") as "pause" | "play", disabled: playDisabled, action: onTogglePlayback },
-    { label: "Next move", icon: "next" as const, disabled: atEnd, action: onNext },
-    { label: inVariation ? "Variation end" : "Last position", icon: "last" as const, disabled: atEnd, action: onLast },
+  const controls: { label: string; icon: IconName; disabled: boolean; action: () => void }[] = [
+    { label: inVariation ? "Variation start" : "First position", icon: "first", disabled: atStart, action: onFirst },
+    { label: "Previous move", icon: "previous", disabled: atStart, action: onPrevious },
+    { label: isPlaying ? "Pause playback" : inVariation ? "Playback pauses during variation" : atEnd ? "Replay game" : "Play game", icon: isPlaying ? "pause" : "play", disabled: playDisabled, action: onTogglePlayback },
+    { label: "Next move", icon: "next", disabled: atEnd, action: onNext },
+    { label: inVariation ? "Variation end" : "Last position", icon: "last", disabled: atEnd, action: onLast },
   ];
 
   return (
@@ -43,13 +36,14 @@ export function MoveTransport({
       {controls.map((control) => (
         <button
           type="button"
-          key={control.icon}
+          key={`${control.icon}-${control.label}`}
           aria-label={control.label}
           title={control.label}
           disabled={control.disabled}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={control.action}
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24"><TransportIcon kind={control.icon} /></svg>
+          <Icon name={control.icon} size={16} />
         </button>
       ))}
     </div>

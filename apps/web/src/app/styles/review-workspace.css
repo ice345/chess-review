@@ -19,15 +19,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  transform: translateX(calc((var(--eval-gutter) + 10px) / 2));
-  /* The transform makes this row a stacking context. Chessboard arrows use
-     their own z-index inside the board; without isolating the board they
-     compete in this workspace and paint through the settings menu. */
+  /* Eval gutter left + matching empty gutter right keep this row centred
+     over the board without a translateX that pinned icons to the card edge. */
   position: relative;
   z-index: 24;
 }
 .board-player-header .player-strip { width: auto; flex: 1; margin: 0; transform: none; min-width: 0; }
-.board-toolbar { display: flex; flex: none; gap: 6px; }
+.board-toolbar { display: none; }
+.board-instrument-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 
 /* On a phone the two header controls (menu, flip) plus a player's name do not
    fit one row inside the board width, and the row would push the page sideways.
@@ -42,25 +45,24 @@
 .board-focus-button,
 .board-controls > summary,
 .sound-toggle-button {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   padding: 6px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface-paper);
-  color: var(--ink-secondary);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-muted);
   cursor: pointer;
-  transition: background .16s ease, border-color .16s ease, color .16s ease;
+  transition: color .16s ease, background .16s ease;
 }
 
 .board-flip-button:hover,
 .board-focus-button:hover,
 .board-controls > summary:hover,
 .sound-toggle-button:hover {
-  border-color: var(--line-accent);
-  background: var(--wash-blue);
+  background: color-mix(in srgb, var(--wash-blue) 55%, transparent);
   color: var(--ink-primary);
 }
 
@@ -72,15 +74,15 @@
   height: 100%;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.55;
+  stroke-width: 1.4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .board-focus-button[aria-pressed="true"],
 .sound-toggle-button[aria-pressed="true"] {
-  background: var(--wash-cream);
-  color: var(--accent-brass);
+  background: var(--bluebird-wash);
+  color: var(--bluebird-ink);
 }
 
 .board-controls { position: relative; z-index: 2; }
@@ -140,7 +142,6 @@
   grid-template-columns: 34px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  transform: translateX(calc((var(--eval-gutter) + 10px) / 2));
   color: var(--ink-primary);
 }
 
@@ -223,11 +224,13 @@
 }
 
 .board-stage {
-  width: calc(var(--board-size) + var(--eval-gutter) + 10px);
+  /* Left: eval bar. Right: empty mirror gutter so the board is not flush to
+     the paper edge (user: 左右不对称就很窄). */
+  width: calc(var(--board-size) + (2 * var(--eval-gutter)) + 20px);
   min-height: 0;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: var(--eval-gutter) var(--board-size);
+  grid-template-columns: var(--eval-gutter) var(--board-size) var(--eval-gutter);
   align-items: stretch;
   gap: 10px;
 }
@@ -299,7 +302,6 @@
   width: var(--board-size);
   margin: 4px auto 0;
   display: block;
-  transform: translateX(calc((var(--eval-gutter) + 10px) / 2));
 }
 
 .move-status {
@@ -348,6 +350,7 @@
 .move-transport {
   width: 100%;
   min-height: 46px;
+  overflow-anchor: none;
   display: grid;
   grid-template-columns: repeat(5, 44px);
   justify-content: center;
@@ -387,7 +390,15 @@
 .move-transport svg {
   width: 100%;
   height: 100%;
-  fill: currentColor;
+  /* Prefer Icon stroke; filled play/seek triangles set fill on their path. */
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.move-transport svg path[fill]:not([fill="none"]) {
+  stroke: none;
 }
 
 @media (max-width: 1120px) {
@@ -404,10 +415,14 @@
 @media (max-width: 560px) {
   .position-workspace {
     --board-size: var(--review-board-size);
+    --eval-gutter: 22px;
   }
-
-  .position-workspace {
-    --eval-gutter: 36px;
+  .board-stage {
+    width: 100%;
+    max-width: 100%;
+    gap: 6px;
+    grid-template-columns: var(--eval-gutter) minmax(0, var(--board-size)) var(--eval-gutter);
+    justify-content: center;
   }
 
   .move-transport {
@@ -475,10 +490,21 @@
   border: 0;
 }
 
-/* Board card: paper around the players, board, transport and status. */
+/* Board card: own plane, slightly stronger than surrounding paper.
+   Solid — never translucent over scenery. */
 .board-card {
-  padding: 8px 0 6px;
+  padding: 10px 12px 8px;
   box-sizing: border-box;
+  background: var(--surface-paper);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 4px;
+  box-shadow: var(--shadow-board);
+}
+
+.analysis-column .board-card.paper-panel {
+  box-shadow: var(--shadow-board);
+  background: var(--surface-paper);
+  border-radius: 4px;
 }
 .board-card-header {
   align-items: center;
@@ -501,10 +527,10 @@
 .board-card-meta {
   flex: none;
   color: var(--ink-muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .14em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  text-transform: none;
   white-space: nowrap;
 }
 .board-card-footer {
@@ -513,7 +539,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  transform: translateX(calc((var(--eval-gutter) + 10px) / 2));
 }
 .board-card-footer .board-card-meta {
   margin-left: auto;
@@ -523,9 +548,9 @@
 }
 .board-card .move-dock {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
-  gap: 4px 12px;
+  gap: 4px 10px;
 }
 .board-card .move-transport {
   grid-column: 1;
@@ -536,12 +561,18 @@
   gap: 6px;
   border: 0;
 }
-.board-card .move-status {
+.board-card .board-instrument-tools {
   grid-column: 2;
   grid-row: 1;
+}
+.board-card .move-status {
+  grid-column: 3;
+  grid-row: 1;
   min-height: 44px;
+  max-height: 44px;
   justify-content: flex-end;
   text-align: right;
+  overflow: hidden;
 }
 .board-card .branch-session-note {
   grid-column: 1 / -1;
@@ -555,9 +586,10 @@
    squeezed into a two-pixel column and its text would push the page sideways.
    Stack them: transport, then the position line. */
 @media (max-width: 620px) {
-  .board-card .move-dock { grid-template-columns: minmax(0, 1fr); }
-  .board-card .move-transport { grid-column: 1; grid-row: 1; justify-content: center; }
-  .board-card .move-status { grid-column: 1; grid-row: 2; min-height: 0; justify-content: flex-start; text-align: left; }
+  .board-card .move-dock { grid-template-columns: auto minmax(0, 1fr); }
+  .board-card .move-transport { grid-column: 1; grid-row: 1; justify-content: start; }
+  .board-card .board-instrument-tools { grid-column: 2; grid-row: 1; justify-self: end; }
+  .board-card .move-status { grid-column: 1 / -1; grid-row: 2; min-height: 0; justify-content: flex-start; text-align: left; }
 }
 
 @media (max-width: 560px) {
@@ -583,3 +615,20 @@
 }
 
 
+
+/* Bluebird desk — batch one. */
+/* Player identity gets a whole line instead of competing with three tools. */
+.board-card-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; }
+.board-card-header .player-strip { grid-column: 1 / -1; width: 100%; }
+.board-card-header .board-card-accuracy { grid-column: 1; grid-row: 2; }
+.board-card-header .board-card-turn { grid-column: 1; grid-row: 3; }
+.board-card-header .board-toolbar { grid-column: 2; grid-row: 2 / 4; margin-left: 0; }
+.board-card .player-name strong, .board-card .player-name small { white-space: normal; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; }
+.board-card .player-name small { font-size: 10px; letter-spacing: .03em; }
+.board-card-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.board-card-footer .board-card-meta { grid-column: 1 / -1; width: 100%; max-width: 100%; margin: 0; }
+@media (max-width: 560px) {
+  .board-card-footer .board-card-meta { display: none; }
+  .board-card-accuracy { font-size: 11px; white-space: normal; line-height: 1.4; }
+  .board-card-header .board-card-turn { letter-spacing: .04em; }
+}

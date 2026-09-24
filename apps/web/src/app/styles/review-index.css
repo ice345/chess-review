@@ -106,6 +106,13 @@
   gap: 8px;
   text-align: center;
 }
+.review-index-empty:not(.scene-sheet) {
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 
 .review-index-empty h2 {
   margin: 0;
@@ -143,3 +150,6 @@
     transition-duration: .01ms !important;
   }
 }
+.review-index-empty .desk-empty-state { text-align: left; }
+.review-index-empty .desk-empty-state h2 { font: 500 clamp(24px, 3vw, 32px)/1.2 var(--font-serif); }
+.review-index-empty .desk-empty-state p { margin: 12px 0 20px; }
