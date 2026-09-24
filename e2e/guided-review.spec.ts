@@ -9,6 +9,10 @@ import { seedReview, writeStores } from "./fixtures";
  * faults, because a practisable moment needs canonical engine evidence for a
  * better move than the one played. */
 
+function reviewEnd(page: import("@playwright/test").Page) {
+  return page.getByRole("region", { name: /Review (complete|summary)/ });
+}
+
 async function openGuidedReview(page: import("@playwright/test").Page) {
   const fixture = await seedReview(page, { visualLabels: true });
   const moment = fixture.analysis.moves[1]!;
@@ -105,7 +109,7 @@ test("practises a key moment with a hint before the answer", async ({ page }) =>
   // A hinted position is reported as hinted, never as solved, even after the
   // solution was viewed.
   await page.locator(".key-moment-finish").getByRole("button", { name: /Finish review/ }).click();
-  const completion = page.getByRole("region", { name: "Review complete" });
+  const completion = reviewEnd(page);
   await expect(completion).toContainText("Solved 0, hinted 1.");
   await expect(completion).toContainText("A hinted position is not counted as solved.");
   // A blind attempt is not a review of an answer that was already on screen.
@@ -165,7 +169,7 @@ test("marks practice that follows an answer the visitor already saw", async ({ p
   await page.getByText("Export", { exact: true }).click();
 
   await page.locator(".key-moment-finish").getByRole("button", { name: /Finish review/ }).click();
-  const completion = page.getByRole("region", { name: "Review complete" });
+  const completion = reviewEnd(page);
   await expect(completion).toContainText("1 of them followed a position whose analysis you had already seen");
 });
 
@@ -173,7 +177,7 @@ test("adds this game's positions to Training from the end of the review", async 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openGuidedReview(page);
   await page.locator(".key-moment-finish").getByRole("button", { name: /Finish review/ }).click();
-  const completion = page.getByRole("region", { name: "Review complete" });
+  const completion = reviewEnd(page);
 
   // The manual import has no learner, so the visitor names the side; the offer
   // starts on the side that actually recorded a trainable position.
@@ -193,7 +197,7 @@ test("counts what was actually viewed when the review ends early", async ({ page
   // The board starts before the only moment, so nothing has been viewed yet.
   await page.locator(".key-moment-finish").getByRole("button", { name: "Finish review early" }).click();
 
-  const completion = page.getByRole("region", { name: "Review complete" });
+  const completion = reviewEnd(page);
   await expect(completion).toContainText("0 of 1 key moment viewed");
   await expect(completion).toContainText("1 moment is still unseen");
   await expect(completion).not.toContainText(/reviewed/);
@@ -222,7 +226,8 @@ test("ends the review with canonical facts and a next step", async ({ page }) =>
   await expect(finish).toContainText("You have seen every key moment.");
   await finish.getByRole("button", { name: "Finish review" }).click();
 
-  const completion = page.getByRole("region", { name: "Review complete" });
+  const completion = reviewEnd(page);
+  await expect(completion).toHaveAccessibleName("Review complete");
   await expect(completion).toContainText("The only key moment was viewed");
   // The record is a manual import, so the summary covers both sides and states
   // the mover instead of pretending one of them is the visitor.
@@ -234,8 +239,31 @@ test("ends the review with canonical facts and a next step", async ({ page }) =>
   await expect(completion).toContainText("No position from this game is in Practice yet.");
   await expect(completion.getByRole("link", { name: "Open Practice" })).toHaveAttribute("href", "/training");
   await expect(completion.getByRole("link", { name: "Study this game" })).toBeVisible();
+  await expect(completion.locator(".bluebird-motif")).toHaveCount(0);
+  await page.screenshot({ path: "/tmp/bluebird-revision/review-complete-1440.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "/tmp/bluebird-revision/review-complete-390.png" });
+  const overflowX = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflowX, "phone review must not scroll sideways").toBe(0);
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   // The summary is a state, not a trap: the guided navigation returns.
   await completion.getByRole("button", { name: "Back to key moments" }).click();
   await expect(page.locator(".key-moment-nav")).toBeVisible();
+});
+
+test("clicking next move does not scroll the document", async ({ page }) => {
+  const { record } = await seedReview(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`/review/${record.id}`);
+  const next = page.getByRole("button", { name: "Next move" });
+  await expect(next).toBeVisible();
+  await next.click();
+  const before = await page.evaluate(() => ({ y: window.scrollY, top: document.querySelector(".move-transport")?.getBoundingClientRect().top ?? 0 }));
+  await next.click();
+  await page.screenshot({ path: "/tmp/bluebird-revision/review-after-next.png" });
+  await next.click();
+  const after = await page.evaluate(() => ({ y: window.scrollY, top: document.querySelector(".move-transport")?.getBoundingClientRect().top ?? 0 }));
+  expect(after.y).toBe(before.y);
+  expect(Math.abs(after.top - before.top)).toBeLessThan(2);
 });

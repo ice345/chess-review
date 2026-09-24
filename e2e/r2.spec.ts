@@ -30,7 +30,22 @@ test("multi-game files require an explicit selection and import only that game",
   await expect(page).toHaveURL(/\/review\/[a-f0-9]+$/);
   await expect(page.locator(".review-titlebar")).toContainText("Mei vs Yuki");
   await page.goto("/history");
-  await expect(page.locator(".history-list > article")).toHaveCount(1);
+  await expect(page.locator(".library-score")).toHaveCount(1);
+});
+
+test("Library filters are chips on a programme, not a collapsed filter card", async ({ page }) => {
+  await seedReview(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/history");
+  await expect(page.getByRole("group", { name: "Source" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "All", exact: true }).first()).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".library-month h2")).toHaveCount(1);
+  await expect(page.locator(".library-movement")).toHaveText("I");
+  await expect(page.locator(".library-score")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Open →" })).toBeVisible();
+  await page.screenshot({ path: "/tmp/bluebird-revision/library-1280.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "/tmp/bluebird-revision/library-390.png" });
 });
 
 test("pasted collections use the same game chooser", async ({ page }) => {

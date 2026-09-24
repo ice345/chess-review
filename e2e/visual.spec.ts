@@ -80,7 +80,7 @@ test("representative Phase 5.3 workspace states", async ({ page }) => {
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/history");
-  await expect(page.locator(".history-list > article, .history-list > a")).toHaveCount(60);
+  await expect(page.locator(".library-score")).toHaveCount(60);
   await settle(page);
   await expect(page).toHaveScreenshot("library-1920.png");
 

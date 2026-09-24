@@ -368,21 +368,21 @@ test("page head, board card and panel rows compose the review", async ({ page },
   await page.goto(`/review/${fixture.record.id}`);
   await expect(page.getByRole("region", { name: "Persistent board workspace" })).toBeVisible();
 
-  const head = page.locator(".review-head-slot > .page-head");
-  await expect(head.locator(".page-kicker")).toBeVisible();
-  await expect(head.locator(".page-display")).toBeVisible();
-  await expect(head.locator(".page-steps")).toBeVisible();
-  await expect(head.locator('.page-steps [data-step="current"]')).toHaveCount(1);
+  const title = page.locator(".review-titlebar .review-title h1");
+  await expect(title).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Review sections" })).toBeVisible();
 
   const card = page.locator(".board-card");
   await expect(card).toBeVisible();
   await expect(card.locator(".board-wrap")).toBeVisible();
   await expect(card.locator(".move-transport")).toBeVisible();
+  await expect(card.locator(".board-instrument-tools")).toBeVisible();
 
   const panel = page.locator(".objective-route");
   await expect(panel.getByText("Moves, quality and accuracy")).toBeVisible();
-  await expect(panel.getByText("GAME SUMMARY", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Game summary and timeline")).toBeVisible();
   await expect(panel.getByText("Engine lines")).toBeVisible();
+  await page.screenshot({ path: "/tmp/bluebird-revision/review-desk-1440.png" });
 
   const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
@@ -395,8 +395,8 @@ test("page head, board card and panel rows compose the review", async ({ page },
     await page.setViewportSize({ width, height });
     // Below 560px the head keeps its display line and gives up the kicker: a phone
     // has to reach the move transport on its first screen.
-    await expect(head.locator(".page-display")).toBeVisible();
-    if (width > 560) await expect(head.locator(".page-kicker")).toBeVisible();
+    await expect(title).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Review sections" })).toBeVisible();
     await expect(card.locator(".move-transport")).toBeVisible();
     expect(await noOverflow(), `${width}×${height} start overflow`).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(name) });
@@ -406,9 +406,7 @@ test("page head, board card and panel rows compose the review", async ({ page },
   await page.getByRole("button", { name: "First key moment" }).click();
 
   await expect(page.locator(".review-mode-panel")).toHaveAttribute("data-mode", "moment");
-  await expect(head.locator(".page-kicker")).toBeVisible();
-  await expect(head.locator(".page-display")).toBeVisible();
-  await expect(head.locator('.page-steps [data-step="current"]')).toHaveCount(1);
+  await expect(title).toBeVisible();
   await expect(card.locator(".board-wrap")).toBeVisible();
   await expect(card.locator(".move-transport")).toBeVisible();
   await expect(panel.getByText("Nearby moves")).toBeVisible();

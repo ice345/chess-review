@@ -27,6 +27,40 @@ async function chooseBackup(page: Page, buffer: Buffer) {
   await page.getByLabel("Choose library backup").setInputFiles({ name: "library.json", mimeType: "application/json", buffer });
 }
 
+test("switching Your game chapters does not scroll the page", async ({ page }) => {
+  await mockLocalAi(page, "offline");
+  await seedAdvancedStudy(page, { reportPopulation: true });
+  await page.goto("/stats");
+  await expect(page.getByRole("heading", { name: "Your game", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Openings" }).click();
+  await expect(page.locator("#openings")).toBeVisible();
+  await page.evaluate(() => window.scrollBy(0, 240));
+  const before = await page.evaluate(() => window.scrollY);
+  expect(before).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Endgame" }).click();
+  await expect(page.locator("#endgame")).toBeVisible();
+  const after = await page.evaluate(() => window.scrollY);
+  expect(Math.abs(after - before)).toBeLessThan(8);
+});
+
+test("Practice keeps today's task; Stats hosts the player report", async ({ page }) => {
+  await mockLocalAi(page, "offline");
+  await seedAdvancedStudy(page, { reportPopulation: true });
+  await page.goto("/training");
+  await expect(page.getByRole("heading", { name: "Practice" })).toBeVisible();
+  await expect(page.locator(".study-nav")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /live on Stats/ })).toBeVisible();
+  await page.screenshot({ path: "/tmp/bluebird-revision/practice-1280.png" });
+  await page.goto("/stats");
+  await expect(page.getByRole("heading", { name: "Your game", exact: true })).toBeVisible();
+  await expect(page.getByText("Whose games")).toBeVisible();
+  await expect(page.locator(".study-nav")).toBeVisible();
+  await expect(page.locator(".study-ink-stats")).toContainText("5");
+  await page.screenshot({ path: "/tmp/bluebird-revision/stats-your-game.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "/tmp/bluebird-revision/stats-390.png" });
+});
+
 test("Training leads with today's task and opens it without hunting the report", async ({ page }) => {
   const { games, task } = await seedTask(page);
   const today = page.getByRole("region", { name: "Today's training" });

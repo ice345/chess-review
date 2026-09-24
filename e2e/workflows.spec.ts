@@ -481,9 +481,9 @@ test("keeps Coach generation alive across review routes, guards rapid calls, and
 test("renders a large connected Library progressively", async ({ page }) => {
   await seedConnectedLibrary(page, 84);
   await page.goto("/history");
-  await expect(page.locator(".history-game")).toHaveCount(60);
+  await expect(page.locator(".library-score")).toHaveCount(60);
   await page.getByRole("button", { name: /Load 24 more/ }).click();
-  await expect(page.locator(".history-game")).toHaveCount(84);
+  await expect(page.locator(".library-score")).toHaveCount(84);
 });
 
 test("offers first-run whole-history analysis and persists bulk cancellation", async ({ page }) => {
@@ -608,7 +608,7 @@ test("starts objective analysis automatically after full-history import", async 
   await expect(page.locator(".study-player-select select")).toHaveValue("account:chesscom:hikaru", { timeout: 10_000 });
   // The imported population is small, so the report stays folded and Training
   // reports the run the import started instead.
-  await expect(page.locator(".study-player-select")).toContainText("1 games", { timeout: 10_000 });
+  await expect(page.locator(".study-player-select")).toContainText("1 game", { timeout: 10_000 });
   await expect(page.locator(".history-run-heading")).toContainText("Analysis runs", { timeout: 10_000 });
 });
 
@@ -631,14 +631,16 @@ test("resumes a persisted whole-history job to completion", async ({ page }) => 
 
 test("builds advanced study evidence and persists an actionable training queue", async ({ page }) => {
   const fixtures = await seedAdvancedStudy(page, { reportPopulation: true });
-  await page.goto("/training");
+  await page.goto("/stats");
 
-  await expect(page.getByRole("heading", { name: "Practice" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your game", exact: true })).toBeVisible();
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await expect(page.locator(".study-ink-stats")).toContainText("5");
   await expect(page.getByText("No platform rating in this scope", { exact: true })).toBeVisible();
 
-  await page.getByText("Change scope", { exact: true }).click();
+  if (await page.getByText("Change scope", { exact: true }).count()) {
+    await page.getByText("Change scope", { exact: true }).click();
+  }
   await page.getByLabel("Color").selectOption("black");
   await expect(page.locator(".study-overview .study-ink-stats span").filter({ hasText: "Games" }).locator("strong")).toHaveText("0");
   // An empty scope is neither covered nor partial, and the Coverage view has to say so.
@@ -659,13 +661,13 @@ test("builds advanced study evidence and persists an actionable training queue",
   await openingEvidence.click();
   await expect(page).toHaveURL(new RegExp(`${openingHref!.replace(/[?]/g, "\\?")}$`));
 
-  await page.goto("/training");
+  await page.goto("/stats");
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await page.getByRole("button", { name: "Highlights", exact: true }).click();
   await page.getByRole("link", { name: "Open in Review →" }).first().click();
   await expect(page).toHaveURL(new RegExp(`/review/${fixtures[0]!.record.id}/moves\\?ply=5$`));
 
-  await page.goto("/training");
+  await page.goto("/stats");
   await expect(page.locator(".study-player-select select")).toHaveValue("manual:ada");
   await page.getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.locator("#training-plan").getByText("Opening decisions", { exact: true })).toBeVisible();
@@ -674,6 +676,7 @@ test("builds advanced study evidence and persists an actionable training queue",
   const missedCard = page.locator(".weakness-grid > article").filter({ hasText: "Missed opportunities" });
   await missedCard.getByRole("button", { name: "Add to queue" }).click();
   await expect(page.getByRole("status")).toContainText("added to the training queue");
+  await page.goto("/training");
   await expect(page.locator(".training-list")).toContainText("Missed opportunities");
 
   await page.locator(".training-list").getByRole("button", { name: "Start review" }).click();

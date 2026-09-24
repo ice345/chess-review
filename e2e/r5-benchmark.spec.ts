@@ -32,15 +32,14 @@ for (const count of [1_000, 10_000]) {
     measurements.coldMs = performance.now() - started;
     if (!legacy) expect(measurements.coldMs).toBeLessThan(5_000);
     measurements.longTasksMs = await page.evaluate(() => (window as unknown as { benchmarkLongTasks: number[] }).benchmarkLongTasks);
-    expect(await page.locator(".history-list > article").count()).toBe(60);
+    expect(await page.locator(".library-score").count()).toBe(60);
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     started = performance.now();
     await page.getByRole("link", { name: "Library", exact: true }).click();
     await expect(page.locator(".history-summary")).toContainText(`${count} All records`);
     measurements.revisitMs = performance.now() - started;
-    await page.locator(".history-scope > summary").click();
     started = performance.now();
-    await page.getByPlaceholder("Player or event").fill(`Player ${count - 1} vs`);
+    await page.getByPlaceholder("Search a player, opening, or event").fill(`Player ${count - 1} vs`);
     await expect(page.locator(".history-summary")).toContainText("1 All records");
     measurements.searchMs = performance.now() - started;
     measurements.storage = await page.evaluate(async () => navigator.storage.estimate());
