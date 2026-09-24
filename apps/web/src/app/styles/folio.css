@@ -1,0 +1,91 @@
+/* Folio / index — moderate chapter-notebook furniture (Windowlight climate).
+   Hairline ruled rows on a scene-sheet; not Kylin ghost-numeral matrices. */
+
+.folio-index.scene-sheet,
+.folio-index.paper-panel {
+  padding: 10px 18px 14px;
+}
+
+.folio-index .history-summary,
+.folio-index .study-ink-stats {
+  margin: 6px 0 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.folio-index .history-scope,
+.folio-index .study-scope {
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line-soft) 80%, transparent);
+}
+
+.folio-index .ink-row,
+.folio-index .history-game,
+.folio-index .review-index-row {
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+}
+
+.folio-index .ink-row:hover,
+.folio-index .history-game:hover {
+  background: color-mix(in srgb, var(--wash-blue) 28%, transparent);
+}
+
+.folio-index time {
+  color: var(--ink-muted);
+  font-size: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.folio-index .utility-empty {
+  margin: 8px 0 4px;
+  border-style: solid;
+}
+
+/* Quiet board caption — photo label, not HUD */
+.board-card-meta {
+  display: block;
+  margin: 0;
+  padding: 0 2px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  line-height: 1.35;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-card-footer .board-card-meta {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin-top: 2px;
+  opacity: .92;
+}
+
+/* Bluebird chapter openings: shared alignment, one feather at the paper edge. */
+.folio-heading {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px 28px;
+  padding: 30px 0 22px 20px;
+  margin-block: 12px 18px;
+  border-left: 2px solid color-mix(in srgb, var(--bluebird-ink) 35%, transparent);
+}
+.folio-heading-copy { min-width: 0; }
+.folio-heading .page-kicker { margin: 0 0 12px; }
+.folio-heading .page-display { font: 500 clamp(28px, 3vw, 42px)/1.16 var(--font-serif); max-width: 25ch; }
+.folio-heading .page-lede { margin: 12px 0 0; max-width: 54ch; }
+.folio-heading-feather { position: absolute; top: 12px; right: 4px; width: 30px; height: 45px; opacity: .7; transform: rotate(18deg); }
+.folio-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.folio-heading-actions a { min-height: 44px; display: inline-flex; align-items: center; }
+.folio-heading-actions .primary-link { padding: 0 18px; }
+@media (max-width: 700px) {
+  .folio-heading { grid-template-columns: minmax(0, 1fr); padding: 18px 0 16px 14px; gap: 12px; margin-block: 6px 14px; }
+  .folio-heading-copy { padding-right: 24px; }
+  .folio-heading-feather { width: 21px; height: 32px; }
+}
