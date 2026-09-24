@@ -102,13 +102,16 @@ async function handleRequest(request: Request, signal: AbortSignal) {
   const games: SyncedGame[] = rawGames
     .filter((game) => game.pgn && game.end_time && game.end_time * 1000 > sinceMs)
     .slice(0, limit)
-    .map((game) => {
+    .flatMap((game) => {
       const externalGameId = game.url?.split("/").filter(Boolean).at(-1) ?? `${game.end_time}-${game.white?.username}-${game.black?.username}`;
       const whiteName = game.white?.username ?? "White";
       const blackName = game.black?.username ?? "Black";
+      const whiteMatch = whiteName.toLowerCase() === normalizedUsername;
+      const blackMatch = blackName.toLowerCase() === normalizedUsername;
+      if (!whiteMatch && !blackMatch) return [];
       const whiteResult = normalizedResult(game.white?.result);
       const blackResult = normalizedResult(game.black?.result);
-      return {
+      return [{
         id: `chesscom:${externalGameId}`,
         external: { provider: "chesscom", externalGameId, accountId: account.id, username: account.username, ...(game.url ? { url: game.url } : {}), importedAt: now },
         pgn: game.pgn!,
@@ -118,10 +121,10 @@ async function handleRequest(request: Request, signal: AbortSignal) {
         ...(game.rated === undefined ? {} : { rated: game.rated }),
         white: { username: whiteName, ...(game.white?.rating === undefined ? {} : { rating: game.white.rating }), ...(whiteResult === undefined ? {} : { result: whiteResult }) },
         black: { username: blackName, ...(game.black?.rating === undefined ? {} : { rating: game.black.rating }), ...(blackResult === undefined ? {} : { result: blackResult }) },
-        accountColor: whiteName.toLowerCase() === normalizedUsername ? "white" : "black",
+        accountColor: whiteMatch ? "white" as const : "black" as const,
         analyzed: false,
         syncedAt: now,
-      };
+      }];
     });
   const updatedAccount: PlatformAccount = done ? { ...account, lastSyncAt: now } : account;
   return Response.json({

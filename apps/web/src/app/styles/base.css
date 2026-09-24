@@ -22,8 +22,19 @@ button:disabled { opacity: .42; cursor: default; }
 .kicker, .eyebrow { color: var(--ink-secondary); font-size: var(--type-label); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .error { color: var(--danger); font-size: 12px; line-height: 1.5; }
 .primary, .secondary, .primary-link { min-height: 40px; padding: 0 15px; border-radius: 10px; font-weight: 760; cursor: pointer; }
-.primary, .primary-link { border: 0; background: var(--accent-primary); color: var(--accent-ink); box-shadow: var(--shadow-paper); }
-.primary:hover, .primary-link:hover { background: var(--accent-hover); }
+/* Quiet window CTA family — pale fill + hairline + ink (not navy SaaS brick). Danger stays separate. */
+.primary, .primary-link {
+  border: 1px solid color-mix(in srgb, var(--bluebird-ink) 42%, var(--line));
+  background: color-mix(in srgb, var(--bluebird-wash) 90%, #fff);
+  color: var(--bluebird-ink);
+  box-shadow: none;
+  font-weight: 650;
+}
+.primary:hover, .primary-link:hover {
+  background: var(--bluebird-wash);
+  border-color: var(--bluebird-ink);
+  color: var(--ink-primary);
+}
 .secondary { border: 1px solid var(--line); background: var(--surface-paper); color: var(--ink-secondary); }
 .secondary:hover { background: var(--wash-blue); }
 .secondary.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 28%, var(--line)); }

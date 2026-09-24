@@ -18,6 +18,11 @@
   line-height: 1.55;
 }
 .connected-accounts-quiet a { color: var(--accent-primary); }
+.account-link-name {
+  color: var(--ink-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
 .account-link-inline {
   margin-top: 8px;
   display: flex;
@@ -177,24 +182,62 @@
   place-items: center;
   flex: none;
   box-sizing: border-box;
-  border: 1.25px solid currentColor;
-  border-radius: 4px;
-  color: var(--ink-secondary);
+  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: 3px;
+  color: var(--ink-muted);
   font-family: var(--font-sans);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
+  opacity: .9;
   user-select: none;
+}
+/* Chess.com: official pawn silhouette in brand green — never reuse that green on chrome. */
+.provider-mark--color {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  opacity: 1;
+  overflow: visible;
+  padding: 0;
+  box-sizing: border-box;
+}
+.provider-mark--color img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* Lichess: single-ink silhouette tinted to Windowlight cool ink */
+.provider-mark--image {
+  border: 0;
+  border-radius: 0;
+  background-color: var(--ink-secondary);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  opacity: .92;
+}
+.source-chip .provider-mark--image,
+.account-link-card .provider-mark--image,
+.account-link-inline .provider-mark--image,
+.stats-row .provider-mark--image,
+.home-sources .provider-mark--image {
+  color: var(--ink-secondary);
+  background-color: var(--ink-secondary);
 }
 .source-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--ink-muted);
-  font-size: var(--type-label);
-  font-weight: 800;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: none;
   white-space: nowrap;
 }
 .account-face {
@@ -354,3 +397,7 @@
   .account-link-card > div:last-child { flex-wrap: wrap; }
   .account-link-card input { flex: 1 1 120px; width: 120px; }
 }
+/* Account fallback is a graphic, not username initials. Keep it centered, away
+   from the separate provider badge at the corner. */
+.platform-avatar b .provider-mark { position: static; }
+.platform-avatar b .provider-mark--image { background-color: var(--ink-secondary); }

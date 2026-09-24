@@ -5,194 +5,62 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import { playLegalBoardMove } from "@chess-review/chess-core";
-import type { PlatformAccount, SyncedGame } from "@chess-review/shared";
-import { ProviderMark, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
+import type { SyncedGame } from "@chess-review/shared";
+import { Icon, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
 import { useBoardPieces } from "../hooks/use-board-pieces";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import type { LibrarySnapshot } from "../lib/library-snapshot";
-import { listPlatformAccounts } from "../lib/platform-library";
 import { buildReviewRecord, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { externalGameKey } from "../lib/review-status";
-import { ImportForm, STARTING_FEN, openSyncedGameRecord, type ImportPreview } from "./import-desk";
-
-
-
-interface PlayedMove {
-  fen: string;
-  san: string;
-}
-
-function boardMeta(played: readonly PlayedMove[]): string {
-  if (played.length === 0) return "BOARD";
-  const last = played[played.length - 1]!;
-  const moveNumber = Math.ceil(played.length / 2);
-  return `BOARD ${moveNumber}${played.length % 2 === 0 ? "…" : ""} ${last.san}`;
-}
-
-function playedLine(played: readonly PlayedMove[]): string {
-  const recent = played.slice(-2);
-  const start = played.length - recent.length;
-  return recent.map((move, index) => {
-    const ply = start + index;
-    return ply % 2 === 0 ? `${Math.floor(ply / 2) + 1}. ${move.san}` : move.san;
-  }).join(" ");
-}
-
+import { STARTING_FEN, openSyncedGameRecord } from "./import-desk";
 
 export function HomeWorkspace() {
-  const pieces = useBoardPieces();
-  const router = useRouter();
-  const [preview, setPreview] = useState<ImportPreview>({ fen: STARTING_FEN, previewable: false, kind: "pgn", hasInput: false });
-  const [played, setPlayed] = useState<PlayedMove[]>([]);
-  const [opening, setOpening] = useState(false);
-  const { snapshot, error: libraryError, loading: libraryLoading, refresh: refreshLibrary } = useLibrarySnapshot();
-  const recent = snapshot?.records.slice(0, 6) ?? [];
-  const syncedGames = snapshot?.games.slice(0, 8) ?? [];
-  const interactive = !preview.hasInput;
-  const fen = preview.hasInput ? preview.fen : (played.at(-1)?.fen ?? STARTING_FEN);
-
-  async function openPosition() {
-    if (opening) return;
-    setOpening(true);
-    try {
-      const record = await saveReviewRecord(await buildReviewRecord("fen", fen), { restoreDeleted: true });
-      router.push(`/review/${record.id}/engine`);
-    } catch {
-      setOpening(false);
-    }
-  }
-
-  return (
-    <main className="page-scroll home-page">
-      <div className="home-scene">
-        <section className="page-head head-threshold">
-          <p className="page-kicker">Open Chess Review</p>
-          <h1 className="page-display">A quieter desk for your games.</h1>
-          <p className="page-lede">
-            Play, paste or open a game and the desk reads it once: what mattered, what you could have
-            tried, and what to practise next. Everything stays on this machine.
-          </p>
-          <p className="page-steps">
-            <span>Import</span><span>Key moment</span><span>Practice</span><span>Evidence</span><span>Keep</span>
-          </p>
-        </section>
-
-        <div className="home-import">
-          <ImportForm surface="instrument" onPreview={setPreview} />
-          {libraryError && <p className="error" role="alert">{libraryError} <button type="button" className="text-button" disabled={libraryLoading} onClick={() => void refreshLibrary()}>Retry loading games</button></p>}
-        </div>
-
-        <figure className="home-board paper-panel">
-          <div className="board-card-head">
-            <span className="board-card-pip" aria-hidden="true" />
-            <div>
-              <h2>{preview.hasInput ? (preview.kind === "fen" ? "This position" : "PGN preview") : "Start from a position"}</h2>
-              <p>{
-                preview.hasInput
-                  ? (preview.previewable
-                    ? (preview.kind === "fen" ? "Pasted FEN." : "Opening position of the pasted game.")
-                    : "Could not preview this input.")
-                  : played.length > 0
-                    ? `Position after ${playedLine(played)}.`
-                    : "Drag a piece to make a move, or paste a PGN on the right."
-              }</p>
-            </div>
-            <span className="board-card-meta">{boardMeta(interactive ? played : [])}</span>
-          </div>
-          <div className="home-board-frame" {...(interactive ? { "aria-label": "Start from a position" } : { "aria-hidden": true })}>
-            <Chessboard options={{
-              ...WINDOWLIGHT_BOARD_APPEARANCE,
-              position: fen,
-              pieces,
-              allowDragging: interactive,
-              canDragPiece: () => interactive,
-              allowDrawingArrows: false,
-              boardOrientation: "white",
-              showNotation: true,
-              onPieceDrop: ({ sourceSquare, targetSquare }) => {
-                if (!interactive || !targetSquare) return false;
-                try {
-                  const move = playLegalBoardMove(fen, { from: sourceSquare, to: targetSquare });
-                  setPlayed((current) => [...current, { fen: move.fenAfter, san: move.san }]);
-                  return true;
-                } catch {
-                  return false;
-                }
-              },
-            }} />
-
-          </div>
-          <div className="board-card-dock">
-            <div className="home-board-transport">
-              <button type="button" disabled={played.length === 0 || !interactive} onClick={() => setPlayed([])}>Reset</button>
-              <button type="button" disabled={played.length === 0 || !interactive} onClick={() => setPlayed((current) => current.slice(0, -1))}>Undo</button>
-            </div>
-            {played.length > 0 && interactive ? (
-              <button type="button" className="text-button home-open-lab" disabled={opening} onClick={() => void openPosition()}>
-                {opening ? "Opening…" : "Open in Engine Lab →"}
-              </button>
-            ) : null}
-            <figcaption className="board-card-foot">{
-              !preview.hasInput
-                ? played.length === 0
-                  ? "Starting position · plain board, no engine running"
-                  : `Position · after ${playedLine(played)}`
-                : !preview.previewable
-                  ? "Could not preview this input"
-                  : preview.kind === "fen" ? "This position · plain board, no engine running" : "Opening position of the pasted game · plain board, no engine running"
-            }</figcaption>
-          </div>
-        </figure>
-
-        <HomeSources games={snapshot?.games ?? []} />
-        <HomeContinue
-          records={recent}
-          games={syncedGames}
-          statuses={snapshot?.statuses}
-          loading={libraryLoading && !snapshot}
-          onOpened={refreshLibrary}
-        />
-
-        <p className="product-help-link"><Link href="/help">Help, capabilities and data privacy →</Link></p>
-
+  const { snapshot, error, loading, refresh } = useLibrarySnapshot();
+  const latest = snapshot?.records[0];
+  const href = latest ? `/review/${latest.id}${latest.kind === "fen" ? "/engine" : ""}` : "/import";
+  return <main className="page-scroll bluebird-home">
+    <section className="bluebird-hero" aria-label="Home prelude">
+      <div className="bluebird-hero-inside">
+        <p className="page-kicker">A quiet place to understand chess</p>
+        <h1>Between each move,<br />a little more possibility.</h1>
+        <p>Return to a game. Understand a choice.<br />Take something new into the next one.</p>
+        <Link className="primary-link" href={href}>{latest ? "Return to your game" : "Import your first game"} →</Link>
       </div>
-    </main>
-  );
+    </section>
+    {error && <p role="alert" className="error">{error} <button type="button" className="text-button" disabled={loading} onClick={() => void refresh()}>Retry loading games</button></p>}
+    <div className="home-desk-heading"><h2>Start here today</h2><span>Your study desk</span></div>
+    <div className="home-next-grid">
+      <section><p className="page-kicker">On your desk</p><h2>{latest ? latest.title : "Your first game awaits."}</h2><p>{loading && !snapshot ? "Opening your library…" : latest ? snapshot?.statuses.get(latest.id)?.label ?? "Saved in this browser" : "Bring a PGN or a position into your personal library."}</p><Link className="text-button" href={href}>{latest ? "Continue" : "Bring a game in"} →</Link></section>
+      <section><p className="page-kicker">Practice</p><h2>Make understanding a habit.</h2><p>Revisit decisions from your own games, one position at a time.</p><Link className="text-button" href="/training">Visit Practice →</Link></section>
+    </div>
+    <HomeContinue records={snapshot?.records.slice(0,6) ?? []} games={snapshot?.games.slice(0,8) ?? []} statuses={snapshot?.statuses} loading={loading && !snapshot} onOpened={refresh} />
+    <details className="home-position-tools"><summary>Explore a position <span>Open a board without importing a game</span></summary><PositionDesk /></details>
+    <p className="home-footer"><Link href="/import">Import or connect an account →</Link><Link href="/help">Help and data privacy →</Link></p>
+  </main>;
 }
 
-function HomeSources({ games }: { games: readonly SyncedGame[] }) {
-  const [accounts, setAccounts] = useState<PlatformAccount[] | null>(null);
-  useEffect(() => {
-    void listPlatformAccounts().then(setAccounts);
-  }, []);
-
-  const chesscom = accounts?.find((account) => account.provider === "chesscom");
-  const lichess = accounts?.find((account) => account.provider === "lichess");
-  const chesscomCount = games.filter((game) => game.external.provider === "chesscom").length;
-  const lichessCount = games.filter((game) => game.external.provider === "lichess").length;
-
-  return (
-    <section className="home-sources">
-      <div className="panel-heading">
-        <h2>Sources</h2>
-        <Link className="text-button" href="/settings#connected-accounts">Manage</Link>
-      </div>
-      <ul className="home-account-rows">
-        <li>
-          <ProviderMark provider="chesscom" decorative />
-          <span>Chess.com</span>
-          <strong>{chesscom ? chesscom.username : "Not connected"}</strong>
-          <em>{chesscom ? `${chesscomCount} ${chesscomCount === 1 ? "game" : "games"}` : ""}</em>
-        </li>
-        <li>
-          <ProviderMark provider="lichess" decorative />
-          <span>Lichess</span>
-          <strong>{lichess ? lichess.username : "Not connected"}</strong>
-          <em>{lichess ? `${lichessCount} ${lichessCount === 1 ? "game" : "games"}` : ""}</em>
-        </li>
-      </ul>
-    </section>
-  );
+function PositionDesk() {
+  const pieces = useBoardPieces();
+  const router = useRouter();
+  const [played, setPlayed] = useState<{ fen: string; san: string }[]>([]);
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fen = played.at(-1)?.fen ?? STARTING_FEN;
+  async function openPosition() {
+    if (opening) return;
+    setOpening(true); setError(null);
+    try {
+      const record = await saveReviewRecord(await buildReviewRecord("fen",fen), { restoreDeleted:true });
+      router.push(`/review/${record.id}/engine`);
+    } catch { setError("Could not open this position. Please try again."); setOpening(false); }
+  }
+  return <div className="position-desk">
+    <div className="position-desk-board"><Chessboard options={{ ...WINDOWLIGHT_BOARD_APPEARANCE, position:fen, pieces, allowDragging:!opening, allowDrawingArrows:false, showNotation:true, onPieceDrop:({sourceSquare,targetSquare})=> {
+      if (!targetSquare || opening) return false;
+      try { const move=playLegalBoardMove(fen,{from:sourceSquare,to:targetSquare}); setPlayed(current=>[...current,{fen:move.fenAfter,san:move.san}]); return true; } catch { return false; }
+    } }} /></div>
+    <section><p className="page-kicker">Position desk</p><h2>Follow your curiosity.</h2><p>Move pieces to reach a position, then open it in Engine Lab.</p><p>{played.length ? `After ${played.at(-1)?.san}` : "Starting position · no engine running"}</p><div className="position-actions"><button type="button" className="secondary" disabled={!played.length || opening} aria-label="Undo" onClick={()=>setPlayed(current=>current.slice(0,-1))}><Icon name="undo" /> Undo</button><button type="button" className="secondary" disabled={!played.length || opening} onClick={()=>setPlayed([])}><Icon name="reset" /> Reset</button></div><button type="button" className="primary" disabled={opening} onClick={()=>void openPosition()}>{opening ? "Opening…" : "Open in Engine Lab →"}</button>{error && <p role="alert" className="error">{error}</p>}</section>
+  </div>;
 }
 
 function HomeContinue({
@@ -211,6 +79,16 @@ function HomeContinue({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [compactMobile, setCompactMobile] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 560px)");
+    const sync = () => setCompactMobile(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   const reviewedKeys = new Set(
     records.flatMap((record) => (record.external ? [externalGameKey(record.external)] : [])),
@@ -224,6 +102,10 @@ function HomeContinue({
     ...records.map((record) => ({ kind: "review" as const, record, at: record.updatedAt })),
     ...pendingGames.map((game) => ({ kind: "synced" as const, game, at: game.playedAt })),
   ].sort((left, right) => right.at.localeCompare(left.at)).slice(0, 5);
+
+  const limit = compactMobile && !expanded ? 3 : 5;
+  const visible = rows.slice(0, limit);
+  const canExpand = compactMobile && rows.length > 3;
 
   async function openGame(game: SyncedGame) {
     if (busyId) return;
@@ -243,31 +125,43 @@ function HomeContinue({
     <section className="home-continue">
 
       <div className="panel-heading">
-        <h2>Continue</h2>
-        {records.length > 0 ? <Link className="text-button" href="/history">View all →</Link> : null}
+        <h2>Recent games</h2>
+        {records.length > 0 || games.length > 0 ? <Link className="text-button" href="/history">View all →</Link> : null}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       {loading ? <p role="status">Loading saved games…</p> : rows.length === 0 ? (
         <div className="recent-empty">Imported and synced games will wait here.</div>
       ) : (
-        <div className="continue-grid">
-          {rows.map((row) => row.kind === "review" ? (
-            <Link
-              href={row.record.kind === "pgn" ? `/review/${row.record.id}` : `/review/${row.record.id}/engine`}
-              key={row.record.id}
+        <>
+          <div className="continue-grid">
+            {visible.map((row) => row.kind === "review" ? (
+              <Link
+                href={row.record.kind === "pgn" ? `/review/${row.record.id}` : `/review/${row.record.id}/engine`}
+                key={row.record.id}
+              >
+                <strong>{row.record.title}</strong>
+                <small>{row.record.subtitle}</small>
+                <em>{statuses?.get(row.record.id)?.label ?? "Reviewed"}</em>
+              </Link>
+            ) : (
+              <button type="button" key={row.game.id} disabled={busyId !== null} onClick={() => void openGame(row.game)}>
+                <strong>{row.game.white.username} vs {row.game.black.username}</strong>
+                <small>{row.game.timeClass ?? "game"} · {new Date(row.game.playedAt).toLocaleDateString()}</small>
+                <em>{busyId === row.game.id ? "Preparing…" : "Synced · not reviewed"}</em>
+              </button>
+            ))}
+          </div>
+          {canExpand ? (
+            <button
+              type="button"
+              className="text-button home-continue-more"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((current) => !current)}
             >
-              <strong>{row.record.title}</strong>
-              <small>{row.record.subtitle}</small>
-              <em>{statuses?.get(row.record.id)?.label ?? "Reviewed"}</em>
-            </Link>
-          ) : (
-            <button type="button" key={row.game.id} disabled={busyId !== null} onClick={() => void openGame(row.game)}>
-              <strong>{row.game.white.username} vs {row.game.black.username}</strong>
-              <small>{row.game.timeClass ?? "game"} · {new Date(row.game.playedAt).toLocaleDateString()}</small>
-              <em>{busyId === row.game.id ? "Preparing…" : "Synced · not reviewed"}</em>
+              {expanded ? "Show fewer" : `Show ${rows.length - 3} more`}
             </button>
-          ))}
-        </div>
+          ) : null}
+        </>
       )}
     </section>
   );

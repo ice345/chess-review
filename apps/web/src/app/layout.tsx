@@ -10,6 +10,7 @@ import "./styles/chrome.css";
 import "./styles/home.css";
 import "./styles/import.css";
 import "./styles/review-index.css";
+import "./styles/folio.css";
 import "./styles/stats.css";
 import "./styles/utilities.css";
 import "./styles/review-shell.css";
@@ -23,6 +24,7 @@ import "./styles/visual-identity.css";
 import "./styles/study.css";
 import "./styles/notebook.css";
 import "./styles/practice.css";
+import "./styles/platform-pages.css";
 
 export const metadata: Metadata = {
   title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },

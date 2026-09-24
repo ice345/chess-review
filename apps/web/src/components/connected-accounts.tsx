@@ -272,14 +272,18 @@ export function ConnectedAccounts({
 
   if (compact && accounts.length === 0) {
     return (
-      <section className="connected-accounts compact connected-accounts-quiet" id="connected-accounts">
+      <section className="connected-accounts compact connected-accounts-quiet scene-sheet" id="connected-accounts">
         <p>Optional: import games from a platform.</p>
         <div className="account-link-inline" id="chesscom-link">
-          <ProviderMark provider="chesscom" decorative />
-          <input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Chess.com username" />
+          <ProviderMark provider="chesscom" size={18} decorative />
+          <span className="account-link-name">Chess.com</span>
+          <input aria-label="Chess.com username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" />
           <button type="button" className="text-button" disabled={working !== null || username.trim() === ""} onClick={() => void linkChessCom()}>{working === "chesscom" ? "Linking…" : "Link"}</button>
-          <ProviderMark provider="lichess" decorative />
-          <Link href="/settings#lichess-link" aria-label="Connect Lichess in Settings">Connect Lichess in Settings</Link>
+        </div>
+        <div className="account-link-inline" id="lichess-link">
+          <ProviderMark provider="lichess" size={18} decorative />
+          <span className="account-link-name">Lichess</span>
+          <Link href="/settings#lichess-link">Connect in Settings</Link>
         </div>
         {notice && <p className="account-notice" role="status">{notice}</p>}
       </section>
@@ -312,7 +316,7 @@ export function ConnectedAccounts({
         return <article key={account.id}>
           <span className="account-face">
             <span className="platform-avatar">
-              <b>{account.username.slice(0, 2).toUpperCase()}</b>
+              <b><ProviderMark provider={account.provider} size={24} decorative /></b>
               {account.avatarUrl && <img alt="" src={account.avatarUrl} referrerPolicy="no-referrer" />}
             </span>
             <ProviderMark provider={account.provider} size={14} decorative />

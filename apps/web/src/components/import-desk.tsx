@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeFen, parsePgn } from "@chess-review/chess-core";
 import type { SyncedGame } from "@chess-review/shared";
 import { EXAMPLE_PGN } from "../lib/example-game";
@@ -44,10 +44,17 @@ export function previewImport(kind: ReviewRecordKind, input: string): { fen: str
  * owns the library snapshot, because loading it twice in one tree would index
  * the whole library twice.
  */
-export function ImportForm({ latestReview, onPreview, surface = "paper" }: { latestReview?: ReviewRecord | undefined; onPreview?: (preview: ImportPreview) => void; surface?: "paper" | "instrument" }) {
+export function ImportForm({ latestReview, onPreview, surface = "paper", accountContent }: { accountContent?: ReactNode; latestReview?: ReviewRecord | undefined; onPreview?: (preview: ImportPreview) => void; surface?: "paper" | "instrument" | "embedded" }) {
   const router = useRouter();
   const [kind, setKind] = useState<ReviewRecordKind>("pgn");
+  const [intakeTab, setIntakeTab] = useState<"paste" | "file" | "account">("paste");
   const [input, setInput] = useState("");
+  const drafts = useRef({ pgn: "", fen: "" });
+  function changeKind(next: ReviewRecordKind) {
+    drafts.current[kind] = input;
+    setKind(next); setInput(drafts.current[next]);
+    setChoices([]); setFileNotice(null); setError(null);
+  }
   const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const saving = useRef(false);
@@ -121,8 +128,9 @@ export function ImportForm({ latestReview, onPreview, surface = "paper" }: { lat
   }
 
   return (
+    <>
     <form
-      className={`import-card ${surface === "instrument" ? "instrument-panel" : "paper-panel"}${dragging ? " drag-active" : ""}`}
+      className={`import-card${surface === "paper" ? " paper-panel" : surface === "instrument" ? " instrument-panel" : ""}${dragging ? " drag-active" : ""}`}
       aria-busy={busy}
       onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
       onDragLeave={(event) => { if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setDragging(false); }}
@@ -139,8 +147,15 @@ export function ImportForm({ latestReview, onPreview, surface = "paper" }: { lat
       </div>
       {latestReview && <Link className="home-resume" href={latestReview.kind === "pgn" ? `/review/${latestReview.id}` : `/review/${latestReview.id}/engine`}>Continue last review · {latestReview.title} →</Link>}
       <div className="source-tabs" role="group" aria-label="Import source">
-        <button type="button" disabled={busy} aria-pressed={kind === "pgn"} className={kind === "pgn" ? "active" : ""} onClick={() => { if (kind === "pgn") return; setKind("pgn"); setInput(""); setChoices([]); setFileNotice(null); setError(null); }}>PGN</button>
-        <button type="button" disabled={busy} aria-pressed={kind === "fen"} className={kind === "fen" ? "active" : ""} onClick={() => { if (kind === "fen") return; setKind("fen"); setInput(""); setChoices([]); setFileNotice(null); setError(null); }}>FEN</button>
+        <button type="button" disabled={busy} aria-pressed={kind === "pgn" && intakeTab === "paste"} className={kind === "pgn" && intakeTab === "paste" ? "active" : ""} onClick={() => { setIntakeTab("paste"); if (kind !== "pgn") { changeKind("pgn"); } }}>Paste PGN</button>
+        <button type="button" disabled={busy} aria-pressed={intakeTab === "file"} className={intakeTab === "file" ? "active" : ""} onClick={() => { setIntakeTab("file"); if (kind !== "pgn") { changeKind("pgn"); } fileInput.current?.click(); }}>Open file</button>
+        <button type="button" disabled={busy} aria-pressed={intakeTab === "account"} className={intakeTab === "account" ? "active" : ""} onClick={() => { setIntakeTab("account"); if (accountContent) return; const target = document.getElementById("import-accounts") ?? document.getElementById("home-sources") ?? document.querySelector(".home-sources"); target?.scrollIntoView({ block: "nearest" }); }}>From account</button>
+      </div>
+      <div className="import-input-body" hidden={intakeTab === "account" && Boolean(accountContent)}>
+      <div className="import-fen-toggle">
+        <button type="button" className="text-button" disabled={busy} onClick={() => { setIntakeTab("paste"); if (kind === "fen") { changeKind("pgn"); } else { changeKind("fen"); } setChoices([]); setFileNotice(null); setError(null); }}>
+          {kind === "fen" ? "Back to PGN" : "Or paste a FEN"}
+        </button>
       </div>
       {fileNotice && <p className="import-file-notice" role="status">{fileNotice}{choices.length > 1 ? ` · ${choices.length} games. Choose one to analyze.` : " · Ready to analyze."}</p>}
       {choices.length > 1 && <label className="game-choice"><span id="pgn-choice-label">Choose a game</span><select disabled={busy} aria-labelledby="pgn-choice-label" aria-describedby="pgn-choice-help" value={choices.findIndex((choice) => choice.pgn === input)} onChange={(event) => setInput(choices[Number(event.target.value)]?.pgn ?? "")}>
@@ -155,7 +170,7 @@ export function ImportForm({ latestReview, onPreview, surface = "paper" }: { lat
           aria-describedby={error ? "import-error" : "import-help"}
           aria-invalid={Boolean(error)}
           onChange={(event) => { setInput(event.target.value); setChoices([]); setFileNotice(null); setError(null); }}
-          placeholder={kind === "pgn" ? "Paste a complete PGN…\n[Event \"Casual game\"]\n1. e4 e5 2. Nf3 Nc6 3. Bb5 …" : "Paste an explicit FEN…"}
+          placeholder={kind === "pgn" ? "Paste a PGN here" : "Paste a FEN here"}
           spellCheck={false}
         />
       </label>
@@ -165,13 +180,20 @@ export function ImportForm({ latestReview, onPreview, surface = "paper" }: { lat
           {status === "saving" ? "Preparing review…" : kind === "pgn" ? "Analyze game →" : "Open Engine Lab →"}
         </button>
         <input ref={fileInput} type="file" accept=".pgn" aria-label="Choose PGN file" hidden onChange={(event) => { if (event.target.files?.length) void chooseFile(event.target.files); event.target.value = ""; }} />
-        <button type="button" className="text-button file-import-trigger" disabled={busy} onClick={() => fileInput.current?.click()}>{readingFile ? "Reading file…" : "Open PGN file"}</button>
+        {(fileNotice || readingFile) && (
+          <button type="button" className="text-button file-import-trigger" disabled={busy} onClick={() => fileInput.current?.click()}>
+            {readingFile ? "Reading file…" : "Choose another file"}
+          </button>
+        )}
       </div>
       <button type="button" className="secondary import-example" disabled={busy} onClick={kind === "pgn" ? loadExample : loadStartingPosition}>
         {kind === "pgn" ? "Load example game" : "Use starting position"}
       </button>
       <small id="import-help" className="import-note">{kind === "pgn" ? "Drop a .pgn here or paste it — analysis runs on this machine. " : "FEN opens a position study. "}Your library stays in this browser.</small>
+      </div>
     </form>
+    {accountContent && <div id="import-accounts" hidden={intakeTab !== "account"}>{accountContent}</div>}
+    </>
   );
 }
 

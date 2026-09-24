@@ -1,5 +1,5 @@
-/* Home is one scene: the head, the board and the aside share a grid so the
-   hero is not a separate magazine strip above a dashboard. */
+/* Home is one scene: two visual masses — the board sheet and one intake
+   scene-sheet — with Continue as an open hairline list below. */
 
 .home-scene {
   width: var(--scene-width, min(1220px, calc(100% - 44px)));
@@ -8,8 +8,7 @@
   display: grid;
   grid-template-areas:
     "head head"
-    "board import"
-    "board sources"
+    "board intake"
     "board continue"
     "foot .";
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.92fr);
@@ -27,26 +26,34 @@
 }
 .home-scene .page-lede { font-size: 14px; line-height: 1.45; }
 
+/* Specialized board sheet — quieter than a generic paper-panel card. */
 .home-board {
   grid-area: board;
   margin: 0;
-  padding: 16px 28px 14px;
+  padding: 18px 28px 16px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   justify-items: center;
+  border: 1px solid color-mix(in srgb, var(--line) 48%, transparent);
+  border-radius: 12px;
+  background: var(--surface-paper);
+  box-shadow: 0 8px 26px rgba(52, 72, 78, .045);
 }
 .home-board .board-card-head,
 .home-board .board-card-dock { width: 100%; }
+
+@media (min-width: 1440px) {
+  .home-board { padding: 22px 32px 18px; }
+}
 
 
 
 .board-card-head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 13px;
 }
-.board-card-pip { width: 17px; height: 17px; flex: none; border: 1.5px solid var(--line-accent); border-radius: 50%; }
 .board-card-head h2 { margin: 0; color: var(--ink-primary); font: 500 20px/1.2 var(--font-serif); letter-spacing: -.02em; }
 .board-card-head p { margin: 3px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
 .board-card-meta {
@@ -69,19 +76,33 @@
   gap: 8px 16px;
   align-items: center;
 }
-.home-board-transport { display: flex; gap: 4px; }
+.home-board-transport {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wash-blue) 35%, transparent);
+}
 .home-board-transport button {
-  min-height: 40px;
-  min-width: 44px;
-  padding: 0 10px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: transparent;
   color: var(--ink-secondary);
-  font-size: 12px;
   cursor: pointer;
 }
 .home-board-transport button:hover:not(:disabled) { background: var(--wash-blue); color: var(--ink-primary); }
+.home-board-transport button:disabled { opacity: .42; cursor: default; }
+.home-board-transport svg {
+  width: 16px;
+  height: 16px;
+}
 .home-open-lab { justify-self: start; }
 .board-card-foot {
   grid-column: 1 / -1;
@@ -90,19 +111,46 @@
   font-size: 12px;
 }
 
+/* Right column: one intake scene-sheet + open Continue band. */
+.home-intake {
+  grid-area: intake;
+  min-width: 0;
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
 .home-import,
 .home-sources,
 .home-continue {
   min-width: 0;
 }
-.home-import { grid-area: import; }
-.home-sources { grid-area: sources; }
 .home-continue { grid-area: continue; }
 .home-import textarea,
 .home-import select { min-width: 0; }
 
-.home-sources,
-.home-continue { padding: 4px 2px 8px; display: grid; gap: 8px; }
+.home-intake .import-card {
+  padding: 18px 18px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.home-intake .home-sources {
+  padding: 2px 18px 14px;
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+.home-continue {
+  /* Keep open-row paper band (B note) — do not flatten to naked padding. */
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+.home-continue-more {
+  justify-self: start;
+  min-height: 40px;
+}
 
 .home-account-rows {
   margin: 0;
@@ -207,6 +255,8 @@
 }
 .source-tabs button:hover { color: var(--ink-primary); }
 .source-tabs button.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
+.import-fen-toggle { margin-top: -4px; }
+.import-fen-toggle .text-button { color: var(--ink-muted); font-size: 12px; font-weight: 500; }
 
 .import-field { display: grid; gap: 7px; }
 .import-field textarea {
@@ -242,6 +292,7 @@
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-heading .text-button { display: inline-flex; align-items: center; min-height: 40px; }
 .panel-heading h2 { margin: 0; color: var(--ink-primary); font: 500 18px/1.2 var(--font-sans); letter-spacing: -.01em; }
+.home-intake .panel-heading h2 { font-size: 15px; font-weight: 650; }
 .panel-meta { color: var(--ink-muted); font-size: 12px; }
 
 .synced-games-section,
@@ -256,6 +307,12 @@
 .recent-grid em { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--accent-primary); font-size: var(--type-caption); font-style: normal; }
 .recent-empty { padding: 18px 8px; color: var(--muted); font-size: 13px; text-align: center; }
 
+.home-scene > .product-help-link {
+  grid-area: foot;
+  width: auto;
+  margin: 8px 0 0;
+}
+
 @media (min-width: 1080px) {
   .home-scene {
     width: var(--scene-width);
@@ -267,9 +324,8 @@
   .home-scene {
     grid-template-areas:
       "head"
-      "import"
+      "intake"
       "board"
-      "sources"
       "continue"
       "foot";
     grid-template-columns: minmax(0, 1fr);
@@ -281,14 +337,67 @@
 @media (max-width: 560px) {
   .home-scene { width: min(100% - 24px, 1220px); }
   .import-card, .home-board { padding: 16px; }
+  .home-intake .import-card { padding: 16px 16px 12px; }
+  .home-intake .home-sources { padding: 2px 16px 12px; }
+  .home-account-rows li {
+    min-height: 40px;
+    padding: 6px 0;
+    font-size: 12.5px;
+  }
 
-  .import-field textarea { font-size: 16px; min-height: 132px; }
-  .board-card-head { grid-template-columns: auto minmax(0, 1fr); }
-  .board-card-meta { grid-column: 2; }
+  .import-field textarea { font-size: 16px; min-height: 110px; }
+  .board-card-head { grid-template-columns: minmax(0, 1fr); }
+  .board-card-meta { grid-column: 1; }
   .board-card-dock { grid-template-columns: minmax(0, 1fr); }
   .continue-grid a,
   .continue-grid button { grid-template-columns: minmax(0, 1fr); }
   .continue-grid em { grid-column: 1; grid-row: auto; }
   .recent-grid a { grid-template-columns: minmax(0, 1fr); }
   .recent-grid em { grid-column: 1; grid-row: auto; align-self: start; justify-self: start; }
+}
+
+/* Bluebird desk — batch one. */
+.home-scene > .page-head { position: relative; padding-right: 150px; min-height: 132px; }
+.home-bluebird { position: absolute; right: 12px; bottom: 8px; width: 136px; height: 85px; }
+.home-scene .page-lede { max-width: 54ch; }
+.home-board, .home-intake.scene-sheet { border-radius: 4px 14px 14px 4px; }
+.home-board { border-left: 3px solid var(--line-accent); }
+.home-board-frame { width: min(100%, max(320px, min(460px, calc(100dvh - 300px)))); }
+.home-return { display: grid; gap: 12px; padding: 24px 22px 20px; border-bottom: 1px solid var(--line); }
+.home-return h2 { margin: 0; font: 500 clamp(24px, 2.4vw, 32px)/1.15 var(--font-serif); color: var(--ink-primary); }
+.home-return .page-kicker, .home-return p { margin: 0; }
+.home-return-game { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.home-return-meta { font-size: 12px; color: var(--ink-muted); }
+.home-return-action { display: flex; justify-content: space-between; align-items: center; min-height: 44px; text-decoration: none; }
+.home-return > .text-button { justify-self: start; min-height: 36px; display: flex; align-items: center; }
+.home-loading { padding: 18px; }
+.home-import-fold > summary { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; min-height: 52px; cursor: pointer; font-size: 14px; color: var(--ink-primary); list-style: none; }
+.home-import-fold > summary::-webkit-details-marker { display: none; }
+.home-import-fold > summary span { transition: transform var(--motion-micro) var(--motion-paper-ease); }
+.home-import-fold[open] > summary span { transform: rotate(45deg); }
+.home-import-fold[open] .import-card { animation: paper-arrive var(--motion-mode) var(--motion-paper-ease); }
+.home-import-fold[open] .import-heading h2 { display: none; }
+.home-import-fold .import-heading { justify-content: flex-end; }
+.home-explore { min-height: 44px; grid-column: 1 / -1; justify-self: start; }
+
+@media (max-width: 1079px) {
+  .home-scene > .page-head { min-height: 0; padding-right: 100px; }
+  .home-bluebird { width: 90px; height: 60px; right: 0; bottom: 12px; }
+  .home-board-frame { width: min(100%, 460px); }
+}
+@media (max-width: 560px) {
+  .home-scene > .page-head { padding-right: 0; }
+  .home-bluebird { position: static; width: 72px; height: 45px; justify-self: end; grid-row: 1; }
+  .home-scene > .page-head .page-kicker { grid-row: 1; align-self: center; }
+  .home-scene > .page-head .page-display, .home-scene > .page-head .page-lede, .home-scene > .page-head .page-steps { grid-column: 1 / -1; }
+  .home-return { padding: 18px 16px; gap: 10px; }
+  .home-import-fold > summary { padding-inline: 16px; }
+}
+@keyframes paper-arrive {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-import-fold[open] .import-card { animation: none; }
+  .home-import-fold > summary span { transition: none; }
 }

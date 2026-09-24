@@ -7,21 +7,7 @@ import type { ReactNode } from "react";
 import { BrandMark, Icon, type IconName } from "@chess-review/ui";
 import { LocalDataNotice } from "./local-data-notice";
 
-/**
- * The application frame: a persistent rail beside the route content at desktop
- * sizes, and the same rail as a drawer behind a top-bar trigger below them.
- *
- * One `<nav>` serves both. Rendering a second copy for the drawer would give
- * assistive technology two navigation landmarks with identical links and would
- * make every `getByRole("link", …)` ambiguous, so the presentation is switched
- * in CSS and the element itself never moves.
- */
-/**
- * The rail's seven rows, in the reference's order: the desk, the way in, the
- * review, the practice, the library, the numbers, the settings. Each row is a
- * real destination — nothing here is a placeholder for a screen that does not
- * exist.
- */
+/** One navigation serves the desktop header and mobile disclosure. */
 const RAIL_SECTIONS: readonly { href: string; label: string; icon: IconName }[] = [
   { href: "/", label: "Home", icon: "home" },
   { href: "/import", label: "Import", icon: "import" },
@@ -32,23 +18,12 @@ const RAIL_SECTIONS: readonly { href: string; label: string; icon: IconName }[] 
   { href: "/settings", label: "Settings", icon: "settings" },
 ] as const;
 
-/* The reference changes the rail's quiet line per screen. So does the product:
-   the leg says where the reader is, in the same register. */
-const RAIL_REGISTER: readonly { quote: string; foot: [string, string] }[] = [
-  { quote: "A calmer mind sees further.", foot: ["Built for", "A quieter tomorrow"] },
-  { quote: "Start with one good game.", foot: ["Built for", "A fuller library"] },
-  { quote: "Good games linger quietly in the mind.", foot: ["Built for", "A clearer look"] },
-  { quote: "Good moves grow from quiet attention.", foot: ["Built for", "A kinder look"] },
-  { quote: "Every game leaves something behind.", foot: ["Built for", "A longer game"] },
-  { quote: "Numbers, not noise.", foot: ["Built for", "A steadier view"] },
-  { quote: "Your machine, your games.", foot: ["Built for", "A quieter tomorrow"] },
-] as const;
-
-
 function sceneRoute(pathname: string): string {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/import")) return "import";
-  if (pathname.startsWith("/review")) return "review";
+  /* Saved reviews (/review index) shares Library climate; game desk keeps review. */
+  if (pathname === "/review") return "library";
+  if (pathname.startsWith("/review/")) return "review";
   if (pathname.startsWith("/training")) return "practice";
   if (pathname.startsWith("/history")) return "library";
   if (pathname.startsWith("/stats")) return "stats";
@@ -62,11 +37,33 @@ function isCurrentRoute(pathname: string, href: string): boolean {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const currentIndex = RAIL_SECTIONS.findIndex((section) => isCurrentRoute(pathname, section.href));
-  const register = RAIL_REGISTER[currentIndex === -1 ? 0 : currentIndex]!;
   const [open, setOpen] = useState(false);
   const navRef = useRef<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const previousPath = useRef(pathname);
+
+  useEffect(() => {
+    const previous = previousPath.current;
+    previousPath.current = pathname;
+    if (previous === pathname) return;
+    const content = contentRef.current;
+    if (!content) return;
+    // Keep the board mounted and still when moving among one game's tools.
+    const sameGame = /^\/review\/([^/]+)/.exec(previous)?.[1];
+    const staysInGame = sameGame && sameGame === /^\/review\/([^/]+)/.exec(pathname)?.[1];
+    const heading = content.querySelector<HTMLElement>("h1");
+    const focusTarget = heading ?? content;
+    focusTarget.tabIndex = -1;
+    focusTarget.focus({ preventScroll: true });
+    if (staysInGame || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Soft page enter: opacity-only so it stays quieter than task-state motion.
+    const animation = content.animate?.(
+      [{ opacity: 0.72 }, { opacity: 1 }],
+      { duration: 180, easing: "ease" },
+    );
+    return () => animation?.cancel();
+  }, [pathname]);
 
   // Navigating is the one thing that must always leave the page unobscured.
   useEffect(() => {
@@ -100,14 +97,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-frame" data-route={sceneRoute(pathname)}>
+      <a className="skip-to-content" href="#workspace-content" onClick={() => contentRef.current?.focus()}>Skip to content</a>
       <header className="app-rail">
         <Link className="brand" href="/" aria-label="Open Chess Review home">
           <span className="brand-mark"><BrandMark decorative /></span>
           <span>
             <strong>Open Chess Review</strong>
-            {/* The reference sets its tagline as two short lines; ours is the
-                same shape, and "Objective · Human · Coach" stays the words. */}
-            <small><span>Objective · Human</span><span>Coach</span></small>
+            <small>Objective · Human · Coach</small>
           </span>
         </Link>
         <button
@@ -118,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-controls="app-nav"
           onClick={() => setOpen((current) => !current)}
         >
-          <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M1.5 4h13M1.5 8h13M1.5 12h13" /></svg>
+          <Icon name="menu" size={16} />
           Menu
         </button>
         <nav
@@ -127,10 +123,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="rail-nav"
           aria-label="Application navigation"
           data-open={open ? "true" : undefined}
+          onBlur={(event) => {
+            if (open && !event.currentTarget.contains(event.relatedTarget) && event.relatedTarget !== triggerRef.current) setOpen(false);
+          }}
         >
           {RAIL_SECTIONS.map((section) => (
             <Link
               key={section.href}
+              className={section.href === "/import" ? "nav-import" : undefined}
               href={section.href}
               aria-current={
                 section.href === "/"
@@ -143,12 +143,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        {/* The rail's own register: a quiet line above the fold of the leg, at the
-            bottom where the reference puts it. Decorative, never load-bearing. */}
-        <p className="rail-quote">“{register.quote}”</p>
-        <p className="rail-foot"><span>{register.foot[0]}</span><span>{register.foot[1]}</span></p>
       </header>
-      <div className="app-content">
+      <div className="app-content" id="workspace-content" ref={contentRef} tabIndex={-1}>
         <LocalDataNotice />
         {children}
       </div>

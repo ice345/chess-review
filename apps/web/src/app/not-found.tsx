@@ -1,4 +1,20 @@
 import Link from "next/link";
+import { DeskEmptyState } from "../components/desk-empty-state";
+
 export default function NotFound() {
-  return <main className="page-scroll utility-page"><section className="utility-empty"><h1>Page not found</h1><p>Return to your saved games or import a new one.</p><Link href="/history">Open history</Link><Link href="/">Return home</Link></section></main>;
+  return (
+    <main className="page-scroll utility-page">
+      <DeskEmptyState
+        title="This page is not on the desk."
+        actions={(
+          <>
+            <Link className="primary-link" href="/">Return home →</Link>
+            <Link className="text-button" href="/history">Open library</Link>
+          </>
+        )}
+      >
+        Return to your saved games, or import a new one.
+      </DeskEmptyState>
+    </main>
+  );
 }

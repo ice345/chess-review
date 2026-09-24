@@ -10,7 +10,7 @@ import { learnerColorForRecord } from "../lib/player-identity";
 import { PIECE_ASSET_DIR } from "../lib/board-piece-assets";
 import { practiceEmptyCopy, practiceSetup, practiceSideName, type PracticeSetup } from "../lib/practice-setup";
 
-export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
+export function RetroPractice({ analysis, foldIdle = false }: { analysis: GameAnalysisV2; foldIdle?: boolean }) {
   const runtime = useReviewRuntime();
   const retro = runtime.retro;
   const currentPly = useReviewStore((store) => store.currentPly);
@@ -42,22 +42,43 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
 
   if (!retro.active) {
     const { startable } = setup;
+    const meta = startable.count > 0
+      ? `${practiceSideName(startable.color)} · ${startable.count} ${startable.count === 1 ? "position" : "positions"}`
+      : "No positions";
+    const body = (
+      <>
+        <SideChooser setup={setup} onSelect={setPracticeColor} />
+        <label className="practice-inline-check">
+          <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
+          Include inaccuracies
+        </label>
+        {/* Secondary by contract: at the start ply the guided route owns the one
+            primary action, and practice is the second layer of that screen. */}
+        {startable.count > 0 ? (
+          <button type="button" className="secondary retro-idle-start" onClick={() => begin(startable.color)}>
+            Practice {practiceSideName(startable.color)}&apos;s {startable.count} {startable.count === 1 ? "position" : "positions"}
+          </button>
+        ) : (
+          <p className="utility-note">{practiceEmptyCopy(startable)}</p>
+        )}
+      </>
+    );
+    if (foldIdle) {
+      return (
+        <details className="retro-practice retro-idle review-panel-row" aria-label="Practice your mistakes">
+          <summary>
+            <Icon name="practice" />
+            <span className="review-row-copy"><strong>Practice your mistakes</strong></span>
+            <span className="review-row-meta">{meta}</span>
+            <Icon className="review-row-chevron" name="chevron-right" />
+          </summary>
+          <div className="review-open-row-body">{body}</div>
+        </details>
+      );
+    }
     return <section className="retro-practice retro-idle" aria-label="Practice setup">
       <p className="practice-heading">Practice your mistakes</p>
-      <SideChooser setup={setup} onSelect={setPracticeColor} />
-      <label className="practice-inline-check">
-        <input type="checkbox" checked={retro.includeInaccuracies} onChange={(event) => retro.setIncludeInaccuracies(event.target.checked)} />
-        Include inaccuracies
-      </label>
-      {/* Secondary by contract: at the start ply the guided route owns the one
-          primary action, and practice is the second layer of that screen. */}
-      {startable.count > 0 ? (
-        <button type="button" className="secondary retro-idle-start" onClick={() => begin(startable.color)}>
-          Practice {practiceSideName(startable.color)}&apos;s {startable.count} {startable.count === 1 ? "position" : "positions"}
-        </button>
-      ) : (
-        <p className="utility-note">{practiceEmptyCopy(startable)}</p>
-      )}
+      {body}
     </section>;
   }
 
@@ -86,7 +107,7 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
     else retro.skip();
   }
 
-  return <section className="retro-practice paper-panel" aria-label="Learn from your mistakes" data-status={retro.status}>
+  return <section className="retro-practice retro-active" aria-label="Learn from your mistakes" data-status={retro.status}>
     <header className="retro-head">
       <span className="kicker">Practice</span>
       <span className="retro-position">
@@ -129,11 +150,10 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
             <p className="retro-meta">{side} to move</p>
           </div>
         </div>
-        <p className="retro-instruction retro-aside">
+        <p className="retro-aside retro-quiet">
           <strong>{retro.current.faultLabel}</strong>
-          {" "}was played.
+          {" "}was played. The arrow marks it.
         </p>
-        <p className="retro-lead retro-aside">Find a better move on the board. The red arrow is the original mistake.</p>
         {retro.hintSquare && (
           <p className="retro-hint" role="status">
             Look at the piece on <strong>{retro.hintSquare}</strong>. The best move starts there — other moves can still keep the position.
@@ -157,13 +177,13 @@ export function RetroPractice({ analysis }: { analysis: GameAnalysisV2 }) {
           Make your move →
         </button>
         <p className="retro-helper">Select a piece and a square on the board</p>
-        <div className="retro-choices">
+        <div className="retro-choices retro-choices-secondary">
           {retro.hintSquare === null && (
-            <button type="button" className="secondary" onClick={retro.useHint}>
+            <button type="button" className="text-button" onClick={retro.useHint}>
               <Icon name="hint" /> Hint
             </button>
           )}
-          <button type="button" className="secondary" aria-label="View the solution" onClick={() => retro.viewSolution()}>
+          <button type="button" className="text-button" aria-label="View the solution" onClick={() => retro.viewSolution()}>
             <Icon name="answer" /> Show answer
           </button>
           <button type="button" className="text-button" onClick={() => retro.skip()}>Skip</button>

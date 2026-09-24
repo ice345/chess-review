@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FolioHeading } from "./folio-heading";
 import { DEPLOYMENT_MODE } from "../lib/deployment";
 import { useEffect, useRef, useState } from "react";
 import type { CoachLanguage, UiLanguage } from "@chess-review/shared";
@@ -73,20 +74,24 @@ export function SettingsPage() {
 
   return (
     <main className="page-scroll utility-page">
-      <section className="page-head head-instrument">
-
-        <p className="page-kicker">Open Chess Review</p>
-        <h1 className="page-display">Settings</h1>
-        <p className="page-lede">{enhanced ? "Enhanced Local" : "Browser Core"} · Your games and review progress are saved in this browser.</p>
-        <Link className="text-button" href="/help">Help, capabilities and data privacy →</Link>
-      </section>
+      <FolioHeading chapter="Settings" title="Make room for your game." actions={<Link className="text-button" href="/help">Help and capabilities →</Link>}>
+        {enhanced ? "Enhanced Local" : "Browser Core"} · Your games and review progress are saved in this browser.
+      </FolioHeading>
+      <nav className="settings-contents" aria-label="Settings sections">
+        <a href="#interface-settings">Language</a>
+        <a href="#analysis-settings">Analysis</a>
+        <a href="#coach-settings">Coach</a>
+        <a href="#board-settings">Board</a>
+        <a href="#connected-accounts">Accounts</a>
+        <a href="#local-data-settings">Backup &amp; data</a>
+      </nav>
       <div className={`settings-grid${enhanced ? "" : " browser-core-settings"}`}>
-        <section className="settings-card">
+        <section id="interface-settings" className="settings-card">
           <div><span className="kicker">This interface</span><h2>Language</h2></div>
           <label>Interface language<select value={settings.uiLanguage} onChange={(event) => update({ ...settings, uiLanguage: event.target.value as UiLanguage })}><option value="en">English</option><option value="zh-CN">简体中文</option></select></label>
           <small>Interface language covers the lesson panel — its controls, its status and the grounding behind an explanation — which is the part of the workspace translated today. The rest of the interface is English. A lesson itself is written in the Coach output language, set in Explanation layer.</small>
         </section>
-        <section className="settings-card">
+        <section id="analysis-settings" className="settings-card">
           <div><span className="kicker">Review defaults</span><h2>Objective analysis</h2></div>
           <label>Depth<select value={settings.reviewDepth} onChange={(event) => update({ ...settings, reviewDepth: Number(event.target.value) as AppSettings["reviewDepth"] })}><option value={10}>10 · Fast</option><option value={12}>12 · Balanced</option><option value={15}>15 · Thorough</option></select></label>
           <label>Engine Lab lines<select value={settings.reviewMultiPv} onChange={(event) => update({ ...settings, reviewMultiPv: Number(event.target.value) as AppSettings["reviewMultiPv"] })}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label>
@@ -109,7 +114,7 @@ export function SettingsPage() {
           {humanSetupNotice && <small role="status">{humanSetupNotice}</small>}
           <small>Changing the selector never downloads or loads a checkpoint. Use Download model explicitly. Elo and model identity are remembered across reviews and never change Stockfish evaluation or Move Quality.</small>
         </section>}
-        <section className="settings-card">
+        <section id="coach-settings" className="settings-card">
           <div><span className="kicker">Coach defaults</span><h2>Explanation layer</h2></div>
           {enhanced && <><label>Provider<select value={settings.coachProvider} onChange={(event) => update({ ...settings, coachProvider: event.target.value as CoachRequestProvider })}><option value="ollama">Ollama · local</option><option value="openai-compatible">OpenAI-compatible</option></select></label>
           {settings.coachProvider === "openai-compatible" && <small role="status">Cloud explanations send selected positions or whole-game move facts, including headers and player names, through your local gateway to its configured provider. They run only when you request a lesson.</small>}</>}
@@ -121,7 +126,7 @@ export function SettingsPage() {
           <small>{ollamaModels.length > 0 ? `${ollamaModels.length} installed Ollama model${ollamaModels.length === 1 ? "" : "s"} detected. The selected model is passed explicitly to every request.` : "Start Ollama and check the local runtime to discover installed models."}</small></>}
           {!enhanced && <small>Grounded summaries are built from objective analysis on this device. Generative AI is not provided by this website. Output language changes what a lesson says, never the controls around it; the interface has its own language.</small>}
         </section>
-        <section className="settings-card">
+        <section id="board-settings" className="settings-card">
           <div><span className="kicker">Board feedback</span><h2>Board and display</h2></div>
           <label>Piece set<select value={settings.pieceSet} onChange={(event) => update({ ...settings, pieceSet: event.target.value as AppSettings["pieceSet"] })}>
             <option value="liz-blue">Feather Porcelain</option>
@@ -142,7 +147,7 @@ export function SettingsPage() {
             <option value="key">Key moves only</option>
             <option value="all">All analyzed moves</option>
           </select></label>
-          <small>Arrows are the Stockfish and Maia candidates; the red practice arrow is never hidden. Emphasis changes how strongly a non-key move is drawn, never whether it is listed. Board size is set from the board toolbar inside a review.</small>
+          <small>Arrows are the Stockfish and Maia candidates; the practice mistake arrow is never hidden. Emphasis changes how strongly a non-key move is drawn, never whether it is listed. Board size is set from the board toolbar inside a review.</small>
         </section>
         <section className="settings-card">
           <div><span className="kicker">Board feedback</span><h2>Chess sounds</h2></div>
@@ -168,7 +173,7 @@ export function SettingsPage() {
       {oauthNotice && <p className="oauth-notice" role="status">{oauthNotice}</p>}
       <ConnectedAccounts />
       <div className="settings-grid">
-        <section className="settings-card data-card">
+        <section id="local-data-settings" className="settings-card data-card">
           <div><span className="kicker">This browser</span><h2>Local data</h2></div>
           <p>{LOCAL_DATA_RETENTION}</p>
           <LibraryBackupPanel disabled={dataWorking} onBusyChange={setDataWorking} />

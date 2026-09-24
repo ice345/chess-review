@@ -21,3 +21,15 @@
 .notebook-entries li p { white-space: pre-wrap; max-height: 160px; overflow: auto; font-size: 14px; }
 .notebook-draft-notice { font-size: 13px; }
 .notebook-draft-notice .text-button { min-height: 44px; font-size: 13px; }
+
+/* Bluebird desk — batch one. */
+.notebook-save-feedback { display: flex; align-items: center; gap: 10px; color: var(--ink-primary); }
+.saved-feather { width: 24px; height: 36px; animation: feather-place 240ms var(--motion-paper-ease) both; }
+.entry-feather { display: inline-block; width: 15px; height: 22px; vertical-align: middle; margin-right: 6px; }
+@keyframes feather-place {
+  from { opacity: 0; transform: translateY(-6px) rotate(-12deg); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .saved-feather { animation: none; } }
+
+.review-notebook { padding: clamp(16px, 2vw, 26px); border: 1px solid var(--line-soft); border-left: 2px solid color-mix(in srgb, var(--bluebird-ink) 35%, var(--line-soft)); border-radius: 4px; background: var(--surface-paper); }

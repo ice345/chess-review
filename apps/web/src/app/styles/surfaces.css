@@ -1,5 +1,13 @@
 /* Small shared visual grammar. Feature styles own layout; these classes only
-   establish the product's paper, wash and dense-row surface semantics. */
+   establish the product's paper, wash and dense-row surface semantics.
+
+   V4 surface roles (F-P0-01) — map existing optics; do not invent glass:
+   - .scene-sheet  (= .paper-panel in chrome.css): one principal paper plane per
+     scene/side. Solid paper, soft hairline, soft shadow, no backdrop-filter / glass.
+   - .instrument-block (= .instrument-panel): nested tool surface inside a sheet;
+     no outer shadow.
+   - .open-row: secondary destinations (Continue, synced games, library rows) —
+     hairline only; no card radius, no floating shadow. */
 
 .paper-card {
   border: 1px solid var(--line-soft);
@@ -28,13 +36,59 @@
   background: color-mix(in srgb, var(--wash-blue) 28%, transparent);
 }
 
+/* Secondary destinations: ruled rows on the room, not floating cards. */
+.open-row {
+  /* Ruled secondary destinations on solid paper — not translucent over scenery. */
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface-paper);
+  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--line-soft) 80%, transparent);
+}
+.open-row strong,
+.open-row h2 {
+  color: var(--ink-primary);
+}
+.open-row small,
+.open-row em {
+  color: var(--ink-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ink-row,
   .paper-card,
   .wash-card,
+  .open-row,
   button,
   a {
     scroll-behavior: auto;
     transition-duration: .01ms !important;
   }
 }
+
+/* Bluebird desk — batch one. */
+.bluebird-motif { color: var(--bluebird-ink); pointer-events: none; flex: none; }
+
+/* Original staff-paper mark: Liz air + Euphonium brass, never a film still. */
+.staff-mark {
+  display: block;
+  width: 72px;
+  height: 17px;
+  flex: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bluebird-ink) 36%, var(--line)) 0 1px,
+    transparent 1px 4px
+  );
+  border-right: 2px double color-mix(in srgb, var(--bluebird-ink) 45%, var(--line));
+}
+
+.desk-empty-state { display: flex; align-items: center; gap: clamp(20px, 4vw, 40px); padding: clamp(18px, 3vw, 36px) 0; min-width: 0; }
+.desk-empty-state > div { min-width: 0; max-width: 46ch; }
+.desk-empty-state .desk-empty-staff { width: 88px; height: 41px; background: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--bluebird-ink) 36%, var(--line)) 0 1px, transparent 1px 10px); border-right-width: 3px; }
+.desk-empty-state h2 { margin: 0; color: var(--ink-primary); font: 400 clamp(24px, 3vw, 32px)/1.2 var(--font-serif); }
+.desk-empty-state p { margin: 12px 0 20px; font-size: 14px; line-height: 1.7; color: var(--ink-secondary); }
+.desk-empty-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.desk-empty-actions a { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 16px; }
+@media (max-width: 560px) { .desk-empty-state { flex-direction: column; align-items: flex-start; padding: 16px 0; gap: 12px; } }

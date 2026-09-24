@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { PlatformHeading } from "./platform-heading";
 import type { SyncedGame } from "@chess-review/shared";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
 import { applySyncedAnalysisPolicy } from "../lib/auto-analysis";
@@ -9,12 +11,6 @@ import { ImportForm } from "./import-desk";
 import { SyncedGamesPanel } from "./synced-games-panel";
 
 
-/**
- * The import desk. The landing page keeps a compact copy of the same form beside
- * the board preview; this route gives the three sources — paste, file, account —
- * the room the reference draws for them, and keeps the account tools out of the
- * landing page's aside.
- */
 export function ImportPage() {
   const { snapshot, error, loading, refresh } = useLibrarySnapshot();
   const records = snapshot?.records ?? [];
@@ -27,27 +23,12 @@ export function ImportPage() {
 
   return (
     <main className="page-scroll import-page">
-      <section className="page-head head-instrument">
-
-        <p className="page-kicker">Open Chess Review</p>
-        <h1 className="page-display">Bring your games in.</h1>
-        <p className="page-lede">
-          Paste a PGN, open a file, or pull recent games from a connected account. Importing only saves
-          the game; analysis starts when you ask for it, on this machine.
-        </p>
-        <p className="page-steps">
-          <span data-step="current">Import</span><span>Key moment</span><span>Practice</span><span>Evidence</span><span>Keep</span>
-        </p>
-      </section>
-
-      <section className="import-stage">
-        <div className="import-stage-main">
-          <ImportForm latestReview={records[0]} />
+      <PlatformHeading chapter="Import / Begin a review" title="Bring a game to your desk." actions={<Link className="text-button" href="/history">Open library →</Link>}>Paste a game, open a file, or connect a public account.</PlatformHeading>
+      <section className="import-workspace">
+        <aside className="import-guide"><p className="page-kicker">A place to begin</p><h2>One game.<br />A clearer understanding.</h2><ol><li>Choose your source</li><li>Check the game or position</li><li>Open your workspace</li></ol><p>PGN opens a full game review. FEN opens a position in Engine Lab.</p><Link className="text-button" href="/help">Import help →</Link></aside>
+        <div className="import-source-sheet">
+          <ImportForm latestReview={records[0]} surface="embedded" accountContent={<><ConnectedAccounts compact onGamesUpdated={applySyncPolicy} /><SyncedGamesPanel games={games} records={records} statuses={snapshot?.statuses} limit={5} onOpened={refresh} /></>} />
           {error && <p className="error" role="alert">{error} <button type="button" className="text-button" disabled={loading} onClick={() => void refresh()}>Retry loading games</button></p>}
-        </div>
-        <div className="import-stage-aside">
-          <ConnectedAccounts compact onGamesUpdated={applySyncPolicy} />
-          <SyncedGamesPanel games={games} records={records} statuses={snapshot?.statuses} limit={5} onOpened={refresh} />
         </div>
       </section>
     </main>

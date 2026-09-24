@@ -1,280 +1,96 @@
-/* Application frame: the persistent rail and the route column it frames.
-
-   Above the rail breakpoint the rail is a full-height column of raised paper
-   with a single hairline on its inner edge — an instrument surface, not a card:
-   no radius, no shadow, no blur. Below it the same element is the top bar and
-   the same `<nav>` becomes a drawer under a trigger. The one-nav rule lives in
-   `components/app-shell.tsx`; the metrics live in `tokens.css`
-   (`--rail-width`, `--rail-bar-height`). */
-
-/* The frame is a size container so the review workspace can bound the board by
-   the width that actually exists, instead of by `100vw`. The two disagree
-   whenever the layout viewport is not the device viewport — a document-scale CSS
-   zoom, where media queries still read the device width while percentages and
-   flex/grid sizing do not — and the board then overflowed its column and slid
-   under the rail. `contain: layout` makes this element the containing block for
-   fixed descendants, which is a no-op here: the frame spans the whole viewport,
-   and the shortcut overlay's `inset: 0` resolves to the same box. */
-/* The room: the one photographic surface in the product, and the only thing the
-   routes are painted on. It is fixed, so scrolling moves the desk and not the
-   window — the environment is what you look *through*. The whole frame shows it,
-   rail included: the reference's own background measures at roughly a 6% paper
-   wash over the photograph, so the veil is that wash and nothing more. Cards and
-   panels are the opaque surfaces; a heading that sits on the room is protected
-   by its own backing, not by washing out the room. */
+/* Bluebird v4: one top navigation, shared page boundaries, quiet solid ground. */
 .app-frame {
-  --room-presence: 1;
-  --room-veil: 6%;
   container-type: inline-size;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0,1fr);
+  grid-template-rows: auto minmax(0,1fr);
+  background: var(--surface-page);
 }
-
-.app-frame::before {
-  content: "";
-  position: fixed;
-  z-index: -1;
-  inset: 0;
-  opacity: var(--room-presence);
-  background:
-    linear-gradient(
-      color-mix(in srgb, var(--surface-page) var(--room-veil), transparent),
-      color-mix(in srgb, var(--surface-page) var(--room-veil), transparent)
-    ),
-    url("/atmosphere/room.webp") center / cover no-repeat var(--surface-page);
-  pointer-events: none;
-}
-
-/* The room recedes as the work gets harder. Presence is the photograph;
-   veil is extra paper over what remains. Not blur. */
-.app-frame[data-route="home"] { --room-presence: 1; --room-veil: 6%; }
-.app-frame[data-route="import"] { --room-presence: .72; --room-veil: 10%; }
-.app-frame[data-route="review"] { --room-presence: .7; --room-veil: 12%; }
-.app-frame[data-route="review"]:has(.review-shell[data-mode="start"]) { --room-presence: .7; --room-veil: 11%; }
-.app-frame[data-route="review"]:has(.review-shell[data-mode="moment"]) { --room-presence: .55; --room-veil: 16%; }
-.app-frame[data-route="review"]:has(.review-shell[data-mode="move"]) { --room-presence: .62; --room-veil: 14%; }
-.app-frame[data-route="review"]:has(.review-shell[data-mode="practice"]),
-.app-frame[data-route="practice"] { --room-presence: .4; --room-veil: 20%; }
-.app-frame[data-route="library"] { --room-presence: .52; --room-veil: 14%; }
-.app-frame[data-route="stats"] { --room-presence: .4; --room-veil: 16%; }
-.app-frame[data-route="settings"] { --room-presence: .32; --room-veil: 20%; }
-
-
-/* Below the rail breakpoint this is the top bar. It is deliberately *not*
-   sticky: a bar that stays on screen covers the top of the board in the review
-   workspace, which is exactly the reachability the zoom acceptance pass checks,
-   and the previous header scrolled with the document too. */
 .app-rail {
   position: relative;
   z-index: 130;
-  grid-column: 1;
-  grid-row: 1;
-  min-height: var(--rail-bar-height);
-  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  border-bottom: 1px solid var(--line-soft);
-  background: color-mix(in srgb, var(--surface-raised) 62%, transparent);
-}
-
-.app-content {
-  --scene-inline-start: 22px;
-  --scene-width: min(1220px, calc(100% - 44px));
-  grid-column: 1;
-  grid-row: 2;
-  min-width: 0;
-  /* No veil of its own: the room is the page. */
-  background: none;
-}
-
-
-.brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
-.brand > span:last-child { min-width: 0; display: grid; gap: 1px; }
-.brand strong { color: var(--ink-primary); font-size: 14px; letter-spacing: -.01em; }
-.brand small { display: none; }
-
-.app-rail .brand-mark { width: 30px; height: 30px; }
-
-.rail-trigger {
-  min-height: 44px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-paper);
-  color: var(--ink-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.rail-trigger:hover { background: var(--wash-blue); color: var(--ink-primary); }
-
-.rail-trigger svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-}
-
-/* Drawer presentation. The panel hangs off the bar, so it stays with the
-   trigger while the page scrolls under it. */
-.rail-nav {
-  position: absolute;
-  z-index: 140;
-  inset-inline: 0;
-  top: 100%;
-  max-height: min(70dvh, 460px);
-  overflow: auto;
-  padding: 6px;
-  display: none;
-  /* One full-width column: a row's wash and its inset rule must read as a row,
-     not as a highlight behind the label's text box. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
+  gap: 24px;
+  width: 100%;
+  min-height: var(--rail-bar-height);
+  padding: 12px max(24px, calc((100% - 1240px) / 2));
   border-bottom: 1px solid var(--line);
-  background: var(--surface-paper);
-  box-shadow: var(--shadow-floating);
+  background: var(--surface-page);
 }
-
-.rail-nav[data-open="true"] { display: grid; }
-
-.rail-nav a {
-  min-height: 44px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  border-radius: 8px;
-  color: var(--ink-secondary);
-  font-size: 13px;
+.app-content {
+  --scene-width: min(1240px, calc(100% - 48px));
+  --scene-inline-start: max(24px, calc((100% - 1240px) / 2));
+  --scene-inline-end: var(--scene-inline-start);
+  min-width: 0;
 }
-
-.rail-nav a:hover { background: var(--wash-blue); color: var(--ink-primary); }
-
-/* The current route is marked three ways — wash, ink and an inset rule — so the
-   selected state never depends on color alone. */
-.rail-nav a[aria-current="page"] {
-  background: var(--wash-blue);
-  color: var(--accent-primary);
-  box-shadow: inset 2px 0 var(--line-accent);
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand > span:last-child { min-width: 0; }
+.brand strong { color: var(--ink-primary); font: 500 21px/1.2 var(--font-serif); }
+.brand small { display: block; margin-top: 5px; color: var(--ink-muted); font: 10px/1.3 var(--font-sans); letter-spacing: .08em; }
+.app-rail .brand-mark { width: 30px; height: 30px; flex: none; }
+.rail-nav { display: flex; gap: 6px; align-items: center; }
+.rail-nav a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 8px 10px; border-bottom: 2px solid transparent; color: var(--ink-secondary); font-size: 13px; white-space: nowrap; transition: color var(--motion-micro) var(--motion-ease), border-bottom-color var(--motion-micro) var(--motion-ease), background-color var(--motion-micro) var(--motion-ease); }
+.rail-nav a svg { width: 17px; height: 17px; flex: none; }
+.rail-nav a:hover { background: var(--wash-blue); }
+.rail-nav a[aria-current="page"] { border-bottom-color: var(--accent-primary); color: var(--ink-primary); }
+.rail-nav .nav-import {
+  order: 1;
+  margin-left: 10px;
+  padding-inline: 14px;
+  border: 1px solid color-mix(in srgb, var(--bluebird-ink) 42%, var(--line));
+  border-radius: 3px;
+  border-bottom-width: 1px;
+  background: color-mix(in srgb, var(--bluebird-wash) 90%, #fff);
+  color: var(--bluebird-ink);
+  font-weight: 650;
+  transition: color var(--motion-micro) var(--motion-ease), border-color var(--motion-micro) var(--motion-ease), background-color var(--motion-micro) var(--motion-ease);
 }
-
-@media (min-width: 1080px) {
-  .app-frame {
-    grid-template-columns: var(--rail-width) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .app-rail {
-    position: sticky;
-    top: 0;
-    grid-column: 1;
-    grid-row: 1;
-    align-self: start;
-    align-items: stretch;
-    height: 100dvh;
-    min-height: 0;
-    /* Rows are flush with the column's edge, the way the reference's are: the
-       current row's wash reaches the viewport and the icons are inset inside it. */
-    padding: 22px 0 16px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-    align-content: start;
-    gap: 0;
-    border-bottom: 0;
-    border-inline-end: 1px solid var(--line-soft);
-    /* No surface of its own: the rail is a column of the room with rules drawn on
-       it, the way the reference's is. The paper only thickens toward the foot,
-       where the quote and the imprint sit over the desk in the photograph. */
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-page) 46%, transparent) 0%,
-      color-mix(in srgb, var(--surface-page) 46%, transparent) 58%,
-      color-mix(in srgb, var(--surface-page) 82%, transparent) 88%,
-      color-mix(in srgb, var(--surface-page) 86%, transparent) 100%
-    );
-  }
-
-  .app-rail .brand { padding: 0 16px 14px 24px; display: grid; gap: 10px; justify-items: start; }
-  /* The reference marks the end of the brand block with a short rule, not a
-     divider across the column. */
-  .app-rail .brand::after { content: ""; width: 26px; height: 1px; background: var(--line); }
-  .app-rail .brand strong { font: 500 24px/1.12 var(--font-serif); letter-spacing: -.02em; }
-  /* Two short lines on one column: the tagline must not wrap into a ragged stack
-     on the narrower end of the rail (166px at 1440). */
-  .brand small { display: grid; gap: 3px; color: var(--ink-primary); opacity: .74; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; }
-  .app-rail .brand-mark { width: 30px; height: 30px; }
-
-  .rail-trigger { display: none; }
-
-  .rail-nav {
-    position: static;
-    display: grid;
-    align-content: start;
-    gap: 0;
-    max-height: none;
-    overflow: visible;
-    margin-top: 12px;
-    padding: 0;
-    gap: 4px;
+.rail-nav .nav-import:hover {
+  background: var(--bluebird-wash);
+  border-color: var(--bluebird-ink);
+  color: var(--ink-primary);
+}
+.rail-nav .nav-import[aria-current="page"] {
+  background: var(--bluebird-wash);
+  border-color: var(--bluebird-ink);
+  border-bottom-color: var(--bluebird-ink);
+  color: var(--ink-primary);
+}
+.rail-trigger { display: none; min-height: 44px; padding: 8px 12px; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-paper); color: var(--ink-primary); }
+@media(max-width:1079px) {
+  .rail-trigger { display: inline-flex; }
+  .rail-nav { display: none; position: absolute; inset: 100% 16px auto; padding: 8px; background: var(--surface-paper); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow-floating); max-height: calc(100dvh - 100px); overflow-y: auto; }
+  .rail-nav[data-open="true"] { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .rail-nav a { justify-content: flex-start; }
+  .rail-nav .nav-import {
+    margin-left: 0;
+    order: 0;
+    padding-inline: 10px;
     border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
     background: transparent;
-    box-shadow: none;
+    color: var(--ink-secondary);
+    font-weight: inherit;
   }
-
-  .rail-nav a { min-height: 44px; padding: 0 12px 0 38px; gap: 20px; border-radius: 0 10px 10px 0; font-size: 14.5px; color: var(--ink-primary); }
-  .rail-nav a svg { flex: none; width: 20px; height: 20px; color: var(--ink-secondary); }
-  .rail-nav a:hover svg { color: var(--ink-primary); }
-
-  .rail-nav a[aria-current="page"] {
-    background: color-mix(in srgb, var(--wash-blue) 92%, transparent);
-    box-shadow: inset 4px 0 var(--accent-primary);
+  .rail-nav .nav-import:hover { background: var(--wash-blue); color: var(--ink-primary); }
+  .rail-nav .nav-import[aria-current="page"] {
+    background: transparent;
+    border-bottom-color: var(--accent-primary);
     color: var(--ink-primary);
-  }
-  .rail-nav a[aria-current="page"] svg { color: var(--accent-primary); }
-
-  .rail-quote {
-    margin: 0;
-    /* The reference sets its quiet line just under the navigation and leaves the
-       rest of the column to the room; only the imprint is pinned to the foot. */
-    margin-top: 34px;
-    padding: 0 16px 0 24px;
-    align-self: start;
-    /* Words on the room carry the stronger ink: a photograph is not a paper
-       surface, and the muted tiers do not survive it. */
-    color: var(--ink-primary);
-    font: italic 400 13px/1.6 var(--font-serif);
-  }
-
-  .rail-foot {
-    margin: 0;
-    padding: 14px 16px 0 24px;
-    display: grid;
-    gap: 2px;
-    border-top: 1px solid var(--line-soft);
-    color: var(--ink-primary);
-    font-size: 9.5px;
-    letter-spacing: .16em;
-    text-transform: uppercase;
-  }
-
-  .app-content {
-    --scene-inline-start: clamp(24px, 3.2vw, 56px);
-    --scene-inline-end: clamp(48px, 7.5vw, 140px);
-    --scene-width: min(1280px, calc(100% - var(--scene-inline-start) - var(--scene-inline-end)));
-    grid-column: 2;
-    grid-row: 1;
   }
 }
-
+@media(max-width:560px) {
+  .app-rail { padding: 10px 16px; gap: 12px; }
+  .brand strong { font-size: 17px; }
+  .brand small { font-size: 8px; }
+  .brand { gap: 8px; }
+  .app-rail .brand-mark { width: 24px; height: 24px; }
+  .app-content { --scene-width: calc(100% - 32px); --scene-inline-start: 16px; --scene-inline-end: 16px; }
+}
 
 /* Route composition. Four head modes share kicker/display/lede, not one magazine
    template: threshold (Home), task (Review), focus (Practice), instrument
@@ -330,6 +146,40 @@
 .head-focus .page-display { font-size: clamp(22px, 2.3vw, 34px); }
 .head-focus .page-lede { font-size: 14px; }
 .head-instrument { padding: 22px 0 14px; gap: 8px; }
+/* Instrument / document heads: center kicker+title+lede; body stays start-aligned. */
+.head-instrument {
+  justify-items: center;
+  text-align: center;
+  background: radial-gradient(
+    90% 160% at 50% 0%,
+    color-mix(in srgb, var(--surface-page) 72%, transparent),
+    transparent 70%
+  );
+}
+.head-instrument .page-kicker {
+  justify-content: center;
+  width: min(36rem, 100%);
+}
+.head-instrument .page-kicker::after { display: none; }
+.head-instrument .page-display {
+  max-width: 36rem;
+}
+.head-instrument .page-lede {
+  max-width: 42rem;
+  margin-inline: auto;
+}
+.head-instrument .study-player-select {
+  justify-self: center;
+  text-align: left;
+  width: min(28rem, 100%);
+}
+/* Journey desk / board scenes keep start-aligned heads */
+.head-threshold,
+.head-task,
+.head-focus {
+  text-align: start;
+  justify-items: start;
+}
 .head-instrument .page-display {
   font: 550 clamp(22px, 2vw, 30px)/1.2 var(--font-sans);
   letter-spacing: -.02em;
@@ -347,20 +197,82 @@
   .page-steps { display: none; }
 }
 
-/* Surfaces. Focus is the one paper card that holds attention. Instrument is a
-   hairline tool. Open copy sits on the room. */
+/* Surfaces — V4 three roles (see also surfaces.css):
+   .scene-sheet / .paper-panel — solid paper plane (hairline, soft shadow; no glass)
+   .instrument-block / .instrument-panel — tools inside a sheet (no shadow)
+   .open-row — secondary destinations as hairline rows only (surfaces.css) */
+.scene-sheet,
 .paper-panel {
-  border: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
+  /* Solid paper — no translucent soup over scenery, no backdrop-filter. */
+  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--surface-paper) 88%, transparent);
-  box-shadow: 0 12px 34px rgba(52, 72, 78, .07);
+  background: var(--surface-paper);
+  box-shadow: 0 10px 28px rgba(52, 72, 78, .08);
 }
+.instrument-block,
 .instrument-panel {
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-paper) 92%, transparent);
+  background: var(--surface-paper);
   box-shadow: none;
 }
+
+/* ── Batch 3 — spatial layers (no glass) ─────────────────────────────── */
+/* Journey pages: cool window wash / crop light at the edges; content stays
+   solid paper. Not a second illustration decode. */
+.app-frame[data-route="home"],
+.app-frame[data-route="practice"],
+.app-frame[data-route="review"] {
+  background:
+    radial-gradient(38% 72% at 0% 12%, color-mix(in srgb, var(--bluebird-wash) 58%, transparent), transparent 72%),
+    radial-gradient(32% 58% at 100% 6%, color-mix(in srgb, var(--light-cool) 85%, transparent), transparent 70%),
+    var(--surface-page);
+}
+
+.app-frame[data-route="practice"] .page-head,
+.app-frame[data-route="review"] .page-head {
+  background:
+    radial-gradient(56% 120% at 6% 0%, color-mix(in srgb, var(--bluebird-wash) 48%, transparent), transparent 74%),
+    transparent;
+}
+
+/* Batch B — utility edge windowlight: same journey vocabulary, much fainter.
+   Continuity only — no second illustration, no glass. Reading center stays
+   solid paper; Calendar-nav month heads keep their own wash (do not restack). */
+.app-frame[data-route="import"],
+.app-frame[data-route="library"],
+.app-frame[data-route="stats"],
+.app-frame[data-route="settings"] {
+  background:
+    radial-gradient(34% 64% at 0% 10%, color-mix(in srgb, var(--bluebird-wash) 28%, transparent), transparent 74%),
+    radial-gradient(28% 52% at 100% 4%, color-mix(in srgb, var(--light-cool) 50%, transparent), transparent 72%),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--wash-blue) 22%, var(--surface-page)) 0%,
+      var(--surface-page) 18%,
+      var(--surface-page) 82%,
+      color-mix(in srgb, var(--wash-blue) 18%, var(--surface-page)) 100%
+    );
+}
+
+.app-frame[data-route="import"] .app-content,
+.app-frame[data-route="library"] .app-content,
+.app-frame[data-route="stats"] .app-content,
+.app-frame[data-route="settings"] .app-content {
+  border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+}
+
+/* Solid reading paper on utility sheets — edge wash lives on the frame only. */
+.app-frame[data-route="stats"] .stats-inventory,
+.app-frame[data-route="stats"] .stats-growth {
+  background: var(--surface-page);
+}
+.app-frame[data-route="import"] .import-source-sheet,
+.app-frame[data-route="settings"] .settings-card {
+  background: var(--surface-paper);
+}
+
+
 
 .page-scroll { min-height: calc(100dvh - var(--rail-bar-height)); }
 
@@ -376,3 +288,14 @@
     margin-inline: var(--scene-inline-start) auto;
   }
 }
+
+/* Bluebird desk — batch one. */
+@media (max-width: 1079px) { .rail-quote, .rail-foot { display: none; } }
+
+.skip-to-content { position: fixed; top: 8px; left: 12px; z-index: 1000; padding: 12px 18px; background: var(--surface-paper); color: var(--ink-primary); border: 2px solid var(--focus-ring); transform: translateY(-160%); }
+.skip-to-content:focus { transform: none; }
+.app-content:focus { outline: none; }
+@media (max-width: 1079px) and (prefers-reduced-motion: no-preference) {
+  .rail-nav[data-open="true"] { animation: rail-unfold 160ms var(--motion-paper-ease); }
+}
+@keyframes rail-unfold { from { opacity: .5; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

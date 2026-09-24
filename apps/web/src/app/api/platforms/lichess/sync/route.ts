@@ -12,6 +12,7 @@ interface LichessGame {
   createdAt?: number;
   lastMoveAt?: number;
   winner?: "white" | "black";
+  status?: string;
   pgn?: string;
   clock?: { initial?: number; increment?: number };
   players?: {
@@ -20,9 +21,10 @@ interface LichessGame {
   };
 }
 
-function resultFor(color: "white" | "black", winner: LichessGame["winner"]): string {
-  if (!winner) return "draw";
-  return winner === color ? "win" : "loss";
+function resultFor(color: "white" | "black", winner: LichessGame["winner"], status?: string): string | undefined {
+  if (winner) return winner === color ? "win" : "loss";
+  if (status === "draw" || status === "stalemate") return "draw";
+  return undefined;
 }
 
 export async function POST(request: Request) {
@@ -71,14 +73,19 @@ async function handleRequest(request: Request, signal: AbortSignal) {
     ...(rawGames.length < limit ? { lastSyncAt: now } : {}),
     ...(session.account.ratings ? { ratings: session.account.ratings } : {}),
   };
-  const games: SyncedGame[] = rawGames.filter((game) => game.pgn).map((game) => {
+  const games: SyncedGame[] = rawGames.filter((game) => game.pgn).flatMap((game) => {
     const white = game.players?.white;
     const black = game.players?.black;
     const whiteName = white?.user?.name ?? "White";
     const blackName = black?.user?.name ?? "Black";
-    const accountColor = white?.user?.id?.toLowerCase() === session.account.id.toLowerCase() ? "white" : "black";
+    const sessionId = session.account.id.toLowerCase();
+    const whiteMatch = white?.user?.id?.toLowerCase() === sessionId;
+    const blackMatch = black?.user?.id?.toLowerCase() === sessionId;
+    if (!whiteMatch && !blackMatch) return [];
     const playedAt = new Date(game.lastMoveAt ?? game.createdAt ?? Date.now()).toISOString();
-    return {
+    const whiteResult = resultFor("white", game.winner, game.status);
+    const blackResult = resultFor("black", game.winner, game.status);
+    return [{
       id: `lichess:${game.id}`,
       external: { provider: "lichess", externalGameId: game.id, accountId: account.id, username: account.username, url: `https://lichess.org/${game.id}`, importedAt: now },
       pgn: game.pgn!,
@@ -86,12 +93,12 @@ async function handleRequest(request: Request, signal: AbortSignal) {
       ...(game.speed ? { timeClass: game.speed } : {}),
       ...(game.clock?.initial === undefined ? {} : { timeControl: `${game.clock.initial}+${game.clock.increment ?? 0}` }),
       ...(game.rated === undefined ? {} : { rated: game.rated }),
-      white: { username: whiteName, ...(white?.rating === undefined ? {} : { rating: white.rating }), result: resultFor("white", game.winner) },
-      black: { username: blackName, ...(black?.rating === undefined ? {} : { rating: black.rating }), result: resultFor("black", game.winner) },
-      accountColor,
+      white: { username: whiteName, ...(white?.rating === undefined ? {} : { rating: white.rating }), ...(whiteResult ? { result: whiteResult } : {}) },
+      black: { username: blackName, ...(black?.rating === undefined ? {} : { rating: black.rating }), ...(blackResult ? { result: blackResult } : {}) },
+      accountColor: whiteMatch ? "white" as const : "black" as const,
       analyzed: false,
       syncedAt: now,
-    };
+    }];
   });
   const playedTimes = rawGames.flatMap((game) => {
     const value = game.lastMoveAt ?? game.createdAt;
