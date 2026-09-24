@@ -1,18 +1,11 @@
 import type { CSSProperties } from "react";
+import chesscomMark from "../assets/providers/chesscom.svg";
+import lichessMark from "../assets/providers/lichess.svg";
+import notationMark from "../assets/providers/notation.svg";
+import positionMark from "../assets/providers/position.svg";
 
-/**
- * Neutral source identity — not a navigation icon and not a third-party logo.
- * The letter is a scan target; the visible name beside it carries the provider.
- */
+/** Source identity uses local image assets; names remain visible beside marks. */
 export type ProviderKind = "chesscom" | "lichess" | "manual" | "pgn" | "fen";
-
-const LETTER: Record<ProviderKind, string> = {
-  chesscom: "C",
-  lichess: "L",
-  manual: "P",
-  pgn: "P",
-  fen: "F",
-};
 
 const LABEL: Record<ProviderKind, string> = {
   chesscom: "Chess.com",
@@ -22,6 +15,23 @@ const LABEL: Record<ProviderKind, string> = {
   fen: "FEN",
 };
 
+function assetSource(asset: unknown): string {
+  return typeof asset === "string" ? asset : (asset as { src: string }).src;
+}
+
+/** Multi-tone brand glyph — render as <img>, do not CSS-mask. */
+const COLOR_IMAGE: Partial<Record<ProviderKind, string>> = {
+  chesscom: assetSource(chesscomMark),
+};
+
+/** Single-ink silhouette — CSS-mask + Windowlight ink fill. */
+const MASK_IMAGE: Partial<Record<ProviderKind, string>> = {
+  lichess: assetSource(lichessMark),
+  manual: assetSource(notationMark),
+  pgn: assetSource(notationMark),
+  fen: assetSource(positionMark),
+};
+
 export function providerLabel(provider: ProviderKind): string {
   return LABEL[provider];
 }
@@ -29,22 +39,48 @@ export function providerLabel(provider: ProviderKind): string {
 export interface ProviderMarkProps {
   provider: ProviderKind;
   size?: number;
-  /** Hide the accessible name when a visible "Chess.com" / "Lichess" sits beside it. */
   decorative?: boolean;
 }
 
 export function ProviderMark({ provider, size = 16, decorative = false }: ProviderMarkProps) {
   const label = LABEL[provider];
-  return (
-    <span
-      className="provider-mark"
-      style={{ width: size, height: size, fontSize: Math.max(8, size * 0.5) } as CSSProperties}
-      title={decorative ? undefined : label}
-      role={decorative ? undefined : "img"}
-      aria-label={decorative ? undefined : label}
-      aria-hidden={decorative ? true : undefined}
-    >
-      {LETTER[provider]}
-    </span>
-  );
+  const colorSrc = COLOR_IMAGE[provider];
+  const maskSrc = MASK_IMAGE[provider];
+
+  if (colorSrc) {
+    return (
+      <span
+        className="provider-mark provider-mark--color"
+        style={{ width: size, height: size } as CSSProperties}
+        title={decorative ? undefined : label}
+        role={decorative ? undefined : "img"}
+        aria-label={decorative ? undefined : label}
+        aria-hidden={decorative ? true : undefined}
+      >
+        <img src={colorSrc} alt="" width={size} height={size} draggable={false} />
+      </span>
+    );
+  }
+
+  if (maskSrc) {
+    return (
+      <span
+        className="provider-mark provider-mark--image"
+        style={
+          {
+            width: size,
+            height: size,
+            WebkitMaskImage: `url(${maskSrc})`,
+            maskImage: `url(${maskSrc})`,
+          } as CSSProperties
+        }
+        title={decorative ? undefined : label}
+        role={decorative ? undefined : "img"}
+        aria-label={decorative ? undefined : label}
+        aria-hidden={decorative ? true : undefined}
+      />
+    );
+  }
+
+  return null;
 }
