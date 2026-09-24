@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
+import path from "node:path";
 import {
   DATABASE_NAME,
   DATABASE_VERSION,
@@ -14,8 +15,10 @@ import {
   writeStores,
 } from "./fixtures";
 
-const OUT = "/Users/ice/Code/chess-review/tmp/batch-c-shots";
-mkdirSync(OUT, { recursive: true });
+// Screen captures for reviewing this batch by hand. Opt-in: a normal run, and
+// CI, writes nothing. Set BATCH_C_SHOTS=1 to collect them under tmp/.
+const SHOTS = process.env.BATCH_C_SHOTS ? path.join(process.cwd(), "tmp", "batch-c-shots") : null;
+if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 async function clearBrowserData(page: Page) {
   await page.goto("/");
@@ -81,7 +84,7 @@ test.describe("Batch C — Practice chapter binding", () => {
     expect(info.fakePly).toBe(false);
     expect(info.today).toMatch(/Nothing imported|Nothing to train|No due|Checking/i);
     console.log("EMPTY", JSON.stringify(info));
-    await page.screenshot({ path: `${OUT}/batch-c-empty-begin-1440.png`, fullPage: false });
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/batch-c-empty-begin-1440.png`, fullPage: false });
   });
 
   test("imported unanalyzed shows OBSERVE; practiceable shows RETURN; player switch updates", async ({ page }) => {
@@ -101,7 +104,7 @@ test.describe("Batch C — Practice chapter binding", () => {
     expect(info.fakePly).toBe(false);
     expect(info.rehearsal).toBe(true);
     console.log("OBSERVE", JSON.stringify(info));
-    await page.screenshot({ path: `${OUT}/batch-c-observe-imported-1440.png`, fullPage: false });
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/batch-c-observe-imported-1440.png`, fullPage: false });
 
     // Player B: analyzed Ada + saved/attempted task → MOVEMENT III · RETURN
     const games = await seedAdvancedStudy(page, { reportPopulation: true });
@@ -158,7 +161,7 @@ test.describe("Batch C — Practice chapter binding", () => {
     expect(info.method).toBe(true);
     expect(info.fakePly).toBe(false);
     console.log("RETURN", JSON.stringify(info));
-    await page.screenshot({ path: `${OUT}/batch-c-return-practiceable-1440.png`, fullPage: false });
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/batch-c-return-practiceable-1440.png`, fullPage: false });
 
     // Switch back to connected Hikaru → head/progress change toward OBSERVE
     const hikaru = options.findIndex((label) => /Hikaru/i.test(label));
@@ -170,6 +173,6 @@ test.describe("Batch C — Practice chapter binding", () => {
     expect(switched.steps.find((s) => s.id === "observe")?.done).toBe(false);
     expect(switched.revisit).toBe(false);
     console.log("SWITCH", JSON.stringify(switched));
-    await page.screenshot({ path: `${OUT}/batch-c-player-switch-1440.png`, fullPage: false });
+    if (SHOTS) await page.screenshot({ path: `${SHOTS}/batch-c-player-switch-1440.png`, fullPage: false });
   });
 });
