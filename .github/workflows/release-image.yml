@@ -1,0 +1,85 @@
+name: Release image
+
+# Publishes the same linux/amd64 artifact that `deploy/nuc/build.sh` produces, so a
+# NUC update is one `release.py deploy ghcr.io/... --pull` instead of hand-carrying a
+# saved tar. The image carries a unique RELEASE_ID label; `release.py` refuses to
+# promote an image whose label is missing or reused, and records the immutable image
+# id, so a registry tag can never silently change what is running.
+#
+# The `nuc-container` job in ci.yml builds and smoke-tests this Dockerfile on every
+# push. Confirm CI is green on the commit before tagging; publishing does not repeat
+# those gates.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Unique release id, e.g. beta-002. Never reuse one.
+        required: true
+        type: string
+  push:
+    tags:
+      - "web-v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish linux/amd64 image
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve the release id and image reference
+        id: release
+        env:
+          INPUT_ID: ${{ inputs.release_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_ID:-}" ]; then
+            id="$INPUT_ID"
+          else
+            id="$GITHUB_REF_NAME"
+          fi
+          case "$id" in
+            "" | *[!A-Za-z0-9._-]*)
+              echo "::error::Release id must be non-empty and use only A-Z a-z 0-9 . _ -"
+              exit 1
+              ;;
+          esac
+          # GHCR requires a lowercase repository owner.
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/chess-review" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/nuc/Dockerfile
+          # ubuntu-latest is already amd64: no emulation, unlike a Mac build.
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            RELEASE_ID=${{ steps.release.outputs.id }}
+          # Only the immutable release tag. A moving `latest` would undermine
+          # `release.py deploy ... --pull`, which relies on the id being unambiguous.
+          tags: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.id }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Report the deploy command
+        run: |
+          echo "On the NUC:"
+          echo "  python3 release.py deploy ${{ steps.release.outputs.image }}:${{ steps.release.outputs.id }} --pull"
+          echo "  python3 smoke.py"

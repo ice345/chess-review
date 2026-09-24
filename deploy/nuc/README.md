@@ -1,6 +1,6 @@
 # Debian NUC 部署（已有 Cloudflare Tunnel）
 
-适用目标：你的 NUC6CAYS，Debian、8 GB 内存、512 GB 存储，没有公网 IPv4。
+适用目标：NUC6CAYH（Celeron J3455，4 核）、Debian、16 GB 内存、约 215 GB 可用磁盘、没有公网 IPv4。
 这是 Browser Core 复盘网站：服务器提供页面和平台连接，Stockfish WASM 在访客浏览器运行。默认不运行 Maia、Ollama 或服务端整局分析。
 
 拓扑：访客 HTTPS → 现有 Cloudflare Tunnel → Debian 本机 `127.0.0.1:8080` → Nginx → 一个 Next.js standalone 进程。无需公网端口转发或本机证书。
@@ -14,9 +14,9 @@
 | 1 | B | 装 Docker Engine + Compose 插件（[官方 Debian 步骤](https://docs.docker.com/engine/install/debian/)），确认 `docker info`、`docker compose version`、`python3 --version` 正常 |
 | 2 | A | `pnpm install --frozen-lockfile` |
 | 3 | A | `pnpm test && pnpm typecheck && pnpm lint && pnpm build` |
-| 4 | A | `deploy/nuc/build.sh chess-review:beta-001 beta-001`（明确构建 linux/amd64；RELEASE_ID 每次发布必须唯一） |
-| 5 | A | `docker save -o chess-review-beta-001.tar chess-review:beta-001`，再把 tar 传到 B |
-| 6 | B | `docker load -i chess-review-beta-001.tar` |
+| 4 | A | `deploy/nuc/build.sh chess-review:beta-001 beta-001`（明确构建 linux/amd64；RELEASE_ID 每次发布必须唯一）。**或**在 GitHub 运行 **Release image** workflow / 推 `web-v*` tag，由 CI 推到 GHCR |
+| 5 | A | 搬运镜像：`docker save -o chess-review-beta-001.tar chess-review:beta-001`（用 GHCR 则跳过本步） |
+| 6 | B | `docker load -i chess-review-beta-001.tar`（用 GHCR 则改为 `docker login ghcr.io`） |
 | 7 | B | 把整个 `deploy/nuc/` 目录（含 `.env.example`、`compose.yaml`、`release.py`、`smoke.py`、`nginx.conf.template`）放到例如 `/opt/chess-review/deploy/nuc/` |
 | 8 | B | `cd /opt/chess-review/deploy/nuc && python3 release.py init` |
 | 9 | B | 编辑 `.env`：填 `DOMAIN=chess.你的域名`（只填域名，不加 `https://`、端口、引号、路径）；`chmod 600 .env` |
@@ -60,15 +60,34 @@ deploy/nuc/build.sh chess-review:beta-001 beta-001
 
 `build.sh` 明确构建 `linux/amd64`，可以在支持 amd64 模拟的 Mac Docker 或 x86 Linux CI 上执行。不把 macOS 的 node_modules / .next 复制到 Debian。构建上下文仅包含 Web、共享包和必要配置，排除模型、参考仓库、密钥与原生构建产物。
 
-选择一种传输方式：
+选择一种搬运方式。
+
+**方式一（推荐）：CI 构建并推送到 GHCR。** 在 GitHub 上手动运行 **Release image** workflow（填一个唯一 `release_id`，如 `beta-002`），或推一个 `web-v*` tag。workflow 在原生 amd64 runner 上构建同一个 `deploy/nuc/Dockerfile`，推送到 `ghcr.io/<owner>/chess-review:<release_id>`。NUC 上跳过第 6 步的 `docker load`，直接用 `--pull`（见第 3 节）。
+
+它只推不可变的 release tag，没有 `latest`：`release.py` 用镜像 label 校验 RELEASE_ID 并记录不可变 image ID，移动 tag 会让 `--pull` 失去意义。
+
+打 tag 前先确认该 commit 的 CI 是绿的——`ci.yml` 的 `nuc-container` job 会在每次 push 上用同一个 Dockerfile 构建并跑真实代理 smoke；发布 workflow 本身不重复这些门禁。
+
+镜像包默认私有。NUC 首次拉取前需要登录（用带 `read:packages` 的 PAT）：
 
 ```bash
-# 无镜像仓库：导出后自行传到 NUC，并执行 docker load -i chess-review-beta-001.tar
-docker save -o chess-review-beta-001.tar chess-review:beta-001
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+```
 
-# 或使用自己的镜像仓库（把地址换成你的）
-# docker tag chess-review:beta-001 YOUR_REGISTRY/chess-review:beta-001
-# docker push YOUR_REGISTRY/chess-review:beta-001
+也可以在 GitHub 的 package 设置里把该 package 改成 public，之后匿名拉取。
+
+**方式二：本地构建 + tar 传输**（无镜像仓库时）：
+
+```bash
+docker save -o chess-review-beta-001.tar chess-review:beta-001
+# 把 tar 传到 NUC 后：docker load -i chess-review-beta-001.tar
+```
+
+**方式三：自己的镜像仓库**（把地址换成你的）：
+
+```bash
+docker tag chess-review:beta-001 YOUR_REGISTRY/chess-review:beta-001
+docker push YOUR_REGISTRY/chess-review:beta-001
 ```
 
 NUC 仅需 `deploy/nuc/` 这个完整目录和镜像，不需要 pnpm、Node 开发环境、源码或模型。
@@ -85,11 +104,18 @@ python3 release.py init
 chmod 600 .env
 
 python3 release.py deploy chess-review:beta-001
-# 镜像仓库方式：python3 release.py deploy YOUR_REGISTRY/chess-review:beta-001 --pull
+# GHCR：python3 release.py deploy ghcr.io/<owner>/chess-review:beta-001 --pull
+# 其他镜像仓库：python3 release.py deploy YOUR_REGISTRY/chess-review:beta-001 --pull
 python3 release.py check
 python3 smoke.py
 python3 release.py status
 ```
+
+**启用 Lichess 登录时**（`LICHESS_CLIENT_ID` 非空）还要在 Lichess 侧注册回调，否则授权会在 Lichess 端被拒绝，登录无法完成：
+
+- 到 Lichess 账号设置创建 OAuth app，**Redirect URI 必须是 `https://<你的 DOMAIN>/api/platforms/lichess/oauth/callback`**：路径固定，协议必须 https，域名必须与 `.env` 的 `DOMAIN` 完全一致。
+- `LICHESS_CLIENT_ID` 填该 app 的 client id，不是 app 名称。换域名要同步改 app，旧回调不会生效。
+- 不启用登录就把 `LICHESS_CLIENT_ID` 留空；`smoke.py` 此时只检查该接口返回 `configured: false`，不做 OAuth 跳转检查。
 
 `init` 不覆盖已有配置。修改可选的 Lichess 配置后，可再次对同一个镜像运行 `deploy`；脚本检测环境变量、Compose 和代理模板的摘要变化并重新应用配置。脚本不会执行 `.env` 内的 shell 内容，也不打印密钥。`deploy` 默认使用已加载的镜像，只有 `--pull` 才拉取指定应用镜像；首次使用 Docker 会拉取 Compose 指定的 Nginx 镜像。
 
@@ -166,6 +192,7 @@ docker stats --no-stream chess-review-web-1 chess-review-gateway-1
 ```bash
 # 导入或拉取下一个唯一版本后：
 python3 release.py deploy chess-review:beta-002
+# GHCR：python3 release.py deploy ghcr.io/<owner>/chess-review:beta-002 --pull
 python3 smoke.py
 
 # 回到上一份健康镜像：
