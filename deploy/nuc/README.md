@@ -1,5 +1,9 @@
 # Debian NUC 部署（已有 Cloudflare Tunnel）
 
+> 想直接照做上线，看 **[`MIGRATION.md`](MIGRATION.md)**——线性操作手册，从装 Docker
+> 到 Cloudflare 缓存规则一路到底。本文是规范性参考：设计取舍、资源上限、安全边界
+> 和完整故障说明。
+
 适用目标：NUC6CAYH（Celeron J3455，4 核）、Debian、16 GB 内存、约 215 GB 可用磁盘、没有公网 IPv4。
 这是 Browser Core 复盘网站：服务器提供页面和平台连接，Stockfish WASM 在访客浏览器运行。默认不运行 Maia、Ollama 或服务端整局分析。
 
