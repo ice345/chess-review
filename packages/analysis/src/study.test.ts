@@ -7,7 +7,15 @@ import type {
   MoveClassification,
   PlayerColor,
 } from "@chess-review/shared";
-import { buildAdvancedStudyReport, gameTrainingWeaknesses, STUDY_ALGORITHM_VERSION, type StudyGameInput } from "./study";
+import {
+  buildEngineConfigurations,
+  buildOpeningRepertoire,
+  buildRecurringWeaknesses,
+  buildStudyTrends,
+  gameTrainingWeaknesses,
+  type StudyGameInput,
+} from "./study";
+import * as analysisPackage from "./index";
 
 function reason(loss: number): ClassificationReason {
   return {
@@ -82,29 +90,49 @@ function game(
   return { gameId, title: `Ada game ${gameId}`, playedAt, playerColor: color, result, analysis };
 }
 
-describe("advanced multi-game study", () => {
+describe("study package public surface", () => {
+  it("exposes only the V2 report entry — no advanced-study-v1 builder or version", () => {
+    const exported = analysisPackage as Record<string, unknown>;
+    expect(exported.buildAdvancedStudyReportV2).toEqual(expect.any(Function));
+    expect(exported.STUDY_ALGORITHM_V2).toBe("advanced-study-v2");
+    expect(exported.gameTrainingWeaknesses).toEqual(expect.any(Function));
+    expect(exported.buildAdvancedStudyReport).toBeUndefined();
+    expect(exported.STUDY_ALGORITHM_VERSION).toBeUndefined();
+    expect(Object.keys(exported).some((key) => key === "AdvancedStudyReport")).toBe(false);
+    expect(exported.buildStudyTrends).toBeUndefined();
+    expect(exported.buildRecurringWeaknesses).toBeUndefined();
+    expect(exported.buildEngineConfigurations).toBeUndefined();
+    expect(exported.buildOpeningRepertoire).toBeUndefined();
+  });
+});
+
+describe("study trend aggregation helpers", () => {
   it("aggregates canonical game Accuracy without recalculating it from moves", () => {
-    const report = buildAdvancedStudyReport([
+    const trends = buildStudyTrends([
       game("g3", "2026-08-03T00:00:00.000Z", 90, "win", [move(1, "white", "opening", "best", 0)]),
       game("g1", "2026-08-01T00:00:00.000Z", 70, "loss", [move(1, "white", "opening", "best", 0)]),
       game("g2", "2026-08-02T00:00:00.000Z", 80, "draw", [move(1, "white", "opening", "best", 0)]),
       game("g4", "2026-08-04T00:00:00.000Z", 100, "win", [move(1, "white", "opening", "best", 0)]),
     ]);
 
-    expect(report.algorithmVersion).toBe(STUDY_ALGORITHM_VERSION);
-    expect(report.trends.games.map(({ gameId }) => gameId)).toEqual(["g1", "g2", "g3", "g4"]);
-    expect(report.trends.summary).toMatchObject({
+    expect(trends.games.map(({ gameId }) => gameId)).toEqual(["g1", "g2", "g3", "g4"]);
+    expect(trends.summary).toMatchObject({
       gameCount: 4,
       averageAccuracy: 85,
       previousAccuracy: 75,
       recentAccuracy: 95,
       accuracyChange: 20,
     });
-    expect(report.engineConfigurations).toEqual([{ stockfishVersion: "18", depth: 12, multiPv: 3, gameCount: 4 }]);
+    expect(buildEngineConfigurations([
+      game("g3", "2026-08-03T00:00:00.000Z", 90, "win", [move(1, "white", "opening", "best", 0)]),
+      game("g1", "2026-08-01T00:00:00.000Z", 70, "loss", [move(1, "white", "opening", "best", 0)]),
+      game("g2", "2026-08-02T00:00:00.000Z", 80, "draw", [move(1, "white", "opening", "best", 0)]),
+      game("g4", "2026-08-04T00:00:00.000Z", 100, "win", [move(1, "white", "opening", "best", 0)]),
+    ])).toEqual([{ stockfishVersion: "18", depth: 12, multiPv: 3, gameCount: 4 }]);
   });
 
   it("keeps repertoire color-specific and derives results and opening error rate", () => {
-    const report = buildAdvancedStudyReport([
+    const repertoire = buildOpeningRepertoire([
       game("g1", "2026-08-01T00:00:00.000Z", 70, "win", [
         move(1, "white", "opening", "mistake", 15),
         move(2, "black", "opening", "best", 0),
@@ -113,8 +141,8 @@ describe("advanced multi-game study", () => {
       game("g3", "2026-08-03T00:00:00.000Z", 85, "loss", [move(2, "black", "opening", "blunder", 25)], "black"),
     ]);
 
-    expect(report.repertoire).toHaveLength(2);
-    expect(report.repertoire.find(({ color }) => color === "white")).toMatchObject({
+    expect(repertoire).toHaveLength(2);
+    expect(repertoire.find(({ color }) => color === "white")).toMatchObject({
       gameCount: 2,
       wins: 1,
       draws: 1,
@@ -123,11 +151,11 @@ describe("advanced multi-game study", () => {
       openingErrorCount: 1,
       openingErrorRate: 50,
     });
-    expect(report.repertoire.find(({ color }) => color === "black")?.gameCount).toBe(1);
+    expect(repertoire.find(({ color }) => color === "black")?.gameCount).toBe(1);
   });
 
   it("emits only weaknesses repeated across two distinct games with traceable evidence", () => {
-    const report = buildAdvancedStudyReport([
+    const weaknesses = buildRecurringWeaknesses([
       game("g1", "2026-08-01T00:00:00.000Z", 70, "loss", [
         move(1, "white", "opening", "blunder", 31),
         move(3, "white", "middlegame", "missed_win", 35),
@@ -139,13 +167,13 @@ describe("advanced multi-game study", () => {
       game("g3", "2026-08-03T00:00:00.000Z", 90, "win", [move(9, "white", "endgame", "inaccuracy", 7)]),
     ]);
 
-    expect(report.weaknesses.map(({ kind }) => kind)).toEqual(["missed-opportunities", "opening-decisions"]);
-    expect(report.weaknesses[0]).toMatchObject({ gameCount: 2, incidentCount: 2, averageWinPercentLoss: 38.5 });
-    expect(report.weaknesses[0]?.evidence).toEqual([
+    expect(weaknesses.map(({ kind }) => kind)).toEqual(["missed-opportunities", "opening-decisions"]);
+    expect(weaknesses[0]).toMatchObject({ gameCount: 2, incidentCount: 2, averageWinPercentLoss: 38.5 });
+    expect(weaknesses[0]?.evidence).toEqual([
       { gameId: "g2", ply: 7, san: "Nf3", phase: "endgame", classification: "missed_mate", winPercentLoss: 42 },
       { gameId: "g1", ply: 3, san: "Nf3", phase: "middlegame", classification: "missed_win", winPercentLoss: 35 },
     ]);
-    expect(report.weaknesses.some(({ kind }) => kind === "endgame-decisions")).toBe(false);
+    expect(weaknesses.some(({ kind }) => kind === "endgame-decisions")).toBe(false);
   });
 });
 

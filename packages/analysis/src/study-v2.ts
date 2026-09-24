@@ -8,7 +8,16 @@ import type {
   PlayerColor,
   TrainingEvidenceReference,
 } from "@chess-review/shared";
-import { buildAdvancedStudyReport, type RecurringWeakness, type StudyGameInput, type StudyGameResult } from "./study";
+import {
+  buildEngineConfigurations,
+  buildRecurringWeaknesses,
+  buildStudyTrends,
+  type RecurringWeakness,
+  type StudyEngineConfiguration,
+  type StudyGameInput,
+  type StudyGameResult,
+  type StudyTrendsSlice,
+} from "./study";
 
 export const STUDY_ALGORITHM_V2 = "advanced-study-v2";
 
@@ -165,7 +174,7 @@ export interface AdvancedStudyReportV2 {
    * games is the one thing the counts must not be allowed to mean.
    */
   coverage: StudyCoverageV2 & { coverageRate: number; partial: boolean; state: "empty" | "complete" | "partial" };
-  overview: ReturnType<typeof buildAdvancedStudyReport>["trends"] & {
+  overview: StudyTrendsSlice & {
     scoreRate?: number;
     errorRate: number;
     platformDistribution: Array<{ key: ExternalPlatform; gameCount: number; share: number }>;
@@ -179,7 +188,7 @@ export interface AdvancedStudyReportV2 {
   gameHighlights: StudyGameHighlightV2[];
   weaknesses: WeaknessProfileV2[];
   trainingPlan: TrainingRecommendationV2[];
-  engineConfigurations: ReturnType<typeof buildAdvancedStudyReport>["engineConfigurations"];
+  engineConfigurations: StudyEngineConfiguration[];
 }
 
 const PHASES: GamePhase[] = ["opening", "middlegame", "endgame"];
@@ -512,7 +521,9 @@ export function buildAdvancedStudyReportV2(
     .sort((left, right) => left.playedAt.localeCompare(right.playedAt));
   const objectiveVersions = new Set(games.map((game) => game.analysis.algorithmVersion));
   if (objectiveVersions.size > 1) throw new Error("One player-intelligence report cannot mix objective algorithm versions.");
-  const legacy = buildAdvancedStudyReport(games);
+  const trends = buildStudyTrends(games);
+  const recurringWeaknesses = buildRecurringWeaknesses(games);
+  const engineConfigurations = buildEngineConfigurations(games);
   const resolvedCoverage = coverage ?? {
     eligibleGames: games.length,
     analyzedGames: games.length,
@@ -536,7 +547,7 @@ export function buildAdvancedStudyReportV2(
       && move.annotations.some((annotation) => annotation === "brilliant" || annotation === "critical"))
     .map((move) => evidence(game, move)))
     .sort((left, right) => right.winPercentLoss - left.winPercentLoss || right.playedAt.localeCompare(left.playedAt));
-  const weaknesses = weaknessProfiles(games, legacy.weaknesses, minimumSampleSize);
+  const weaknesses = weaknessProfiles(games, recurringWeaknesses, minimumSampleSize);
   const openings = openingProfiles(games, minimumSampleSize);
   const knownResults = games.map((game) => score(game.result)).filter((value): value is number => value !== undefined);
   const allPlayerMoves = games.flatMap(playerMoves);
@@ -568,7 +579,7 @@ export function buildAdvancedStudyReportV2(
       state: coverageState,
     },
     overview: {
-      ...legacy.trends,
+      ...trends,
       ...(knownResults.length === 0 ? {} : { scoreRate: rounded(knownResults.reduce((sum, value) => sum + value, 0) / knownResults.length * 100) }),
       errorRate: allPlayerMoves.length === 0 ? 0 : rounded(errorCount / allPlayerMoves.length * 100),
       platformDistribution: distribution(games.flatMap((game) => game.source?.provider ?? [])),
@@ -582,6 +593,6 @@ export function buildAdvancedStudyReportV2(
     gameHighlights: gameHighlights(games),
     weaknesses,
     trainingPlan: trainingPlan(weaknesses, openings),
-    engineConfigurations: legacy.engineConfigurations,
+    engineConfigurations,
   };
 }

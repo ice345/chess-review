@@ -7,7 +7,17 @@ export * from "./human-analysis";
 export * from "./human-difficulty";
 export * from "./sacrifice";
 export * from "./score";
-export * from "./study";
+export {
+  gameTrainingWeaknesses,
+  type OpeningRepertoireEntry,
+  type RecurringWeakness,
+  type StudyEngineConfiguration,
+  type StudyGameInput,
+  type StudyGameResult,
+  type StudyTrendPoint,
+  type StudyTrendSummary,
+  type StudyTrendsSlice,
+} from "./study";
 export * from "./study-v2";
 export * from "./verification";
 export * from "./win-percent";

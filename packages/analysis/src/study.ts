@@ -7,8 +7,6 @@ import type {
   TrainingEvidenceReference,
 } from "@chess-review/shared";
 
-export const STUDY_ALGORITHM_VERSION = "advanced-study-v1";
-
 export type StudyGameResult = "win" | "draw" | "loss" | "unknown";
 
 export interface StudyGameInput {
@@ -50,6 +48,7 @@ export interface StudyTrendSummary {
   classificationCounts: Partial<Record<MoveClassification, number>>;
 }
 
+/** Opening groups used by internal repertoire aggregation and V1→V2 migration tests. */
 export interface OpeningRepertoireEntry {
   key: string;
   eco: string;
@@ -86,16 +85,9 @@ export interface StudyEngineConfiguration {
   gameCount: number;
 }
 
-export interface AdvancedStudyReport {
-  version: 1;
-  algorithmVersion: typeof STUDY_ALGORITHM_VERSION;
-  trends: {
-    summary: StudyTrendSummary;
-    games: StudyTrendPoint[];
-  };
-  repertoire: OpeningRepertoireEntry[];
-  weaknesses: RecurringWeakness[];
-  engineConfigurations: StudyEngineConfiguration[];
+export interface StudyTrendsSlice {
+  summary: StudyTrendSummary;
+  games: StudyTrendPoint[];
 }
 
 const ERROR_CLASSIFICATIONS = new Set<MoveClassification>([
@@ -182,7 +174,37 @@ function buildTrendSummary(games: StudyGameInput[], points: StudyTrendPoint[]): 
   };
 }
 
-function buildRepertoire(games: StudyGameInput[]): OpeningRepertoireEntry[] {
+/**
+ * Cross-game trend points and summary. Private package helper — not part of the
+ * public report API (reports go through buildAdvancedStudyReportV2 only).
+ */
+export function buildStudyTrends(inputGames: StudyGameInput[]): StudyTrendsSlice {
+  const games = [...inputGames].sort((left, right) => left.playedAt.localeCompare(right.playedAt) || left.gameId.localeCompare(right.gameId));
+  const points: StudyTrendPoint[] = games.map((game) => {
+    const player = game.analysis[game.playerColor];
+    return {
+      gameId: game.gameId,
+      title: game.title,
+      playedAt: game.playedAt,
+      color: game.playerColor,
+      result: game.result,
+      ...(player.accuracy === undefined ? {} : { accuracy: rounded(player.accuracy) }),
+      phaseAccuracy: Object.fromEntries(
+        Object.entries(player.phaseAccuracy).map(([phase, value]) => [phase, rounded(value)]),
+      ),
+      errorCount: game.analysis.moves.filter(({ color, classification }) => (
+        color === game.playerColor && ERROR_CLASSIFICATIONS.has(classification)
+      )).length,
+    };
+  });
+  return { summary: buildTrendSummary(games, points), games: points };
+}
+
+/**
+ * Color-specific opening repertoire aggregation. Package-internal; V2 openings
+ * replace this for the product report surface.
+ */
+export function buildOpeningRepertoire(games: StudyGameInput[]): OpeningRepertoireEntry[] {
   const groups = new Map<string, StudyGameInput[]>();
   for (const game of games) {
     const opening = game.analysis.opening;
@@ -270,7 +292,11 @@ export function gameTrainingWeaknesses(analysis: AnyGameAnalysis, gameId: string
     .sort((left, right) => right.priority - left.priority || left.kind.localeCompare(right.kind));
 }
 
-function buildWeaknesses(games: StudyGameInput[]): RecurringWeakness[] {
+/**
+ * Recurring weaknesses across games (two-game minimum). Package-internal helper
+ * for buildAdvancedStudyReportV2 — not a second public report builder.
+ */
+export function buildRecurringWeaknesses(games: StudyGameInput[]): RecurringWeakness[] {
   const groups = new Map<StudyWeaknessKind, TrainingEvidenceReference[]>();
   for (const game of games) {
     for (const [kind, evidence] of gameWeaknessEvidence(game.analysis, game.gameId, game.playerColor)) {
@@ -284,7 +310,8 @@ function buildWeaknesses(games: StudyGameInput[]): RecurringWeakness[] {
   }).sort((left, right) => right.priority - left.priority || right.gameCount - left.gameCount || left.kind.localeCompare(right.kind));
 }
 
-function buildEngineConfigurations(games: StudyGameInput[]): StudyEngineConfiguration[] {
+/** Engine configuration histogram. Package-internal for the V2 report. */
+export function buildEngineConfigurations(games: StudyGameInput[]): StudyEngineConfiguration[] {
   const configurations = new Map<string, StudyEngineConfiguration>();
   for (const { analysis } of games) {
     const { stockfishVersion, depth, multiPv } = analysis.engine;
@@ -295,34 +322,4 @@ function buildEngineConfigurations(games: StudyGameInput[]): StudyEngineConfigur
       : { stockfishVersion, depth, multiPv, gameCount: 1 });
   }
   return [...configurations.values()].sort((left, right) => right.gameCount - left.gameCount || right.depth - left.depth || right.multiPv - left.multiPv);
-}
-
-export function buildAdvancedStudyReport(inputGames: StudyGameInput[]): AdvancedStudyReport {
-  const games = [...inputGames].sort((left, right) => left.playedAt.localeCompare(right.playedAt) || left.gameId.localeCompare(right.gameId));
-  const points: StudyTrendPoint[] = games.map((game) => {
-    const player = game.analysis[game.playerColor];
-    return {
-      gameId: game.gameId,
-      title: game.title,
-      playedAt: game.playedAt,
-      color: game.playerColor,
-      result: game.result,
-      ...(player.accuracy === undefined ? {} : { accuracy: rounded(player.accuracy) }),
-      phaseAccuracy: Object.fromEntries(
-        Object.entries(player.phaseAccuracy).map(([phase, value]) => [phase, rounded(value)]),
-      ),
-      errorCount: game.analysis.moves.filter(({ color, classification }) => (
-        color === game.playerColor && ERROR_CLASSIFICATIONS.has(classification)
-      )).length,
-    };
-  });
-
-  return {
-    version: 1,
-    algorithmVersion: STUDY_ALGORITHM_VERSION,
-    trends: { summary: buildTrendSummary(games, points), games: points },
-    repertoire: buildRepertoire(games),
-    weaknesses: buildWeaknesses(games),
-    engineConfigurations: buildEngineConfigurations(games),
-  };
 }
