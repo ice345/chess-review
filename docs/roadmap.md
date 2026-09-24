@@ -2,27 +2,23 @@
 
 ## Free/open-source Web release — R1–R5 + S1 (2026-09-08)
 
-The current scope and remaining launch gates are tracked in the
-[stable-release audit](audits/2026-09-08-free-stable-release.md) and
-[Web release roadmap](web-release-roadmap.md). R1–R5 have been implemented and
-locally verified. S1 adds personal notebooks and fixes section navigation and
-export failure feedback. Chess algorithms and their semantics are unchanged.
+R1–R5 have been implemented and locally verified. S1 adds personal notebooks and
+fixes section navigation and export failure feedback. Chess algorithms and their
+semantics are unchanged.
 
 **Visual status (2026-09-13).** The palette and board are no longer the pre-release
-values: the [Windowlight pass](design/2026-09-13-windowlight-implementation.md)
-converged the light theme and the authored piece set into the production system
-(board `#eee8d9` / `#b1c6c2`, Feather Porcelain pieces, tokens in
-`apps/web/src/app/styles/tokens.css`). PNG export and the promotion chooser now
-render the same piece family as the board, with a Unicode fallback for the
-Classic set or an undecodable asset. The mobile companion shares the same board
+values: the Windowlight pass converged the light theme and the authored piece set
+into the production system (board `#eee8d9` / `#b1c6c2`, Feather Porcelain pieces,
+tokens in `apps/web/src/app/styles/tokens.css`). PNG export and the promotion
+chooser now render the same piece family as the board, with a Unicode fallback for
+the Classic set or an undecodable asset. The mobile companion shares the same board
 appearance and board tokens; only its own shell palette and the piece assets are
-still separate. The follow-up
-[UI/UX/layout audit](audits/2026-09-13-ui-ux-layout-audit.md) swept 12 routes over
-7 viewports and fixed the phone overflow, practice `Filters` affordance, Study
-touch targets, phase-label size and Home phone rows. What remains is scoped, not
-open-ended: three low-severity audit items (checkbox and inline-link touch sizes,
-the practice CTA alignment) wait for the next forms/art-direction review, and a
-dark theme is a future feature rather than an inverted Windowlight.
+still separate. The follow-up UI/UX/layout sweep covered 12 routes over 7 viewports
+and fixed the phone overflow, practice `Filters` affordance, Study touch targets,
+phase-label size and Home phone rows. What remains is scoped, not open-ended: three
+low-severity items (checkbox and inline-link touch sizes, the practice CTA
+alignment) wait for the next forms/art-direction review, and a dark theme is a
+future feature rather than an inverted Windowlight.
 
 The first public release is free Browser Core, with local browser storage and
 portable backups. Payment, accounts, cloud sync and hosted AI are not launch

@@ -17,6 +17,17 @@ export default tseslint.config(
       "test-results/**",
       "references/**",
       ".tmp-ui-pass/**",
+      // Local-only capture/diagnostic tooling; listed in .gitignore too. ESLint
+      // does not read .gitignore, so without this the local lint disagrees with
+      // the CI lint.
+      "scripts/capture-*.mjs",
+      "scripts/diag-*.mjs",
+      "scripts/cabinet-library-shots.mjs",
+      "scripts/inspect-idb-keys.mjs",
+      "scripts/probe-*.mjs",
+      "scripts/seed-and-capture-*.mjs",
+      "scripts/verify-kickers.mjs",
+      "apps/web/scripts/**",
     ],
   },
   eslint.configs.recommended,

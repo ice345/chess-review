@@ -28,3 +28,18 @@ references/*
 .playwright-mcp/
 page-screenshot.png
 .tmp-ui-pass/
+.home-shots/
+.ocr-live-audit/
+/tmp/
+
+# One-off local capture/diagnostic tooling. Kept on disk for the current visual
+# pass; not product source, and several hardcode an absolute developer path.
+/scripts/cabinet-library-shots.mjs
+/scripts/capture-*.mjs
+/scripts/diag-*.mjs
+/scripts/inspect-idb-keys.mjs
+/scripts/probe-*.mjs
+/scripts/seed-and-capture-*.mjs
+/scripts/verify-kickers.mjs
+/apps/web/scripts/
+/make-ui-review-bundle-local.sh

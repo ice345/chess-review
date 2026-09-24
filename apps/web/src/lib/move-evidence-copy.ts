@@ -51,8 +51,7 @@ export function moveEvidenceSentence(move: Evidence): string {
  * depth. A move outside that selection keeps its depth-10 classification, and in a
  * sharp position that depth can rank the objectively best move third. Saying so is
  * the honest version of a confident label: the number is real, the search behind it
- * is finite. Calibrated by the C01 investigation
- * (`docs/audits/2026-09-15-c01-opera-evaluation-investigation.md`).
+ * is finite. Calibrated by the C01 investigation.
  */
 export function baselineOnlyCaveat(move: Evidence): string | null {
   const consequential = ["mistake", "blunder"].includes(move.quality)

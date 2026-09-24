@@ -3,7 +3,7 @@
 Open Chess Review is free and open source. The public release focuses on browser
 review, personal study and portable local data. Payment, hosted AI, accounts and
 online play are outside the current release scope. See the
-[current audit and roadmap](docs/audits/2026-09-08-free-stable-release.md).
+[roadmap](docs/roadmap.md).
 
 ## Start locally
 

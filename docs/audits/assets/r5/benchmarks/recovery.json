@@ -1,9 +1,0 @@
-{
-  "date": "2026-09-08",
-  "currentRelease": "r5-local-20260907-candidate",
-  "pending": false,
-  "functionalFailureRecovery": "passed",
-  "pythonOptimize": "1",
-  "publicDomainTested": false,
-  "physicalNUCTested": false
-}

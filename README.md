@@ -26,9 +26,8 @@ Open Chess Review is a free, open-source chess game review and coaching workspac
 The public Browser Core release requires no subscription or Open Chess Review
 account. Games and notebooks stay in each visitor's browser; cloud sync and
 hosted AI are not provided. Optional third-party API coaching uses the provider
-you configure locally. See the [2026-09-08 release audit](docs/audits/2026-09-08-free-stable-release.md),
-which is a record of that pass rather than the current contract,
-and [contribution guide](CONTRIBUTING.md).
+you configure locally. See the [roadmap](docs/roadmap.md) and
+[contribution guide](CONTRIBUTING.md).
 
 ## Architecture
 
