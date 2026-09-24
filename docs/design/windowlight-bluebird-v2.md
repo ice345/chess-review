@@ -12,6 +12,38 @@ Implementation state: **not implemented as a whole.** Where a rule already match
 product it is marked *implemented* below; everything else is target behaviour. Do not read this
 document as a description of current behaviour.
 
+## September 22 amendment — Bluebird desk, batch one
+
+Owner requested implementation of the [Bluebird platform proposal](proposals/2026-09-22-bluebird-platform-direction.md).
+This amendment takes precedence over older composition and motif prohibitions below.
+
+Implemented in this batch:
+
+- Home gives the newest saved record a primary return action and starting-position
+  preview; import expands on request (open by default for an empty library). It does
+  not claim to restore a persisted last-viewed ply; the record has no such field.
+- Manual board exploration is an explicit action. The shared import form stays mounted
+  when collapsed, preserving its draft. An import preview still takes precedence.
+- Authored bluebird and feather SVGs now have bounded interface roles. The logo and room
+  photograph remain unchanged; these motifs are not official film asset extractions.
+- Player names get the full header row, evidence rows stack, short desktop viewports
+  reserve a stable review heading slot; mobile board sizing includes both gutters.
+- Review mode changes use a cancellable 240ms paper animation without remounting the
+  board or disclosures. Ordinary ply updates within a mode do not replay it.
+- A 240ms feather placement follows persisted notebook feedback. Reduced motion removes
+  both movements. No first-visit overlay or ambient flight was added.
+
+The proposal's completed-review bird flight is **not adopted**. Working screens
+do not add a second bird: Home's watercolor remains the only bird illustration,
+and Feather Porcelain plus notebook bookmarks keep the feather. A finished
+review is a lesson sheet (one staff-paper rule, brass kicker, serif harvest line,
+one filled next step). Library and Saved reviews are concert programmes (roman
+movement numerals, serif titles). Stats keeps Your game as the holding structure
+and adds cool-window wash plus a brass kicker. Empty desks use a staff mark
+instead of the abstract bird. These are original translations of *Liz and the
+Blue Bird* air and *Sound! Euphonium* brass, not official film stills or
+characters.
+
 ## 0. Adoption record — 2026-09-18
 
 Adopted in this round:
@@ -47,7 +79,8 @@ Adopted in this round:
 **Removed by the owner, later the same day:** the first-visit Bluebird Passage. There is
 no introductory overlay, no `introSeen` flag and no setting to replay it. The bird that
 appears in the room photograph is part of the environment image, not an interface motif,
-and no interface element draws a bird or a feather. V3 does **not** add a second
+and was not then an interface motif. This restriction is superseded by the September 22
+amendment above. The earlier V3 did **not** add a second
 environmental bird, flute/oboe still-life, or official provider logos. `room.webp` stays
 the shipped photograph.
 
@@ -88,7 +121,7 @@ Implementation state, 2026-09-18:
 | Tier C first-visit passage (§8, §9) | **not adopted** — removed by the owner |
 | Surfaces policy (§10) | superseded by §0.3: the mockups' paper panels are the target |
 | Brand mark | **unchanged**; Brand Mark V2 is a separate future task |
-| Phase D player intelligence (from `FIX.md`) | out of scope for this round |
+| Phase D player intelligence | out of scope for this round |
 
 Previously implemented, and still true:
 
@@ -498,6 +531,10 @@ No full-screen wipe is needed in core Review.
 
 ### Tier C — first-visit passage
 
+> **Withdrawn (owner decision, same day as adoption).** Tier C is not product scope.
+> Do not implement a cinematic / first-visit passage. Kept below only as historical record
+> of what was considered. See §0 and the implementation table row for Tier C.
+
 **Not adopted.** The owner removed it after seeing it built; §0 records the decision.
 There is no introductory overlay, no scroll-driven reveal, no `introSeen` flag and no
 setting to replay one. Tier B remains the longest motion in the product.
@@ -636,7 +673,6 @@ Rules for this inventory:
 
 Likely implementation surfaces to inspect before editing:
 
-- `FIX.md` — local maintainer/current remediation context; read first if present
 - `AGENTS.md`
 - `docs/design/windowlight-contract.md`
 - `apps/web/src/app/styles/tokens.css`
@@ -647,7 +683,7 @@ Likely implementation surfaces to inspect before editing:
 - Practice components/styles
 - current visual acceptance skill/tests
 
-Historical audits marked superseded should not override `FIX.md` or current implementation.
+Historical audits marked superseded should not override the current implementation.
 
 ---
 
@@ -829,3 +865,45 @@ When uncertain about a UI decision, ask:
 > Does this make the chess position easier to notice, understand, try, and remember — while preserving the feeling of a quiet desk beside a cool window?
 
 If the answer is only “it looks more cinematic,” reject the change.
+
+### 2026-09-23 — 第二批：章节页与收束反馈
+
+- Library、Stats、Settings 使用 `FolioHeading`：左侧细蓝书脊线、衬线标题、单枚页边羽毛，动作入口与标题分区。Library 可直接 Import a game；Stats 可返回 Library。
+- Library 的正文是连续纸页，长对局标题允许换行；Stats 在 900px 及以上使用双栏，以下使用单栏，数据口径未变。
+- Settings 提供 Language / Analysis / Coach / Board / Accounts / Backup & data 页内目录。下拉框和一般输入框最小高度 44px；目录不更改用户设置。
+- Notebook 使用实色纸底，避免说明和编辑器文字与室内背景叠加。
+- 用户点击结束复盘后，仅当现有 `reviewSessionCounts().browsedEverything` 为真时，在总结页头保留的 58px 区域显示原创飞鸟 SVG，进入动画 600ms，不循环、不挡按钮。每次打开合格的完成总结会播放一次；不是已掌握或已解题的声明。
+- 提前结束使用 Review summary 标签和原有已浏览数量，不播放飞鸟。减少动态效果偏好下静态显示。
+- 验收范围和未覆盖项目见 `proposals/2026-09-23-bluebird-batches-acceptance.md`。
+
+### 2026-09-23 — 第三批：页面衔接与空状态
+
+- AppShell 对客户端跨页面导航使用 240ms 轻微淡入/4px 位移；首次加载不播放，同一 gameId 的复盘子路由不移动整个棋盘。动画取消不卸载内容，不延迟按钮使用。
+- 路由改变时焦点移到新页面首个 h1（没有时落到内容容器），不强制滚动。新增键盘可见的 Skip to content。移动菜单在焦点离开时关闭，Escape 关闭并返回触发器。
+- Library、Review、Stats 的真正空库使用同一只原创蓝鸟和直接导入入口。筛选无结果不误报空库，提供 Clear filters，重置五项筛选而不改动棋谱。
+- 手机棋谱列表将标题与“打开 / 删除”动作分行，长名称完整换行，操作最小高度 44px。
+- 所有新增动态效果尊重 prefers-reduced-motion；无全屏过场、循环装饰或新增依赖。
+
+## September 24, 2026 — v4 migration authority
+
+The owner-approved v4 design supersedes older room/left-rail composition requirements.
+See [implementation and handoff](implementation/2026-09-24-bluebird-integration.md).
+The first production slice changes the shared shell, Stats composition and source marks.
+Home/import/library and review interiors remain pending staged migration; the watercolour
+asset is stored in the prototype directory and is not yet part of production.
+
+### v4 A2 implementation
+
+Home now ships the approved watercolor as a compressed WebP, with separate recent
+and practice entry sections. Import has one source sheet; Library and Review index
+share a component. Position exploration remains available in a disclosure. See the
+integration handoff for completed checks and remaining state-restoration work.
+
+
+## September 24 — Practice rehearsal amendment
+
+The practice hub now groups Today on a cool paper sheet and its method in a warmer
+margin, stacked on narrow screens. This is a bounded use of existing wash tokens,
+not a return to the photographic room or a new bird asset. The broader atmosphere
+proposal in [the browser audit](audits/2026-09-24-atmosphere-practice.md) remains
+planned; only its explicitly listed shipped scope is implemented.

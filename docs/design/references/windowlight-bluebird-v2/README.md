@@ -38,8 +38,8 @@ Do **not** take from these images:
   one soft shadow;
 - the photographic still-life as a *per-screen* element — it is one fixed background for
   the whole application, never a hero image or a second layer;
-- the birds, the feather and the blossom as interface motifs: they belong to the
-  photograph. No interface element draws a bird or a feather;
+- extracting the birds, feather and blossom from these mockups as UI icons. The
+  September 22 amendment instead adds a separate authored bluebird/feather SVG family;
 - script quotes, decorative petals or extra ornament scattered through the interface;
 - any product *fact* the images imply (a score, a count, a classification): those come from
   canonical data, never from a mockup;
@@ -54,3 +54,10 @@ Do **not** take from these images:
   served or bundled.
 - Playwright baselines in `e2e/__screenshots__/` are the acceptance record; these images
   are not compared against anything.
+
+## 2026-09-24 migration note
+
+These images are historical composition references. The owner-approved v4 platform
+redesign now supersedes their left-rail and full-room-background requirements.
+See `../../implementation/2026-09-24-bluebird-integration.md` for shipped scope and
+remaining work. Do not restore the old environment during the staged migration.

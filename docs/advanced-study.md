@@ -5,7 +5,8 @@ Implementations:
 - `packages/analysis/src/study-v2.ts`: deterministic report semantics.
 - `apps/web/src/lib/advanced-study-library.ts`: identity and lazy cache loading.
 - `apps/web/src/lib/history-analysis-jobs.ts`: durable browser work.
-- `/training`: filters, report, queue and job controls.
+- `/training`: today's task, the training queue, and history-analysis controls that prepare practice positions.
+- `/stats`: the player report (ratings, openings, phases, mistakes, highlights, plan, coverage) and library counts.
 
 ## Report contract
 

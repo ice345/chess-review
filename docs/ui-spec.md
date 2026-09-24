@@ -4,7 +4,7 @@
 
 The product is route-based rather than a single analysis dashboard:
 
-- `/` owns PGN/FEN import, a live (non-interactive) position preview, a compact Chess.com/Lichess connect row, and recent reviews. Chess.com and Lichess are account actions, not import modes.
+- `/` prioritizes returning to the newest saved game (or position), with its initial-position preview. PGN/FEN import is expandable and opens by default when the library is empty. Manual board exploration is an explicit secondary action. The shared import form supports paste, file and account sources. This page does not promise last-viewed-ply restoration.
 - `/review/[gameId]` is the objective review.
 - `/review/[gameId]/moves` is the move explorer.
 - `/review/[gameId]/coach` is the Study surface for grounded move lessons and whole-game learning (the URL remains stable).
@@ -13,41 +13,33 @@ The product is route-based rather than a single analysis dashboard:
 
 ### Application frame
 
-Every route renders inside one application frame: a persistent rail beside the
-route content, and that same rail as a drawer behind a top-bar trigger below the
-rail breakpoint (1080px). The rail carries the product mark — which is also the
-link to `/` — and the three utility routes; the current route is marked with
-`aria-current="page"` plus a wash and an inset rule, so the selected state never
-depends on color alone.
+Every route renders inside one application frame. **Shipped (24 Sept 2026):** a
+top navigation bar on a solid page surface. Below 1080px the same `<nav>` becomes
+a disclosure behind a Menu trigger (Escape, outside pointer, blur, and route
+change all close it). This supersedes the earlier persistent left rail and the
+full-page room photograph. Do not restore the left rail or `room.webp` wallpaper
+while this shell is current.
+
+The current route is marked with `aria-current="page"` plus an underline, so the
+selected state never depends on color alone.
 
 Two rules the implementation must keep:
 
 - **One navigation landmark.** The drawer is the same `<nav>` element as the
-  rail, switched by CSS. A second copy would give assistive technology two
+  desktop bar, switched by CSS. A second copy would give assistive technology two
   identical landmarks and would make every role-based link query ambiguous.
-- **A rail column never covers content.** At desktop sizes the rail is a grid
-  column, so nothing can sit under it. Below the breakpoint the bar scrolls with
+- **The bar must not cover the board.** Below the breakpoint the bar scrolls with
   the document rather than sticking: a bar that stays on screen covers the top of
-  the board in Review, which is reachability the zoom acceptance pass checks.
+  the board in Review.
 
-The rail is chrome, not a card: a column of the room with one inner hairline, no
-radius, no shadow, no blur. Its paper thickens toward the foot — where the quiet line
-and the imprint sit — so the room reads through the navigation while the rail's small
-print keeps its contrast. Its width tracks the reference proportion
-(`clamp(166px, 11.54vw, 190px)`; the reference's own column ends 11.5% into its window)
-and its bar height is 48px below the breakpoint; both live in `tokens.css` as
-`--rail-width` and `--rail-bar-height`, and every layout that measures the viewport
-subtracts one of them. The review workspace bounds its board
-with container-query units against the frame (`100cqw`) rather than `100vw`, so a
-document-scale zoom cannot make the board overflow its column.
+`--rail-bar-height` in `tokens.css` is the top bar height. `--rail-width` is `0`
+in this shell (kept as a compatibility token). The review workspace still bounds
+its board with container-query units against the frame (`100cqw`) rather than
+`100vw`.
 
-The rail's contents follow the reference: the mark, a two-line serif wordmark and a
-two-line tagline above a short rule, then one row per destination with an icon and its
-label (rows flush with the column's edge, the current one washed and accented), the
-quiet line just under the navigation, and the product's two micro-caps words at the
-foot. The register at the
-foot changes with the current row, the way the reference's does per screen. All of
-it is decorative: nothing in the rail is load-bearing except the links.
+The bar carries the brand mark (home), the seven destinations, and Import as a
+quiet outlined control — not a second navy brick. In the mobile disclosure,
+Import is one row among the others, not a separate tile.
 
 The seven rows are the reference's seven, and each one is a real destination:
 
@@ -56,9 +48,9 @@ The seven rows are the reference's seven, and each one is a real destination:
 | Home | `/` | the desk: board preview beside the import, account and recent panels |
 | Import | `/import` | the import desk: paste, file and account in one place, with the library's own tools |
 | Review | `/review` | the reviews you have, newest first, each one a way back in |
-| Practice | `/training` | recurring decisions across analysed games and today's task |
-| Library | `/history` | every imported game and review, with filters, open and delete |
-| Stats | `/stats` | counts from what this browser has saved |
+| Practice | `/training` | today's task and the queue of positions to retry |
+| Library | `/history` | every imported game and review, grouped by month, with filters, open and delete |
+| Stats | `/stats` | library counts plus the player report: ratings, openings, mistakes, plan |
 | Settings | `/settings` | local data, engine, coach and library settings |
 
 A review workspace lives under Review, so that row stays marked while one is open.
@@ -187,16 +179,11 @@ The visual system is **Windowlight**: warm paper, mist blue, dusty pink, sage an
 
 There is one production light theme. `tokens.css` is the color source of truth: `--surface-page` `#f8f6ef`, `--surface-paper` `#fffef9`, `--surface-raised` `#fbf8f1`, the `--wash-*` atmosphere colors, `--ink-primary`/`-secondary`/`-muted`/`-faint`, `--line`/`--line-soft`/`--line-accent`, `--accent-primary` `#587493` with `--accent-hover` and `--focus-ring`, the board tokens, `--danger`/`--success-soft`/`--warning-soft` semantics, the three paper shadows, the `--rail-*` frame metrics, the two motion durations, and the fallback light layer `--light-cool` / `--light-warm`. The legacy aliases (`--bg`, `--surface`, `--text`, `--muted`, `--accent`, `--paper`, `--mist`, `--pink`, `--sage`, `--cream`) remain for existing feature stylesheets. There is no second switchable theme and no theme provider: the piece-set preference stays an independent setting.
 
-The environment is the room: `apps/web/public/atmosphere/room.webp`, a compressed
-derivative of the reference's `background_pic.png`, painted once and fixed behind the whole
-application (`.app-frame::before` in `chrome.css`). Nothing hides it: the frame paints the
-photograph under `--room-wash` (6% paper, the veil the reference's own background measures),
-the route column adds no surface of its own, the rail thickens its paper only toward its
-foot, and the route head carries a soft glow where its words are. Words on the room use the
-primary ink tier; the muted and secondary tiers belong to words on paper, and
-`e2e/room-contrast.spec.ts` measures every room-sitting element against the pixels the
-browser paints. `body` keeps the paper plus the two light washes as the pre-load fallback
-(`--light-cool`, `--light-warm`). The photograph never moves and is never a per-screen hero.
+The 24 Sept 2026 platform shell paints a solid page (`--surface-page`) plus the two
+light washes (`--light-cool`, `--light-warm`). The room photograph (`room.webp`)
+is **not** the current environment; Home's watercolor is the only bird illustration.
+Do not restore `.app-frame::before` room wallpaper in this shell. Contrast for
+utility pages is measured against the paper tokens.
 
 Board appearance is centralized in `apps/web/src/lib/board-appearance.ts` as `WINDOWLIGHT_BOARD_APPEARANCE`; Home, Review and the design fixtures spread it into their react-chessboard options instead of repeating hex values, and it references the board tokens by CSS variable. Board interaction states live in `board-move-hints.ts`: a dusty-rose selection with a restrained brass wash, a rose ring for legal captures and a rose dot for quiet moves, all token-owned and kept more visible than the theme. Stockfish (blue), Maia (green), fault (rose) and overlap (teal) arrow families keep their source-aware semantics and are never folded into one aesthetic palette.
 
@@ -509,9 +496,70 @@ system. Training status supports queued, in progress and completed, remains in
 IndexedDB after refresh, and is never inferred from Coach text. Start review and
 Continue review open the first pending source position. A task panel beside the
 desktop board (below it on mobile) offers explicit confirmation, saved progress,
-Next position and Pause. Confirmation requires the canonical task position and
-loaded objective evidence. Repeated visits never add credit. Completed means
-all positions were explicitly reviewed, not solved or mastered; historical manual
-completions remain labelled separately. Tasks remain available without analysis
+Next position and Pause. The decision entry opens at source.ply - 1; evidence identity stays at source.ply.
+The task panel offers Before the decision and Show played move. Confirmation
+requires the played-move position and loaded objective evidence, and records only
+exposed. The former self-reported unaided/hinted buttons are removed: the open-book
+panel cannot verify recall. The queue still needs integration with actual board
+attempts before it can legitimately advance mastery through the UI. Completed
+means all positions are mastered; historical manual completions remain labelled separately. Tasks remain available without analysis
 caches, including after [backup restoration](library-backup.md). At mobile width,
 all sections stack without document-level horizontal overflow.
+
+### Bluebird chapter pages (2026-09-23)
+
+Library, Stats and Settings share a platform heading. Library exposes
+Import a game in its heading; Stats links back to Library. Settings has an anchor
+contents strip for language, analysis, coaching, board, accounts and local data.
+Stats uses two columns from 900px and one below. Notebook text sits on a paper
+surface. Ending a review early is labelled Review summary; only viewing all key
+moments is labelled Review complete, independently of practice results. The
+completion state is a lesson sheet (staff rule, harvest sentence, programme facts),
+not a geometric bird.
+
+### Navigation and empty states (2026-09-23)
+
+Client-side pathname changes focus the first page h1, with a content-container
+fallback. Skip to content precedes the rail. The mobile navigation closes when
+focus leaves it; Escape returns focus to Menu. Cross-page entry takes 240ms;
+same-game review tools preserve the stationary board, and reduced-motion skips
+the entry animation. Empty Library, Review and Stats expose a direct import
+entry. A filtered library with no matches instead offers Clear filters.
+
+## September 24, 2026 — Bluebird integration, first slice
+
+The shared shell now uses a top navigation and solid page surface, superseding the
+persistent left rail described above. A single navigation remains a disclosure below
+1080px, with existing Escape/outside/blur/route dismissal. All seven routes remain
+available during migration; Stats is explicitly retained. Import is the primary action.
+Stats displays records, synced games, analyzed and pending as a metric band, sources
+as one row, results/time metadata as independent distribution panels and practice as
+its own band. Records and synced games overlap and are not summed. Missing source
+result/time metadata is shown as Not recorded, not inferred. Counts/analysis/maturity
+semantics are unchanged. All provider marks are image assets, including PGN/FEN.
+
+Stats also offers a Distribution scope selector: all review records or all synced
+games, including games never opened for review. This switches source/result/time
+metadata together; headline analysis counts remain record-scoped. Synced results
+use `game[game.accountColor].result`, consistent with review-record import metadata.
+
+### Bluebird A2 — home, import and library
+
+Home now uses a watercolor hero and real newest-record/recent-game links. Position
+exploration remains in an expandable desk; import lives on `/import`. That route
+shows account content within the same source sheet, outside the input form, and
+preserves PGN/FEN drafts during in-page source switching. `/review` now reuses the
+library component as a saved-record-only view, retaining unanalysed saved records
+and FEN entries. Pagination replaces the old eight-record cap. Filter URL persistence
+and back-navigation scroll restoration remain pending.
+
+
+### 2026-09-24 Practice audit amendment
+
+Practice uses a cool task sheet and warmer method margin, stacked below 720px.
+The queue is scoped to the selected player, and manual players have no connected-account
+sync backlog. Today offers no start action when no unreviewed or due position exists.
+Mistake/phase/opening/plan decision links open before the move; highlights still open
+the played move. No analysis formulas or mastery intervals changed. See
+[the audit and implementation plan](design/audits/2026-09-24-atmosphere-practice.md)
+for observed issues, shipped fixes and the outstanding attempt-to-queue integration.
