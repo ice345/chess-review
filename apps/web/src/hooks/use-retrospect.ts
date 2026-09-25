@@ -5,6 +5,7 @@ import { judgePracticeScore, practiceHumanComparison, practiceMoves, type Practi
 import { replayUciLine } from "@chess-review/chess-core";
 import { BrowserStockfish } from "@chess-review/stockfish";
 import { formatMoveNotation, type EngineScore, type GameAnalysisV2, type MoveAnalysisV2, type PlayerColor } from "@chess-review/shared";
+import { useUiLanguage } from "./use-ui-language";
 import { analysisScheduler } from "../lib/analysis-scheduler";
 import {
   practiceAnswerOwed,
@@ -121,6 +122,7 @@ export function useRetrospect({
   playUci: (uci: string) => boolean;
   onSolved?: (retrospective: Retrospective) => void;
 }): RetroRuntime {
+  const language = useUiLanguage();
   const [active, setActive] = useState(false);
   const [color, setColor] = useState<PlayerColor>("white");
   const [includeInaccuracies, setIncludeInaccuracies] = useState(false);
@@ -190,11 +192,12 @@ export function useRetrospect({
           ...(move.classificationReason.secondBestGapCp === undefined ? {} : { secondBestGapCp: move.classificationReason.secondBestGapCp }),
           ...(move.classificationReason.secondBestGapWinPercent === undefined ? {} : { secondBestGapWinPercent: move.classificationReason.secondBestGapWinPercent }),
           tacticalMotifCount: move.motifs.length,
+          language,
         });
         return { comparison };
       })()),
     };
-  }, []);
+  }, [language]);
 
   const recordResult = useCallback((ply: number, kind: ExerciseResultKind) => {
     setResults((previous) => previous[ply] === undefined ? { ...previous, [ply]: kind } : previous);

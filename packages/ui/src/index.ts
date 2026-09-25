@@ -8,4 +8,6 @@ export * from "./human-difficulty-mark";
 export * from "./icons";
 export * from "./provider-mark";
 
+export * from "./phase-labels";
+
 export * from "./quality-icon";

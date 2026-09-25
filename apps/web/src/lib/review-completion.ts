@@ -6,7 +6,9 @@ import type {
   MoveClassification,
   MoveQuality,
   PlayerColor,
+  UiLanguage,
 } from "@chess-review/shared";
+import { phaseLabel } from "@chess-review/ui";
 
 /**
  * Facts for the end-of-review state.
@@ -88,13 +90,13 @@ function highlightTier(move: MoveAnalysisV2): number {
   return 3;
 }
 
-export function buildReviewCompletion(analysis: GameAnalysisV2, player: PlayerColor | null): ReviewCompletionFacts {
+export function buildReviewCompletion(analysis: GameAnalysisV2, player: PlayerColor | null, language: UiLanguage): ReviewCompletionFacts {
   const scope: CompletionScope = player ?? "both";
   const inScope = (move: MoveAnalysisV2) => scope === "both" || move.color === scope;
 
   // The mistake that cost the most winning chances, by canonical loss and quality
-  // evidence. A tiny loss on a move the analysis still called good — a critical
-  // choice, for instance — is not a mistake at all. Moves arrive in ascending ply,
+  // evidence. A tiny loss on a move the analysis still called good - a critical
+  // choice, for instance - is not a mistake at all. Moves arrive in ascending ply,
   // so a strict comparison keeps the earlier move on a tie.
   const worst = analysis.moves
     .filter((move) => inScope(move)
@@ -121,9 +123,28 @@ export function buildReviewCompletion(analysis: GameAnalysisV2, player: PlayerCo
     scope,
     mostImportantMistake: worst ? moment(worst) : null,
     highlight: highlight ? moment(highlight) : null,
-    lesson: phaseLesson(analysis, player),
+    lesson: phaseLesson(analysis, player, language),
   };
 }
+
+type LessonCopy = {
+  side: (color: PlayerColor) => string;
+  forPlayer: (phase: string, side: string, accuracy: string) => string;
+  forSide: (side: string, phase: string, accuracy: string) => string;
+};
+
+const LESSON_COPY: Record<UiLanguage, LessonCopy> = {
+  en: {
+    side: (color) => (color === "white" ? "White" : "Black"),
+    forPlayer: (phase, side, accuracy) => `${phase} was the lowest-scoring phase: ${side} Accuracy ${accuracy}.`,
+    forSide: (side, phase, accuracy) => `${side}'s ${phase.toLowerCase()} was the lowest-scoring phase in this game: Accuracy ${accuracy}.`,
+  },
+  "zh-CN": {
+    side: (color) => (color === "white" ? "白方" : "黑方"),
+    forPlayer: (phase, side, accuracy) => `${phase}是得分最低的阶段：${side}准确率 ${accuracy}。`,
+    forSide: (side, phase, accuracy) => `${side}的${phase}是这盘棋得分最低的阶段：准确率 ${accuracy}。`,
+  },
+};
 
 /**
  * The lowest-scoring scored phase, stated as a fact.
@@ -133,8 +154,9 @@ export function buildReviewCompletion(analysis: GameAnalysisV2, player: PlayerCo
  * known learner the sentence is theirs; without one it names the side, because an
  * anonymous review must not turn either player into "you".
  */
-function phaseLesson(analysis: GameAnalysisV2, player: PlayerColor | null): string | null {
+function phaseLesson(analysis: GameAnalysisV2, player: PlayerColor | null, language: UiLanguage): string | null {
   if (analysis.division.middlePly === undefined) return null;
+  const copy = LESSON_COPY[language];
   const scored = (color: PlayerColor) => PHASES.flatMap((phase) => {
     const value = (color === "white" ? analysis.white : analysis.black).phaseAccuracy[phase];
     return value === undefined ? [] : [{ phase, value }];
@@ -143,14 +165,10 @@ function phaseLesson(analysis: GameAnalysisV2, player: PlayerColor | null): stri
     const phases = scored(player);
     if (phases.length < 2) return null;
     const weakest = phases.reduce((lowest, entry) => (entry.value < lowest.value ? entry : lowest));
-    return `${phaseLabel(weakest.phase)} was the lowest-scoring phase: ${player === "white" ? "White" : "Black"} Accuracy ${weakest.value.toFixed(1)}.`;
+    return copy.forPlayer(phaseLabel(weakest.phase, language), copy.side(player), weakest.value.toFixed(1));
   }
   const sides = (["white", "black"] as const).flatMap((color) => scored(color).map((entry) => ({ color, ...entry })));
   if (sides.length < 2) return null;
   const weakest = sides.reduce((lowest, entry) => (entry.value < lowest.value ? entry : lowest));
-  return `${weakest.color === "white" ? "White" : "Black"}'s ${phaseLabel(weakest.phase).toLowerCase()} was the lowest-scoring phase in this game: Accuracy ${weakest.value.toFixed(1)}.`;
-}
-
-function phaseLabel(phase: GamePhase): string {
-  return phase === "middlegame" ? "Middlegame" : phase === "endgame" ? "Endgame" : "Opening";
+  return copy.forSide(copy.side(weakest.color), phaseLabel(weakest.phase, language), weakest.value.toFixed(1));
 }

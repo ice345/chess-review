@@ -25,7 +25,7 @@ describe("personal notebook persistence", () => {
     const book = await api.saveNotebookEntry(record, position, note, null);
     const entry = book.entries[0]!;
     expect(entry).toMatchObject({ ...position, ...note, id: notebookPositionKey(position) });
-    expect(notebookPositionLabel(record, position)).toBe("2. Bc4 2… Nf6");
+    expect(notebookPositionLabel(record, position, "en")).toBe("2. Bc4 2… Nf6");
     expect(await (await freshPage()).getReviewNotebook(record)).toEqual(book);
     expect((await library.getReviewRecord(record.id))?.originalPgn).toBe(PGN);
     expect(validateNotebook({ ...book, engine: "untrusted", entries: [{ ...entry, fen: "forged", classification: "brilliant", score: 1000 }] }, record)).toEqual(book);
@@ -125,7 +125,7 @@ describe("notebook validation and portable backup", () => {
     const { record, api, library } = await fixture();
     const fen = await library.saveReviewRecord(await library.buildReviewRecord("fen", "7k/8/8/8/8/8/p7/7K b - - 0 50"));
     const promotion = { rootPly: 0, line: ["a2a1n"] };
-    expect(notebookPositionLabel(fen, promotion)).toBe("50… a1=N");
+    expect(notebookPositionLabel(fen, promotion, "en")).toBe("50… a1=N");
     await api.saveNotebookEntry(record, position, note, null);
     await api.saveNotebookEntry(fen, promotion, note, null);
     const backup = await import("./library-backup"), file = await backup.createLibraryBackup();

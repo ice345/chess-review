@@ -49,8 +49,8 @@ describe("opening explorer population", () => {
   });
 
   it("names the population the numbers describe", () => {
-    expect(explorerPopulationLabel({ ratingFloor: 1600, speeds: ["blitz", "rapid", "classical"] })).toBe("rated 1600+ · blitz, rapid, classical");
-    expect(explorerPopulationLabel({ ratingFloor: null, speeds: [] })).toBe("all ratings · all speeds");
+    expect(explorerPopulationLabel({ ratingFloor: 1600, speeds: ["blitz", "rapid", "classical"] }, "en")).toBe("rated 1600+ · blitz, rapid, classical");
+    expect(explorerPopulationLabel({ ratingFloor: null, speeds: [] }, "en")).toBe("all ratings · all speeds");
   });
 
   it("reads only populations the contract defines", () => {

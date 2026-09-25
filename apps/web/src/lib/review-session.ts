@@ -1,4 +1,37 @@
-import type { CriticalMoment, GameAnalysisV2 } from "@chess-review/shared";
+import type { CriticalMoment, GameAnalysisV2, UiLanguage } from "@chess-review/shared";
+
+type CompletionCopy = {
+  noneCrossed: string;
+  onlyMoment: string;
+  allMoments: (total: number) => string;
+  someMoments: (seen: number, total: number) => string;
+  noSwing: string;
+  stillUnseen: (remaining: number) => string;
+  viewedIsNotSolved: string;
+};
+
+/* Counting a view is not counting a solve, and the wording has to keep saying so in
+   both languages: this line is the one place the product admits that. */
+const COMPLETION_COPY: Record<UiLanguage, CompletionCopy> = {
+  en: {
+    noneCrossed: "No key moment crossed the thresholds",
+    onlyMoment: "The only key moment was viewed",
+    allMoments: (total) => `All ${total} key moments viewed`,
+    someMoments: (seen, total) => `${seen} of ${total} key ${total === 1 ? "moment" : "moments"} viewed`,
+    noSwing: "This game had no swing large enough for a guided moment.",
+    stillUnseen: (remaining) => `${remaining} ${remaining === 1 ? "moment is" : "moments are"} still unseen; they stay available in Moves and Study.`,
+    viewedIsNotSolved: "Viewing a position is not the same as solving it; practice results are counted separately.",
+  },
+  "zh-CN": {
+    noneCrossed: "没有关键节点越过阈值",
+    onlyMoment: "唯一的关键节点已看过",
+    allMoments: (total) => `${total} 个关键节点全部看过`,
+    someMoments: (seen, total) => `${total} 个关键节点中看过 ${seen} 个`,
+    noSwing: "这盘棋的波动没有大到产生引导节点。",
+    stillUnseen: (remaining) => `还有 ${remaining} 个关键节点没看；它们仍可在「着法」和「学习」中找到。`,
+    viewedIsNotSolved: "看过一个局面不等于解出它；训练成绩单独计算。",
+  },
+};
 
 /**
  * What one review session actually did.
@@ -81,23 +114,21 @@ export function reviewSessionCounts(
  * contains. Browsing every moment is reported as browsing, because no practice
  * result is implied by it.
  */
-export function reviewCompletionHeadline(counts: ReviewSessionCounts): string {
-  if (counts.total === 0) return "No key moment crossed the thresholds";
+export function reviewCompletionHeadline(counts: ReviewSessionCounts, language: UiLanguage): string {
+  const copy = COMPLETION_COPY[language];
+  if (counts.total === 0) return copy.noneCrossed;
   if (counts.browsedEverything) {
-    return counts.total === 1
-      ? "The only key moment was viewed"
-      : `All ${counts.total} key moments viewed`;
+    return counts.total === 1 ? copy.onlyMoment : copy.allMoments(counts.total);
   }
-  return `${counts.seen} of ${counts.total} key ${counts.total === 1 ? "moment" : "moments"} viewed`;
+  return copy.someMoments(counts.seen, counts.total);
 }
 
 /** A second line that keeps the remaining work visible, or explains the state. */
-export function reviewCompletionDetail(counts: ReviewSessionCounts): string {
-  if (counts.total === 0) return "This game had no swing large enough for a guided moment.";
-  if (counts.remaining > 0) {
-    return `${counts.remaining} ${counts.remaining === 1 ? "moment is" : "moments are"} still unseen; they stay available in Moves and Study.`;
-  }
-  return "Viewing a position is not the same as solving it; practice results are counted separately.";
+export function reviewCompletionDetail(counts: ReviewSessionCounts, language: UiLanguage): string {
+  const copy = COMPLETION_COPY[language];
+  if (counts.total === 0) return copy.noSwing;
+  if (counts.remaining > 0) return copy.stillUnseen(counts.remaining);
+  return copy.viewedIsNotSolved;
 }
 
 /**

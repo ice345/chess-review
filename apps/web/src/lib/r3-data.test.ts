@@ -124,10 +124,10 @@ describe("position review ledger", () => {
   it("rejects a missing or changed source without credit", async () => {
     const { task, queue } = await seed();
     await queue.saveTrainingQueueItem({ ...task, evidence: [{ ...task.evidence[0]!, san: "d4" }] });
-    await expect(queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed")).rejects.toThrow("no longer matches");
+    await expect(queue.reviewTrainingPosition(task.id, task.evidence[0]!, "exposed", "en")).rejects.toThrow("no longer matches");
     expect((await queue.listTrainingQueue())[0]!.progress.positions).toEqual([]);
     await queue.saveTrainingQueueItem({ ...task, evidence: [{ ...task.evidence[0]!, gameId: "missing" }] });
-    await expect(queue.startTrainingTask(task.id)).rejects.toThrow("source game is missing");
+    await expect(queue.startTrainingTask(task.id, "en")).rejects.toThrow("source game is missing");
   });
   it("removes only deleted references and preserves acknowledged remaining positions", async () => {
     const { task, queue, record, lib } = await seed();

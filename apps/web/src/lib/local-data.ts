@@ -175,5 +175,4 @@ export async function deleteSyncedGamesForAccount(id: string, disconnect = false
 export async function clearObjectiveAnalysisCache(): Promise<void> { await cleanup({ kind: "cache" }); }
 export type LocalResetScope = "cache" | "all";
 export async function resetLocalData(scope: LocalResetScope): Promise<void> { await cleanup({ kind: scope }); }
-export const LOCAL_DATA_RETENTION = "Games and learning records are saved in this browser. Use Library backup below to keep a recoverable copy. Delete review removes its learning references; an imported source game remains available for a new review. Account game deletion also removes linked reviews. Cleanup pauses background work; reload other open tabs before continuing.";
 export { DEFAULT_APP_SETTINGS };

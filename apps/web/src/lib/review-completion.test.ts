@@ -50,7 +50,7 @@ describe("review completion facts", () => {
         { ply: 1, classification: "inaccuracy", winPercentSwing: 6 },
         { ply: 3, classification: "blunder", winPercentSwing: 24.5 },
       ],
-    }), "white");
+    }), "white", "en");
 
     expect(facts.keyMomentCount).toBe(2);
     expect(facts.mostImportantMistake).toMatchObject({ ply: 3, san: "Nf3", loss: 24.5, classification: "blunder" });
@@ -60,7 +60,7 @@ describe("review completion facts", () => {
     const facts = buildReviewCompletion(analysis({
       moves: [move({ ply: 1, san: "e4", color: "white" })],
       criticalMoments: [{ ply: 1, classification: "best", winPercentSwing: 0 }],
-    }), "white");
+    }), "white", "en");
 
     expect(facts.mostImportantMistake).toBeNull();
     expect(facts.keyMomentCount).toBe(1);
@@ -75,7 +75,7 @@ describe("review completion facts", () => {
         lost({ ply: 2, san: "e5", color: "black", quality: "best", classification: "great", annotations: ["critical"] }, 0.2),
       ],
       criticalMoments: [{ ply: 2, classification: "great", winPercentSwing: 0.2 }],
-    }), null);
+    }), null, "en");
 
     expect(facts.mostImportantMistake).toBeNull();
     expect(facts.highlight).toMatchObject({ ply: 2, annotations: ["critical"] });
@@ -85,7 +85,7 @@ describe("review completion facts", () => {
     const facts = buildReviewCompletion(analysis({
       moves: [lost({ ply: 2, san: "Qd5", color: "black", quality: "good", classification: "missed_win", annotations: ["missed_win"] }, 12)],
       criticalMoments: [{ ply: 2, classification: "missed_win", winPercentSwing: 12 }],
-    }), "black");
+    }), "black", "en");
 
     expect(facts.mostImportantMistake).toMatchObject({ ply: 2, classification: "missed_win" });
   });
@@ -97,7 +97,7 @@ describe("review completion facts", () => {
         move({ ply: 3, san: "Bb5", color: "white", classification: "brilliant", quality: "best", annotations: ["brilliant", "sacrifice"], accuracy: 100 }),
         move({ ply: 5, san: "Nf3", color: "white", classification: "best", quality: "best", accuracy: 100 }),
       ],
-    }), "white");
+    }), "white", "en");
 
     expect(facts.highlight).toMatchObject({ ply: 3, classification: "brilliant" });
   });
@@ -108,7 +108,7 @@ describe("review completion facts", () => {
         move({ ply: 1, san: "e4", color: "white", classification: "best", quality: "best", accuracy: 97 }),
         move({ ply: 3, san: "Nf3", color: "white", classification: "best", quality: "best", accuracy: 97 }),
       ],
-    }), "white");
+    }), "white", "en");
 
     expect(facts.highlight?.ply).toBe(1);
   });
@@ -120,34 +120,34 @@ describe("review completion facts", () => {
       move({ ply: 3, san: "Bb5", color: "white", classification: "best", quality: "best", accuracy: 99 }),
       move({ ply: 4, san: "Nc6", color: "black", classification: "best", quality: "best", accuracy: 88 }),
     ];
-    const black = buildReviewCompletion(analysis({ moves }), "black");
+    const black = buildReviewCompletion(analysis({ moves }), "black", "en");
     expect(black.mostImportantMistake).toMatchObject({ ply: 2, color: "black" });
     expect(black.highlight).toMatchObject({ ply: 4, color: "black" });
     expect(black.scope).toBe("black");
 
-    const both = buildReviewCompletion(analysis({ moves }), null);
+    const both = buildReviewCompletion(analysis({ moves }), null, "en");
     expect(both.scope).toBe("both");
     expect(both.mostImportantMistake).toMatchObject({ ply: 1, color: "white" });
     expect(both.highlight).toMatchObject({ ply: 3, color: "white" });
   });
 
   it("states the visitor's weakest scored phase as a fact", () => {
-    const facts = buildReviewCompletion(analysis(), "black");
+    const facts = buildReviewCompletion(analysis(), "black", "en");
     expect(facts.lesson).toBe("Middlegame was the lowest-scoring phase: Black Accuracy 60.0.");
   });
 
   it("names the side's lowest-scoring phase when no learner is known", () => {
-    const facts = buildReviewCompletion(analysis(), null);
+    const facts = buildReviewCompletion(analysis(), null, "en");
 
     expect(facts.scope).toBe("both");
     expect(facts.lesson).toBe("Black's middlegame was the lowest-scoring phase in this game: Accuracy 60.0.");
   });
 
   it("makes no phase claim when the game never left the opening or a side has no scored phase", () => {
-    expect(buildReviewCompletion(analysis({ division: { totalPlies: 2 } }), "white").lesson).toBeNull();
+    expect(buildReviewCompletion(analysis({ division: { totalPlies: 2 } }), "white", "en").lesson).toBeNull();
     expect(buildReviewCompletion(analysis({
       black: { color: "black", accuracy: 72, phaseAccuracy: { opening: 88 }, classificationCounts: {}, qualityCounts: { best: 0, excellent: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 }, annotationCounts: {} },
-    }), null).lesson).toBe("White's middlegame was the lowest-scoring phase in this game: Accuracy 80.0.");
+    }), null, "en").lesson).toBe("White's middlegame was the lowest-scoring phase in this game: Accuracy 80.0.");
   });
 });
 
@@ -157,7 +157,7 @@ describe("completion moment evidence", () => {
     const quality: MoveQuality = "best";
     const facts = buildReviewCompletion(analysis({
       moves: [move({ ply: 1, san: "Bb5", color: "white", classification: "brilliant", quality, annotations, accuracy: 98.4 })],
-    }), "white");
+    }), "white", "en");
 
     expect(facts.highlight).toEqual({
       ply: 1,

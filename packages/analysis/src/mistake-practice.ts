@@ -5,6 +5,7 @@ import type {
   HumanFindDifficulty,
   MoveAnalysisV2,
   PlayerColor,
+  UiLanguage,
 } from "@chess-review/shared";
 import { humanFindDifficulty } from "./human-difficulty";
 import { scoreForColor } from "./score";
@@ -163,6 +164,7 @@ export function practiceHumanComparison(input: {
   secondBestGapCp?: number;
   secondBestGapWinPercent?: number;
   tacticalMotifCount: number;
+  language: UiLanguage;
 }): PracticeHumanComparison {
   const best = input.human.candidates.find((candidate) => candidate.uci === input.bestMove);
   // Only computed when the probability is real; see the field comment.
@@ -182,9 +184,21 @@ export function practiceHumanComparison(input: {
   // the engine's move there is nothing to compare, and claiming the played move
   // was the natural one would be an unsupported conclusion.
   const natural = best !== undefined && input.human.playedMoveProbability > best.probability;
-  const bestClause = best === undefined
-    ? "Maia did not evaluate the stronger move at this level."
-    : `the stronger move is chosen ${percentText(best.probability)} of the time.`;
+  const language = input.language;
+  const bestClause = language === "zh-CN"
+    ? (best === undefined
+      ? "Maia 未在该水平评估更强的着法。"
+      : `更强的着法只有 ${percentText(best.probability)} 的选择率。`)
+    : (best === undefined
+      ? "Maia did not evaluate the stronger move at this level."
+      : `the stronger move is chosen ${percentText(best.probability)} of the time.`);
+  const summary = language === "zh-CN"
+    ? (natural
+      ? `在 ${input.human.targetElo} 水平，${playedPct} 的棋手会选择你下的这步（Maia 排名 #${input.human.playedMoveRank}），而${bestClause}常见着法其实是错的。`
+      : `在 ${input.human.targetElo} 水平，你下了一手只有 ${playedPct} 选择率的着法（Maia 排名 #${input.human.playedMoveRank}）。${bestClause}`)
+    : (natural
+      ? `At ${input.human.targetElo}, ${playedPct} of players choose the move you played (Maia rank #${input.human.playedMoveRank}), while ${bestClause} The natural move was the wrong one.`
+      : `At ${input.human.targetElo}, you played a move chosen ${playedPct} of the time (Maia rank #${input.human.playedMoveRank}). ${bestClause}`);
   return {
     targetElo: input.human.targetElo,
     model: input.human.model,
@@ -195,8 +209,6 @@ export function practiceHumanComparison(input: {
     playedMoveWasNatural: natural,
     // Both branches name the rank exactly once; the two clauses are joined with a
     // period so a missing comparison does not read as a comma-spliced run-on.
-    summary: natural
-      ? `At ${input.human.targetElo}, ${playedPct} of players choose the move you played (Maia rank #${input.human.playedMoveRank}), while ${bestClause} The natural move was the wrong one.`
-      : `At ${input.human.targetElo}, you played a move chosen ${playedPct} of the time (Maia rank #${input.human.playedMoveRank}). ${bestClause}`,
+    summary,
   };
 }

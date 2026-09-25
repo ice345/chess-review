@@ -1,5 +1,5 @@
 import { parsePgn, replayUciLine, type NormalizedGame } from "@chess-review/chess-core";
-import { formatMoveNotation } from "@chess-review/shared";
+import { formatMoveNotation, type UiLanguage } from "@chess-review/shared";
 import type { ReviewRecord } from "./review-library";
 
 export const MAX_NOTEBOOK_ENTRIES = 200;
@@ -81,7 +81,24 @@ export function validateNotebook(value: unknown, record: ReviewRecord, game = no
   return { version: 1, id: record.id, entries };
 }
 
-export function notebookPositionLabel(record: ReviewRecord, position: NotebookPosition, game = notebookSource(record)): string {
+const POSITION_COPY: Record<UiLanguage, {
+  after: (san: string) => string;
+  imported: string;
+  starting: string;
+}> = {
+  en: {
+    after: (san) => `After ${san}`,
+    imported: "Imported position",
+    starting: "Starting position",
+  },
+  "zh-CN": {
+    after: (san) => `${san} 之后`,
+    imported: "导入局面",
+    starting: "起始局面",
+  },
+};
+
+export function notebookPositionLabel(record: ReviewRecord, position: NotebookPosition, language: UiLanguage, game = notebookSource(record)): string {
   const root = notebookRootFen(record, position.rootPly, game);
   if (position.line.length) {
     const moves = replayUciLine(root, position.line);
@@ -92,5 +109,6 @@ export function notebookPositionLabel(record: ReviewRecord, position: NotebookPo
     })).join(" ");
   }
   const move = game?.plies[position.rootPly - 1];
-  return move ? `After ${formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san })}` : record.kind === "fen" ? "Imported position" : "Starting position";
+  const copy = POSITION_COPY[language];
+  return move ? copy.after(formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san })) : record.kind === "fen" ? copy.imported : copy.starting;
 }

@@ -1,19 +1,17 @@
-import type { MoveAnalysisV2, MoveAnnotation } from "@chess-review/shared";
-import { classificationForAnnotation, QUALITY_META } from "@chess-review/ui";
+import type { MoveAnalysisV2, MoveAnnotation, UiLanguage } from "@chess-review/shared";
+import { classificationForAnnotation, qualityLabel } from "@chess-review/ui";
 
+/** Display order for the annotations a move can carry. */
 export const ANNOTATION_ORDER: MoveAnnotation[] = ["brilliant", "critical", "book", "forced", "sacrifice", "missed_win", "missed_mate"];
-export const ANNOTATION_LABEL: Record<MoveAnnotation, string> = {
-  brilliant: "Brilliant",
-  critical: "Critical",
-  book: "Book",
-  forced: "Forced",
-  sacrifice: "Sacrifice",
-  missed_win: "Missed win",
-  missed_mate: "Missed mate",
-};
 
-export function displayedMoveQualityLabel(move: Pick<MoveAnalysisV2, "classification">): string {
-  return QUALITY_META[move.classification].label;
+/**
+ * The name of the move's quality, in the interface language.
+ *
+ * The names themselves live in `@chess-review/ui` alongside the marks, because the
+ * board badge, the move list and the export all have to agree on them.
+ */
+export function displayedMoveQualityLabel(move: Pick<MoveAnalysisV2, "classification">, language: UiLanguage): string {
+  return qualityLabel(move.classification, language);
 }
 
 /** Annotations whose V3 silhouette is not already the row's classification icon. */

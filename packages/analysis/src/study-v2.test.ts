@@ -103,7 +103,7 @@ describe("advanced-study-v2", () => {
       game("cc-2", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "loss", 1510),
       game("li-1", "lichess", "blitz", "2026-08-03T00:00:00.000Z", "win", 1800),
     ];
-    const report = buildAdvancedStudyReportV2(games, { ...FILTERS, providers: ["chesscom"] }, undefined, "2026-08-26T00:00:00.000Z");
+    const report = buildAdvancedStudyReportV2(games, { ...FILTERS, providers: ["chesscom"] }, "en", undefined, "2026-08-26T00:00:00.000Z");
 
     expect(report.algorithmVersion).toBe(STUDY_ALGORITHM_V2);
     expect(report.overview.summary.gameCount).toBe(2);
@@ -124,14 +124,14 @@ describe("advanced-study-v2", () => {
     const white = game("white", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500);
     const black = { ...game("black", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "loss", 1510), playerColor: "black" as const };
     const openingKey = "white|C50|Italian Game|";
-    const combined = buildAdvancedStudyReportV2([white, black], FILTERS);
-    const recent = buildAdvancedStudyReportV2([white, black], { ...FILTERS, dateFrom: "2026-08-02T00:00:00.000Z" });
+    const combined = buildAdvancedStudyReportV2([white, black], FILTERS, "en");
+    const recent = buildAdvancedStudyReportV2([white, black], { ...FILTERS, dateFrom: "2026-08-02T00:00:00.000Z" }, "en");
     const report = buildAdvancedStudyReportV2([white, black], {
       ...FILTERS,
       playerColors: ["white"],
       openingKeys: [openingKey],
       minimumSampleSize: 2,
-    });
+    }, "en");
 
     expect(combined.openings.map(({ color }) => color).sort()).toEqual(["black", "white"]);
     expect(recent.overview.summary.gameCount).toBe(1);
@@ -147,7 +147,7 @@ describe("advanced-study-v2", () => {
       game("cc", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500),
       game("li", "lichess", "rapid", "2026-08-02T00:00:00.000Z", "win", 1800),
       game("cc-b", "chesscom", "blitz", "2026-08-03T00:00:00.000Z", "loss", 1400),
-    ], FILTERS);
+    ], FILTERS, "en");
 
     expect(report.ratings).toHaveLength(3);
     expect(report.ratings.every((band) => band.confidence === "low" && band.nextTarget === undefined)).toBe(true);
@@ -161,7 +161,7 @@ describe("advanced-study-v2", () => {
       `2026-08-0${index + 1}T00:00:00.000Z`,
       index < 3 ? "win" : "loss",
       1500 + index * 10,
-    )), FILTERS);
+    )), FILTERS, "en");
 
     expect(report.ratings[0]).toMatchObject({ confidence: "medium", currentRating: 1540, nextTarget: 1600 });
   });
@@ -182,7 +182,7 @@ describe("advanced-study-v2", () => {
     delete games[4]!.source!.opponentRating;
     delete games[5]!.source!.opponentRating;
 
-    const report = buildAdvancedStudyReportV2(games, FILTERS);
+    const report = buildAdvancedStudyReportV2(games, FILTERS, "en");
     expect(report.ratings[0]).toMatchObject({ performanceSampleSize: 4, scoreRate: 50 });
     expect(report.ratings[0]?.performanceRating).toBeUndefined();
   });
@@ -195,17 +195,17 @@ describe("advanced-study-v2", () => {
 
   it("keeps draw-heavy and strength-of-opposition estimates honest", () => {
     const draws = Array.from({ length: 6 }, (_, index) => game(`draw-${index}`, "chesscom", "rapid", `2026-08-0${index + 1}T00:00:00.000Z`, "draw", 1500));
-    const drawReport = buildAdvancedStudyReportV2(draws, FILTERS);
+    const drawReport = buildAdvancedStudyReportV2(draws, FILTERS, "en");
     expect(drawReport.ratings[0]).toMatchObject({ scoreRate: 50, performanceRating: 1520, performanceSampleSize: 6 });
 
     const strongOpposition = Array.from({ length: 6 }, (_, index) => game(`strong-${index}`, "chesscom", "rapid", `2026-08-0${index + 1}T00:00:00.000Z`, index < 5 ? "win" : "draw", 1500));
     strongOpposition.forEach((item) => { item.source = { ...item.source!, opponentRating: 1900 }; });
-    const strongReport = buildAdvancedStudyReportV2(strongOpposition, FILTERS);
+    const strongReport = buildAdvancedStudyReportV2(strongOpposition, FILTERS, "en");
     expect(strongReport.ratings[0]?.performanceRating).toBeGreaterThan(1900);
 
     const weakOpposition = Array.from({ length: 6 }, (_, index) => game(`weak-${index}`, "chesscom", "rapid", `2026-08-0${index + 1}T00:00:00.000Z`, index < 1 ? "win" : "loss", 1500));
     weakOpposition.forEach((item) => { item.source = { ...item.source!, opponentRating: 1100 }; });
-    const weakReport = buildAdvancedStudyReportV2(weakOpposition, FILTERS);
+    const weakReport = buildAdvancedStudyReportV2(weakOpposition, FILTERS, "en");
     expect(weakReport.ratings[0]?.performanceRating).toBeLessThan(1100);
   });
 
@@ -213,7 +213,7 @@ describe("advanced-study-v2", () => {
     const missing = game("missing", "lichess", "rapid", "2026-08-01T00:00:00.000Z", "draw", 1800);
     missing.source = { accountId: "lichess-ada", provider: "lichess", timeClass: "rapid", rated: true };
 
-    const report = buildAdvancedStudyReportV2([missing], FILTERS);
+    const report = buildAdvancedStudyReportV2([missing], FILTERS, "en");
 
     expect(report.ratings[0]).toMatchObject({ confidence: "low", sampleSize: 1 });
     expect(report.ratings[0]?.currentRating).toBeUndefined();
@@ -236,7 +236,7 @@ describe("advanced-study-v2", () => {
     });
     const report = buildAdvancedStudyReportV2([
       game("g1", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500, { moves: [critical] }),
-    ], FILTERS, {
+    ], FILTERS, "en", {
       eligibleGames: 10,
       analyzedGames: 1,
       staleGames: 2,
@@ -251,7 +251,7 @@ describe("advanced-study-v2", () => {
   });
 
   it("names an empty scope instead of claiming complete coverage of nothing", () => {
-    const empty = buildAdvancedStudyReportV2([], FILTERS, {
+    const empty = buildAdvancedStudyReportV2([], FILTERS, "en", {
       eligibleGames: 0,
       analyzedGames: 0,
       staleGames: 0,
@@ -260,7 +260,7 @@ describe("advanced-study-v2", () => {
     });
     const complete = buildAdvancedStudyReportV2([
       game("g1", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500),
-    ], FILTERS, {
+    ], FILTERS, "en", {
       eligibleGames: 1,
       analyzedGames: 1,
       staleGames: 0,
@@ -276,7 +276,7 @@ describe("advanced-study-v2", () => {
     const unverified = move(5, "white", { annotations: ["brilliant"], classification: "brilliant" });
     const report = buildAdvancedStudyReportV2([
       game("g1", "chesscom", "rapid", "2026-08-01T00:00:00.000Z", "win", 1500, { moves: [unverified] }),
-    ], FILTERS);
+    ], FILTERS, "en");
 
     expect(report.specialMoves).toEqual([]);
   });
@@ -296,7 +296,7 @@ describe("advanced-study-v2", () => {
       game("comeback", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "win", 1510, { moves: [withChances(1, 15, 15)] }),
       game("save", "chesscom", "rapid", "2026-08-03T00:00:00.000Z", "draw", 1520, { moves: [withChances(1, 18, 18)] }),
       game("conversion", "chesscom", "rapid", "2026-08-04T00:00:00.000Z", "win", 1530, { moves: [withChances(1, 80, 79)] }),
-    ], FILTERS);
+    ], FILTERS, "en");
 
     expect(new Set(report.gameHighlights.map(({ kind }) => kind))).toEqual(new Set(["best-game", "comeback", "save", "clean-conversion"]));
   });
@@ -321,8 +321,8 @@ describe("advanced-study-v2", () => {
       game("g2", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "loss", 1490, { moves: [error] }),
     ];
 
-    expect(buildAdvancedStudyReportV2(games, FILTERS).weaknesses[0]).toMatchObject({ gameCount: 2, incidentCount: 2 });
-    expect(buildAdvancedStudyReportV2(games, { ...FILTERS, minimumSampleSize: 3 }).weaknesses).toEqual([]);
+    expect(buildAdvancedStudyReportV2(games, FILTERS, "en").weaknesses[0]).toMatchObject({ gameCount: 2, incidentCount: 2 });
+    expect(buildAdvancedStudyReportV2(games, { ...FILTERS, minimumSampleSize: 3 }, "en").weaknesses).toEqual([]);
   });
 
   it("rejects mixed objective versions", () => {
@@ -331,6 +331,6 @@ describe("advanced-study-v2", () => {
       // Deliberately NOT the current constant: this test is about refusing to
       // mix identities, so the second game must carry a different one.
       game("g2", "chesscom", "rapid", "2026-08-02T00:00:00.000Z", "win", 1510, { algorithmVersion: "objective-v2.0" }),
-    ], FILTERS)).toThrow(/cannot mix objective algorithm versions/i);
+    ], FILTERS, "en")).toThrow(/cannot mix objective algorithm versions/i);
   });
 });

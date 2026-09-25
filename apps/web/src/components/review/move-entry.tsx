@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import type { UiLanguage } from "@chess-review/shared";
 import { resolveMoveInput } from "@chess-review/chess-core";
 import { useReviewStore } from "../../store/review-store";
 import { useReviewRuntime } from "../review-runtime";
+import { useUiLanguage } from "../../hooks/use-ui-language";
 
 /**
  * The keyboard equivalent of moving a piece on the board.
@@ -17,6 +19,43 @@ import { useReviewRuntime } from "../review-runtime";
  */
 type PlayMove = (from: string, to: string, promotion?: "q" | "r" | "b" | "n") => boolean;
 
+type MoveEntryCopy = {
+  empty: string;
+  illegal: (text: string) => string;
+  couldNotPlay: (san: string) => string;
+  played: (san: string) => string;
+  label: string;
+  placeholder: string;
+  play: string;
+  helpCompact: string;
+  help: string;
+};
+
+const COPY: Record<UiLanguage, MoveEntryCopy> = {
+  en: {
+    empty: "Type a move first, for example Nf3, e2e4, O-O or e8=Q.",
+    illegal: (text) => `\u201c${text}\u201d is not a legal move in this position. Use SAN (Nf3, O-O, e8=Q) or UCI (g1f3, e7e8q).`,
+    couldNotPlay: (san) => `\u201c${san}\u201d could not be played from this position.`,
+    played: (san) => `Played ${san}.`,
+    label: "Play a move",
+    placeholder: "Nf3 or g1f3",
+    play: "Play",
+    helpCompact: "SAN or UCI, for example e8=Q.",
+    help: "SAN or UCI. Promotions name the piece, for example e8=Q.",
+  },
+  "zh-CN": {
+    empty: "请先输入着法，例如 Nf3、e2e4、O-O 或 e8=Q。",
+    illegal: (text) => `\u201c${text}\u201d 在此局面不是合法着法。请使用 SAN（Nf3、O-O、e8=Q）或 UCI（g1f3、e7e8q）。`,
+    couldNotPlay: (san) => `\u201c${san}\u201d 无法在此局面走出。`,
+    played: (san) => `已走 ${san}。`,
+    label: "走出一步",
+    placeholder: "Nf3 或 g1f3",
+    play: "走棋",
+    helpCompact: "SAN 或 UCI，例如 e8=Q。",
+    help: "SAN 或 UCI。升变需指定棋子，例如 e8=Q。",
+  },
+};
+
 export function MoveEntry({
   compact = false,
   playMove,
@@ -25,6 +64,7 @@ export function MoveEntry({
   /** Prefer the board-owned play path when rendered inside ReviewBoardSurface. */
   playMove?: PlayMove;
 } = {}) {
+  const copy = COPY[useUiLanguage()];
   const runtime = useReviewRuntime();
   const play = playMove ?? runtime.playMove;
   const positionFen = useReviewStore((store) => store.positionFen);
@@ -38,23 +78,23 @@ export function MoveEntry({
     if (resolved === null) {
       setMessage(null);
       setError(text === ""
-        ? "Type a move first, for example Nf3, e2e4, O-O or e8=Q."
-        : `“${text}” is not a legal move in this position. Use SAN (Nf3, O-O, e8=Q) or UCI (g1f3, e7e8q).`);
+        ? copy.empty
+        : copy.illegal(text));
       return;
     }
     setError(null);
     const played = play(resolved.from, resolved.to, resolved.promotion);
     if (!played) {
-      setError(`“${resolved.san}” could not be played from this position.`);
+      setError(copy.couldNotPlay(resolved.san));
       return;
     }
-    setMessage(`Played ${resolved.san}.`);
+    setMessage(copy.played(resolved.san));
     setValue("");
   }
 
   return (
     <form className="move-entry" onSubmit={submit}>
-      <label htmlFor="board-move-input">Play a move</label>
+      <label htmlFor="board-move-input">{copy.label}</label>
       <input
         id="board-move-input"
         name="move"
@@ -64,12 +104,12 @@ export function MoveEntry({
         autoCorrect="off"
         spellCheck={false}
         value={value}
-        placeholder="Nf3 or g1f3"
+        placeholder={copy.placeholder}
         aria-describedby="board-move-help"
         onChange={(event) => { setValue(event.currentTarget.value); setError(null); }}
       />
-      <button type="submit" className="secondary">Play</button>
-      <small id="board-move-help">{compact ? "SAN or UCI, for example e8=Q." : "SAN or UCI. Promotions name the piece, for example e8=Q."}</small>
+      <button type="submit" className="secondary">{copy.play}</button>
+      <small id="board-move-help">{compact ? copy.helpCompact : copy.help}</small>
       {message !== null && <p className="move-entry-message" role="status">{message}</p>}
       {error !== null && <p className="move-entry-error" role="alert">{error}</p>}
     </form>

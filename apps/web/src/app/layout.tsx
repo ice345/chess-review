@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SITE_DESCRIPTION, SITE_NAME } from "../lib/site-info";
 import type { ReactNode } from "react";
 import { ServiceWorkerRegistrar } from "../components/service-worker-registrar";
+import { InterfaceLanguage } from "../components/interface-language";
 import { AppShell } from "../components/app-shell";
 import "./styles/tokens.css";
 import "./styles/base.css";
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <AppShell>{children}</AppShell>
+        <InterfaceLanguage />
         <ServiceWorkerRegistrar />
       </body>
     </html>

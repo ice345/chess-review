@@ -17,6 +17,7 @@ import type {
   PlatformAccount,
   SyncedGame,
   TrainingQueueItemV3,
+  UiLanguage,
 } from "@chess-review/shared";
 import { subscribeLocalData } from "../lib/browser-storage";
 import {
@@ -41,20 +42,102 @@ import {
 } from "../lib/history-analysis-jobs";
 import { listPlatformAccounts, listSyncedGames } from "../lib/platform-library";
 import { createTrainingQueueItem, listTrainingQueue, saveTrainingQueueItem } from "../lib/training-queue";
+import { useUiLanguage } from "./use-ui-language";
+import { trainingTitle } from "../components/training-queue-panel";
 import {
   collapseHistoryJobs,
   DEFAULT_FILTERS,
   liveAnalysisStatus,
-  WEAKNESS_COPY,
 } from "../components/advanced-study/study-helpers";
 
 type QueueItem = TrainingQueueItemV3;
+
+type StudyCoreCopy = {
+  loadTraining: string;
+  loadPlayer: string;
+  refreshProgress: string;
+  refreshReports: string;
+  refreshCompleted: string;
+  noMatchingGames: string;
+  historyFailed: string;
+  resumeFailed: string;
+  updateJobFailed: string;
+  runRemoved: string;
+  removeRunFailed: string;
+  confirmRemoveRun: string;
+  confirmClearRuns: string;
+  noRunsToClear: string;
+  runsCleared: (n: number) => string;
+  clearRunsFailed: string;
+  addedToQueue: (title: string) => string;
+  saveTaskFailed: string;
+  whoseGames: string;
+  gameCount: (n: number) => string;
+  white: string;
+  black: string;
+  manual: string;
+};
+
+const COPY: Record<UiLanguage, StudyCoreCopy> = {
+  en: {
+    loadTraining: "Unable to load training data.",
+    loadPlayer: "Unable to load this player.",
+    refreshProgress: "Unable to refresh analysis progress.",
+    refreshReports: "Unable to refresh training reports.",
+    refreshCompleted: "Unable to refresh completed analyses.",
+    noMatchingGames: "No games match this analysis scope.",
+    historyFailed: "History analysis failed.",
+    resumeFailed: "Unable to resume history analysis.",
+    updateJobFailed: "Unable to update the history job.",
+    runRemoved: "Analysis run removed. Synced games and Practice data were kept.",
+    removeRunFailed: "Unable to remove this history run.",
+    confirmRemoveRun: "Remove this run from history? Synced games, reviews, Stockfish analyses and Practice data will stay.",
+    confirmClearRuns: "Clear finished analysis runs? This removes only run history; synced games, reviews, Stockfish analyses and Practice data will stay.",
+    noRunsToClear: "No finished analysis runs to clear.",
+    runsCleared: (n) => `${n} finished analysis run${n === 1 ? "" : "s"} cleared. Practice data was kept.`,
+    clearRunsFailed: "Unable to clear finished history runs.",
+    addedToQueue: (title) => `${title} added to the training queue.`,
+    saveTaskFailed: "Unable to save this task. Try again.",
+    whoseGames: "Whose games",
+    gameCount: (n) => `${n} ${n === 1 ? "game" : "games"}`,
+    white: "White",
+    black: "Black",
+    manual: "manual",
+  },
+  "zh-CN": {
+    loadTraining: "无法加载训练数据。",
+    loadPlayer: "无法加载此棋手。",
+    refreshProgress: "无法刷新分析进度。",
+    refreshReports: "无法刷新训练报告。",
+    refreshCompleted: "无法刷新已完成的分析。",
+    noMatchingGames: "没有对局符合此分析范围。",
+    historyFailed: "历史分析失败。",
+    resumeFailed: "无法继续历史分析。",
+    updateJobFailed: "无法更新历史任务。",
+    runRemoved: "分析记录已移除。已同步的对局和训练数据已保留。",
+    removeRunFailed: "无法移除此历史记录。",
+    confirmRemoveRun: "从历史中移除此记录？已同步的对局、复盘、Stockfish 分析和训练数据将保留。",
+    confirmClearRuns: "清除已完成的分析记录？这只删除运行历史；已同步的对局、复盘、Stockfish 分析和训练数据将保留。",
+    noRunsToClear: "没有已完成的分析记录可清除。",
+    runsCleared: (n) => `${n} 条已完成的分析记录已清除。训练数据已保留。`,
+    clearRunsFailed: "无法清除已完成的历史记录。",
+    addedToQueue: (title) => `${title} 已加入训练队列。`,
+    saveTaskFailed: "无法保存此任务。请重试。",
+    whoseGames: "谁的对局",
+    gameCount: (n) => `${n} 盘对局`,
+    white: "白方",
+    black: "黑方",
+    manual: "手动",
+  },
+};
 
 /**
  * Shared Practice/Stats data plane: player library, filters, history jobs, report.
  * Surface hooks add Practice chapter furniture or Stats report view-models.
  */
 export function useAdvancedStudyCore() {
+  const language = useUiLanguage();
+  const copy = COPY[language];
   const settings = useMemo(() => loadAppSettings(), []);
   const searchParams = useSearchParams();
   const scopedPlayerKey = searchParams.get("player") ?? "";
@@ -116,9 +199,9 @@ export function useAdvancedStudyCore() {
     void refreshSources().catch((error) => {
       setSummaries([]);
       setSourcesFailed(true);
-      setNotice(error instanceof Error ? error.message : "Unable to load training data.");
+      setNotice(error instanceof Error ? error.message : copy.loadTraining);
     });
-  }, [refreshSources]);
+  }, [copy.loadTraining, refreshSources]);
 
   useEffect(() => {
     setFiltersState((current) => current.openingKeys.length === 0 ? current : { ...current, openingKeys: [] });
@@ -143,11 +226,11 @@ export function useAdvancedStudyCore() {
     }).catch((error) => {
       if (!active) return;
       setQueueState("failed");
-      setNotice(error instanceof Error ? error.message : "Unable to load this player.");
+      setNotice(error instanceof Error ? error.message : copy.loadPlayer);
     });
     const unsubscribe = subscribeLocalData(() => { void listTrainingQueue(playerKey).then((items) => { if (active) { setQueue(items); loadedQueueKey.current = playerKey; setQueueState("ready"); } }).catch((error) => { if (active) { setQueueState("failed"); setNotice(String(error)); } }); });
     return () => { active = false; unsubscribe(); };
-  }, [playerKey, playerRevision]);
+  }, [copy.loadPlayer, playerKey, playerRevision]);
 
   const hasActiveHistoryJob = jobs.some((job) => !job.supersededBy && (job.status === "running" || job.status === "queued"));
   const activeJobSignature = jobs
@@ -159,16 +242,16 @@ export function useAdvancedStudyCore() {
   useEffect(() => {
     if (!hasActiveHistoryJob) return;
     const jobTimer = window.setInterval(() => {
-      void refreshJobs().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh analysis progress."));
+      void refreshJobs().catch((error) => setNotice(error instanceof Error ? error.message : copy.refreshProgress));
     }, 1500);
     const reportTimer = window.setInterval(() => {
-      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh training reports."));
+      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : copy.refreshReports));
     }, 8000);
     return () => {
       window.clearInterval(jobTimer);
       window.clearInterval(reportTimer);
     };
-  }, [hasActiveHistoryJob, refreshJobs, refreshSources]);
+  }, [copy.refreshProgress, copy.refreshReports, hasActiveHistoryJob, refreshJobs, refreshSources]);
 
   useEffect(() => {
     if (previousActiveJobs.current === null) {
@@ -176,10 +259,10 @@ export function useAdvancedStudyCore() {
       return;
     }
     if (previousActiveJobs.current !== "" && activeJobSignature === "") {
-      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh completed analyses."));
+      void refreshSources().catch((error) => setNotice(error instanceof Error ? error.message : copy.refreshCompleted));
     }
     previousActiveJobs.current = activeJobSignature;
-  }, [activeJobSignature, refreshSources]);
+  }, [activeJobSignature, copy.refreshCompleted, refreshSources]);
 
   const timeClasses = useMemo(() => [...new Set(player
     ? player.games.flatMap((game) => game.source?.timeClass ?? [])
@@ -237,7 +320,7 @@ export function useAdvancedStudyCore() {
       }),
     };
   }, [cacheBytes, compatibleGames, eligibleSynced, excludedGameIds, failedGameIds, filters, player, settings.reviewDepth]);
-  const report = useMemo(() => player ? buildAdvancedStudyReportV2(compatibleGames, filters, coverage) : null, [compatibleGames, coverage, filters, player]);
+  const report = useMemo(() => player ? buildAdvancedStudyReportV2(compatibleGames, filters, language, coverage) : null, [compatibleGames, coverage, filters, language, player]);
   const queueIds = useMemo(() => new Set(queue.map(({ id }) => id)), [queue]);
 
   function setFilters(next: StudyReportFiltersV2) {
@@ -266,7 +349,7 @@ export function useAdvancedStudyCore() {
       if (job.status === "failed") job = await retryFailedHistoryAnalysisItems(job.id);
       setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]);
       if (job.items.length === 0) {
-        setNotice("No games match this analysis scope.");
+        setNotice(copy.noMatchingGames);
         return;
       }
       const completed = await runHistoryAnalysisJob(job.id, (updated) => setJobs((current) => [updated, ...current.filter((item) => item.id !== updated.id)]));
@@ -274,7 +357,7 @@ export function useAdvancedStudyCore() {
       await refreshSources();
       if (playerKey) setPlayer(await loadStudyPlayerLibrary(playerKey));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "History analysis failed.");
+      setNotice(error instanceof Error ? error.message : copy.historyFailed);
     } finally {
       setJobWorking(false);
     }
@@ -290,34 +373,34 @@ export function useAdvancedStudyCore() {
         updated = action === "retry" ? await retryFailedHistoryAnalysisItems(job.id) : job;
         void runHistoryAnalysisJob(updated.id, (progress) => setJobs((current) => [progress, ...current.filter((item) => item.id !== progress.id)]))
           .then(() => refreshSources())
-          .catch((error) => setNotice(error instanceof Error ? error.message : "Unable to resume history analysis."));
+          .catch((error) => setNotice(error instanceof Error ? error.message : copy.resumeFailed));
       }
       setJobs((current) => [updated, ...current.filter((item) => item.id !== updated.id)]);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to update the history job.");
+      setNotice(error instanceof Error ? error.message : copy.updateJobFailed);
     }
   }
 
   async function removeHistoryRun(job: HistoryAnalysisJobV1) {
     if (!isHistoryAnalysisJobFinished(job)) return;
-    if (!window.confirm("Remove this run from history? Synced games, reviews, Stockfish analyses and Practice data will stay.")) return;
+    if (!window.confirm(copy.confirmRemoveRun)) return;
     try {
       await removeHistoryAnalysisJob(job.id);
       setJobs((current) => current.filter((item) => item.id !== job.id));
-      setNotice("Analysis run removed. Synced games and Practice data were kept.");
+      setNotice(copy.runRemoved);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to remove this history run.");
+      setNotice(error instanceof Error ? error.message : copy.removeRunFailed);
     }
   }
 
   async function clearFinishedRuns() {
-    if (!window.confirm("Clear finished analysis runs? This removes only run history; synced games, reviews, Stockfish analyses and Practice data will stay.")) return;
+    if (!window.confirm(copy.confirmClearRuns)) return;
     try {
       const removed = await clearFinishedHistoryAnalysisJobs();
       setJobs((current) => current.filter((job) => !isHistoryAnalysisJobFinished(job)));
-      setNotice(removed === 0 ? "No finished analysis runs to clear." : `${removed} finished analysis run${removed === 1 ? "" : "s"} cleared. Practice data was kept.`);
+      setNotice(removed === 0 ? copy.noRunsToClear : copy.runsCleared(removed));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to clear finished history runs.");
+      setNotice(error instanceof Error ? error.message : copy.clearRunsFailed);
     }
   }
 
@@ -329,8 +412,8 @@ export function useAdvancedStudyCore() {
     try {
       await saveTrainingQueueItem(item, { ifAbsent: true });
       setQueue(await listTrainingQueue(player.key));
-      setNotice(`${WEAKNESS_COPY[weakness.kind].title} added to the training queue.`);
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to save this task. Try again."); } finally {
+      setNotice(copy.addedToQueue(trainingTitle(weakness.kind, language)));
+    } catch (error) { setNotice(error instanceof Error ? error.message : copy.saveTaskFailed); } finally {
       queueWorking.current = false;
       setWorkingItem(null);
     }
@@ -343,7 +426,7 @@ export function useAdvancedStudyCore() {
     setQueueState("loading");
     void refreshSources().catch((error) => {
       setSourcesFailed(true);
-      setNotice(error instanceof Error ? error.message : "Unable to load training data.");
+      setNotice(error instanceof Error ? error.message : copy.loadTraining);
     });
   }
 
@@ -352,14 +435,14 @@ export function useAdvancedStudyCore() {
     : sourcesFailed
       ? "failed"
       : queueState;
-  const analysisStatus = useMemo(() => liveAnalysisStatus(jobs), [jobs]);
+  const analysisStatus = useMemo(() => liveAnalysisStatus(jobs, language), [jobs, language]);
   const scopeGameCount = report?.overview.summary.gameCount ?? (player?.games.length ?? eligibleSynced.length);
   const availableGames = player === null ? 0 : player.games.length;
   const unanalyzedEligibleCount = eligibleSynced.filter((game) => !excludedGameIds.has(game.id) && !game.analyzed).length;
   const canAnalyzeHistory = accounts.length > 0 && unanalyzedEligibleCount > 0 && !hasActiveHistoryJob;
   const showRunHistory = historyJobGroups.length > 0;
 
-  const playerSelect: ReactNode = summaries && summaries.length > 0 ? <label className="study-player-select"><span>Whose games</span><select value={playerKey} onChange={(event) => { playerSelectionTouched.current = true; setPlayerKey(event.target.value); }}>{summaries.map((summary) => <option key={summary.key} value={summary.key}>{summary.name} · {summary.gameCount} {summary.gameCount === 1 ? "game" : "games"}{summary.color ? ` · ${summary.color === "white" ? "White" : "Black"}` : ""}{summary.provider ? ` · ${summary.provider === "chesscom" ? "Chess.com" : "Lichess"}` : " · manual"}</option>)}</select></label> : null;
+  const playerSelect: ReactNode = summaries && summaries.length > 0 ? <label className="study-player-select"><span>{copy.whoseGames}</span><select value={playerKey} onChange={(event) => { playerSelectionTouched.current = true; setPlayerKey(event.target.value); }}>{summaries.map((summary) => <option key={summary.key} value={summary.key}>{summary.name} · {copy.gameCount(summary.gameCount)}{summary.color ? ` · ${summary.color === "white" ? copy.white : copy.black}` : ""}{summary.provider ? ` · ${summary.provider === "chesscom" ? "Chess.com" : "Lichess"}` : ` · ${copy.manual}`}</option>)}</select></label> : null;
 
   return {
     settings,

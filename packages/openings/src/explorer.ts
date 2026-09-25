@@ -13,6 +13,7 @@
  */
 
 import { fenToEpd, normalizeFen } from "@chess-review/chess-core";
+import type { UiLanguage } from "@chess-review/shared";
 
 export type ExplorerSource = "lichess" | "masters";
 export const EXPLORER_SOURCES: readonly ExplorerSource[] = ["lichess", "masters"];
@@ -95,10 +96,50 @@ export function explorerPopulationKey(population: ExplorerPopulationV1): string 
   return `${rating}|${speeds.length === 0 ? "all-speeds" : speeds.join(",")}`;
 }
 
+const POPULATION_COPY: Record<UiLanguage, {
+  allRatings: string;
+  rated: (floor: number) => string;
+  allSpeeds: string;
+  speed: Record<ExplorerSpeed, string>;
+  speedSeparator: string;
+}> = {
+  en: {
+    allRatings: "all ratings",
+    rated: (floor) => `rated ${floor}+`,
+    allSpeeds: "all speeds",
+    speed: {
+      ultraBullet: "ultraBullet",
+      bullet: "bullet",
+      blitz: "blitz",
+      rapid: "rapid",
+      classical: "classical",
+      correspondence: "correspondence",
+    },
+    speedSeparator: ", ",
+  },
+  "zh-CN": {
+    allRatings: "全部等级分",
+    rated: (floor) => `等级分 ${floor}+`,
+    allSpeeds: "全部速度",
+    speed: {
+      ultraBullet: "极快棋",
+      bullet: "超快棋",
+      blitz: "闪棋",
+      rapid: "快棋",
+      classical: "经典",
+      correspondence: "通讯棋",
+    },
+    speedSeparator: "、",
+  },
+};
+
 /** How the numbers name their own population, e.g. "rated 1600+ · blitz, rapid, classical". */
-export function explorerPopulationLabel(population: ExplorerPopulationV1): string {
-  const rating = population.ratingFloor === null ? "all ratings" : `rated ${population.ratingFloor}+`;
-  const speeds = population.speeds.length === 0 ? "all speeds" : population.speeds.join(", ");
+export function explorerPopulationLabel(population: ExplorerPopulationV1, language: UiLanguage): string {
+  const copy = POPULATION_COPY[language];
+  const rating = population.ratingFloor === null ? copy.allRatings : copy.rated(population.ratingFloor);
+  const speeds = population.speeds.length === 0
+    ? copy.allSpeeds
+    : population.speeds.map((speed) => copy.speed[speed]).join(copy.speedSeparator);
   return `${rating} · ${speeds}`;
 }
 

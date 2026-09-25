@@ -1,5 +1,5 @@
-import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis } from "@chess-review/shared";
-import { BRAND_MARK_SOURCE, QUALITY_META } from "@chess-review/ui";
+import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis, type UiLanguage } from "@chess-review/shared";
+import { BRAND_MARK_SOURCE, QUALITY_META, phaseLabel, qualityLabel } from "@chess-review/ui";
 import { PIECE_ASSET_DIR, PIECE_ASSET_KEYS, boardPieceImageKey, type PieceAssetKey, type PieceSetId } from "./board-piece-assets";
 
 const PIECES: Record<string, string> = {
@@ -266,6 +266,7 @@ export async function renderDisplayedPositionCard(options: {
   orientation: "white" | "black";
   title: string;
   subtitle: string;
+  language: UiLanguage;
   pieceSet?: PieceSetId;
 }): Promise<Blob> {
   const [element, context] = canvas();
@@ -275,43 +276,103 @@ export async function renderDisplayedPositionCard(options: {
   drawBoard(context, options.fen, 50, 80, 520, options.orientation, pieces);
   context.fillStyle = "#294653";
   context.font = "800 28px system-ui";
-  context.fillText("Displayed position", 620, 174);
+  context.fillText(COPY[options.language].displayedPosition, 620, 174);
   context.fillStyle = "#71848d";
   context.font = "500 14px system-ui";
   context.fillText(options.fen, 620, 210);
   return toBlob(element);
 }
 
+type ExportCopy = {
+  displayedPosition: string;
+  objectiveGameReview: string;
+  whitePov: string;
+  moveAccuracy: string;
+  winPercentLoss: string;
+  phase: (label: string) => string;
+  rule: (rule: string) => string;
+  sacrifice: (material: number, see: number) => string;
+  engineLine: (version: string, depth: number, multiPv: number) => string;
+  white: string;
+  black: string;
+  whiteAccuracy: string;
+  blackAccuracy: string;
+  stockfishEvaluation: string;
+  pliesAndMoments: (plies: number, moments: number, version: string) => string;
+};
+
+/* The cards are a product surface, so their labels follow the interface language.
+   What they say *about the game* does not: the phase name comes from `phaseLabel`
+   and the rule id stays the canonical analysis value the panels also print. */
+const COPY: Record<UiLanguage, ExportCopy> = {
+  en: {
+    displayedPosition: "Displayed position",
+    objectiveGameReview: "Objective game review",
+    whitePov: "STOCKFISH · WHITE POV",
+    moveAccuracy: "MOVE ACCURACY",
+    winPercentLoss: "WIN% LOSS",
+    phase: (label) => `Phase · ${label}`,
+    rule: (rule) => `Rule · ${rule}`,
+    sacrifice: (material, see) => `Sacrifice · ${material} cp · SEE ${see}`,
+    engineLine: (version, depth, multiPv) => `Stockfish ${version} · Depth ${depth} · MultiPV ${multiPv}`,
+    white: "White",
+    black: "Black",
+    whiteAccuracy: "WHITE ACCURACY",
+    blackAccuracy: "BLACK ACCURACY",
+    stockfishEvaluation: "STOCKFISH EVALUATION",
+    pliesAndMoments: (plies, moments, version) => `${plies} plies · ${moments} key moments · ${version}`,
+  },
+  "zh-CN": {
+    displayedPosition: "当前局面",
+    objectiveGameReview: "客观复盘",
+    whitePov: "STOCKFISH · 白方视角",
+    moveAccuracy: "着法准确率",
+    winPercentLoss: "胜率损失",
+    phase: (label) => `阶段 · ${label}`,
+    rule: (rule) => `规则 · ${rule}`,
+    sacrifice: (material, see) => `弃子 · ${material} 厘兵 · SEE ${see}`,
+    engineLine: (version, depth, multiPv) => `Stockfish ${version} · 深度 ${depth} · MultiPV ${multiPv}`,
+    white: "白方",
+    black: "黑方",
+    whiteAccuracy: "白方准确率",
+    blackAccuracy: "黑方准确率",
+    stockfishEvaluation: "STOCKFISH 评估",
+    pliesAndMoments: (plies, moments, version) => `${plies} 个半回合 · ${moments} 个关键节点 · ${version}`,
+  },
+};
+
 export async function renderPositionCard(
   analysis: AnyGameAnalysis,
   move: MoveAnalysis,
   orientation: "white" | "black",
+  language: UiLanguage,
   pieceSet: PieceSetId = "liz-blue",
 ): Promise<Blob> {
+  const copy = COPY[language];
   const [element, context] = canvas();
   const [pieces, mark] = await Promise.all([loadBoardPieceImages(pieceSet), loadBrandMark()]);
   const moveNumber = formatMoveNotation({ fenBefore: move.fenBefore, color: move.color, san: move.san });
-  background(context, moveNumber, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : move.phase, mark);
+  background(context, moveNumber, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : phaseLabel(move.phase, language), mark);
   roundedRect(context, 35, 65, 550, 575, 20, "#fffdf8");
   drawBoard(context, move.fenAfter, 50, 80, 520, orientation, pieces);
 
   drawBadge(context, move, 620, 128, 76);
   context.fillStyle = QUALITY_META[move.classification].ink;
   context.font = "900 34px system-ui";
-  context.fillText(QUALITY_META[move.classification].label.toUpperCase(), 718, 174);
+  context.fillText(qualityLabel(move.classification, language).toUpperCase(), 718, 174);
   context.fillStyle = "#294653";
   context.font = "800 54px system-ui";
   context.fillText(scoreLabel(move.evaluationAfter), 620, 265);
   context.fillStyle = "#71848d";
   context.font = "600 14px system-ui";
-  context.fillText("STOCKFISH · WHITE POV", 620, 291);
+  context.fillText(copy.whitePov, 620, 291);
 
   roundedRect(context, 620, 330, 245, 105, 14, "#eef3f1");
   roundedRect(context, 885, 330, 270, 105, 14, "#f0e6e9");
   context.fillStyle = "#71848d";
   context.font = "600 13px system-ui";
-  context.fillText("MOVE ACCURACY", 642, 360);
-  context.fillText("WIN% LOSS", 907, 360);
+  context.fillText(copy.moveAccuracy, 642, 360);
+  context.fillText(copy.winPercentLoss, 907, 360);
   context.fillStyle = "#4f7385";
   context.font = "900 32px system-ui";
   context.fillText(move.accuracy.toFixed(1), 642, 404);
@@ -319,13 +380,13 @@ export async function renderPositionCard(
 
   context.fillStyle = "#354f5a";
   context.font = "700 16px system-ui";
-  context.fillText(`Phase · ${move.phase}`, 620, 493);
-  context.fillText(`Rule · ${move.classificationReason.precedenceRule.replaceAll("-", " ")}`, 620, 525);
+  context.fillText(copy.phase(phaseLabel(move.phase, language)), 620, 493);
+  context.fillText(copy.rule(move.classificationReason.precedenceRule.replaceAll("-", " ")), 620, 525);
   const sacrifice = move.classificationReason.sacrifice;
-  if (sacrifice) context.fillText(`Sacrifice · ${sacrifice.sacrificedMaterial} cp · SEE ${sacrifice.see}`, 620, 557);
+  if (sacrifice) context.fillText(copy.sacrifice(sacrifice.sacrificedMaterial, sacrifice.see), 620, 557);
   context.fillStyle = "#71848d";
   context.font = "500 12px system-ui";
-  context.fillText(`Stockfish ${analysis.engine.stockfishVersion} · Depth ${analysis.engine.depth} · MultiPV ${analysis.engine.multiPv}`, 620, 618);
+  context.fillText(copy.engineLine(analysis.engine.stockfishVersion, analysis.engine.depth, analysis.engine.multiPv), 620, 618);
   return toBlob(element);
 }
 
@@ -334,18 +395,19 @@ function graphValue(score: EngineScore): number {
   return Math.max(-6, Math.min(6, score.cp / 100));
 }
 
-export async function renderGameReviewCard(analysis: AnyGameAnalysis): Promise<Blob> {
+export async function renderGameReviewCard(analysis: AnyGameAnalysis, language: UiLanguage): Promise<Blob> {
+  const copy = COPY[language];
   const [element, context] = canvas();
-  const white = analysis.game.headers.White ?? "White";
-  const black = analysis.game.headers.Black ?? "Black";
-  background(context, `${white} — ${black}`, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : "Objective game review", await loadBrandMark());
+  const white = analysis.game.headers.White ?? copy.white;
+  const black = analysis.game.headers.Black ?? copy.black;
+  background(context, `${white} — ${black}`, analysis.opening ? `${analysis.opening.eco} · ${analysis.opening.name}` : copy.objectiveGameReview, await loadBrandMark());
 
   roundedRect(context, 40, 115, 530, 205, 18, "#fffdf8");
   roundedRect(context, 590, 115, 570, 205, 18, "#fffdf8");
   context.fillStyle = "#71848d";
   context.font = "700 14px system-ui";
-  context.fillText("WHITE ACCURACY", 70, 150);
-  context.fillText("BLACK ACCURACY", 620, 150);
+  context.fillText(copy.whiteAccuracy, 70, 150);
+  context.fillText(copy.blackAccuracy, 620, 150);
   context.fillStyle = "#4f7385";
   context.font = "900 70px system-ui";
   context.fillText(analysis.white.accuracy?.toFixed(1) ?? "—", 70, 225);
@@ -356,14 +418,15 @@ export async function renderGameReviewCard(analysis: AnyGameAnalysis): Promise<B
   const phases = ["opening", "middlegame", "endgame"] as const;
   phases.forEach((phase, index) => {
     const y = 260 + index * 22;
-    context.fillText(`${phase.toUpperCase()}  ${analysis.white.phaseAccuracy[phase]?.toFixed(1) ?? "—"}`, 70, y);
-    context.fillText(`${phase.toUpperCase()}  ${analysis.black.phaseAccuracy[phase]?.toFixed(1) ?? "—"}`, 620, y);
+    const label = phaseLabel(phase, language).toUpperCase();
+    context.fillText(`${label}  ${analysis.white.phaseAccuracy[phase]?.toFixed(1) ?? "—"}`, 70, y);
+    context.fillText(`${label}  ${analysis.black.phaseAccuracy[phase]?.toFixed(1) ?? "—"}`, 620, y);
   });
 
   roundedRect(context, 40, 340, 1120, 250, 18, "#fffdf8");
   context.fillStyle = "#354f5a";
   context.font = "800 16px system-ui";
-  context.fillText("STOCKFISH EVALUATION", 70, 378);
+  context.fillText(copy.stockfishEvaluation, 70, 378);
   const graphX = 75;
   const graphY = 410;
   const graphWidth = 1040;
@@ -393,7 +456,7 @@ export async function renderGameReviewCard(analysis: AnyGameAnalysis): Promise<B
   }
   context.fillStyle = "#71848d";
   context.font = "500 12px system-ui";
-  context.fillText(`${analysis.moves.length} plies · ${analysis.criticalMoments.length} key moments · ${analysis.algorithmVersion}`, 70, 635);
+  context.fillText(copy.pliesAndMoments(analysis.moves.length, analysis.criticalMoments.length, analysis.algorithmVersion), 70, 635);
   return toBlob(element);
 }
 

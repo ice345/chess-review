@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { Chessboard, defaultArrowOptions, type Arrow, type PieceRenderObject } from "react-chessboard";
 import { legalBoardDestinations, type NormalizedPly, type ReplayedUciMove } from "@chess-review/chess-core";
-import { QUALITY_META, BoardQualityBadge, WINDOWLIGHT_BOARD_APPEARANCE } from "@chess-review/ui";
-import type { EngineScore, MaiaPositionAnalysis, MoveAnalysisV2 } from "@chess-review/shared";
+import { BoardQualityBadge, WINDOWLIGHT_BOARD_APPEARANCE, qualityLabel } from "@chess-review/ui";
+import type { EngineScore, MaiaPositionAnalysis, MoveAnalysisV2, UiLanguage } from "@chess-review/shared";
 import type { AnalysisBranchMoveQuality, AnalysisBranchTree } from "../../lib/analysis-branch";
 import type { AnalysisMode } from "../../lib/board-analysis-arrows";
 import { faultArrow } from "../../lib/board-analysis-arrows";
@@ -25,6 +25,77 @@ import { EvaluationBar } from "./evaluation-bar";
 import { MoveEntry } from "./move-entry";
 import { MoveTransport } from "./move-transport";
 import { PlayerStrip } from "./player-strip";
+import { useUiLanguage } from "../../hooks/use-ui-language";
+
+type BoardSurfaceCopy = {
+  workspaceAria: string;
+  accuracy: (color: string, value: number) => string;
+  toMove: (side: string) => string;
+  promoteAria: string;
+  queen: string;
+  rook: string;
+  bishop: string;
+  knight: string;
+  cancel: string;
+  variation: (san: string) => string;
+  startingPosition: string;
+  qualityAccuracy: (quality: string, accuracy: string) => string;
+  analyzingQuality: string;
+  qualityFailed: string;
+  branchPly: (index: number, total: number) => string;
+  ply: (current: number, total: number) => string;
+  returnToGame: string;
+  temporaryVariation: string;
+  saveNotebook: string;
+  boardPosition: (fen: string) => string;
+};
+
+const COPY: Record<UiLanguage, BoardSurfaceCopy> = {
+  en: {
+    workspaceAria: "Persistent board workspace",
+    accuracy: (color, value) => `${color} \u00b7 ${value} accuracy`,
+    toMove: (side) => `${side} to move`,
+    promoteAria: "Choose promotion piece",
+    queen: "Queen",
+    rook: "Rook",
+    bishop: "Bishop",
+    knight: "Knight",
+    cancel: "Cancel",
+    variation: (san) => `Analysis variation \u00b7 ${san}`,
+    startingPosition: "Starting position",
+    qualityAccuracy: (quality, accuracy) => `${quality} \u00b7 Accuracy ${accuracy}`,
+    analyzingQuality: "Analyzing this move\u2019s objective quality\u2026",
+    qualityFailed: "Move Quality analysis failed",
+    branchPly: (index, total) => `${index} / ${total} branch ply`,
+    ply: (current, total) => `${current} / ${total} ply`,
+    returnToGame: "Return to game ",
+    temporaryVariation: "Temporary variation \u00b7 not saved automatically. ",
+    saveNotebook: "Save this position in Notebook \u2192",
+    boardPosition: (fen) => `Board position: ${fen}`,
+  },
+  "zh-CN": {
+    workspaceAria: "常驻棋盘工作区",
+    accuracy: (color, value) => `${color === "Black" ? "黑方" : "白方"} \u00b7 准确率 ${value}`,
+    toMove: (side) => `${side === "Black" ? "黑方" : side === "White" ? "白方" : side}走棋`,
+    promoteAria: "选择升变棋子",
+    queen: "后",
+    rook: "车",
+    bishop: "象",
+    knight: "马",
+    cancel: "取消",
+    variation: (san) => `分析变化 \u00b7 ${san}`,
+    startingPosition: "起始局面",
+    qualityAccuracy: (quality, accuracy) => `${quality} \u00b7 准确率 ${accuracy}`,
+    analyzingQuality: "正在分析这步的客观质量…",
+    qualityFailed: "着法质量分析失败",
+    branchPly: (index, total) => `${index} / ${total} 变化半回合`,
+    ply: (current, total) => `${current} / ${total} 半回合`,
+    returnToGame: "返回对局 ",
+    temporaryVariation: "临时变化 \u00b7 不会自动保存。",
+    saveNotebook: "将此局面保存到笔记 →",
+    boardPosition: (fen) => `棋盘局面：${fen}`,
+  },
+};
 
 type PromotionPiece = "q" | "r" | "b" | "n";
 
@@ -216,6 +287,8 @@ export function ReviewBoardSurface({
   onReturnToGame,
   notebookHref,
 }: ReviewBoardSurfaceProps) {
+  const language = useUiLanguage();
+  const copy = COPY[language];
   const interaction = useReviewBoardInteraction({
     positionFen,
     playAnalysisMove,
@@ -243,13 +316,13 @@ export function ReviewBoardSurface({
 
   return (
     <div className="analysis-column" data-review-surface="board">
-      <section className="position-workspace paper-panel board-card" aria-label="Persistent board workspace">
+      <section className="position-workspace paper-panel board-card" aria-label={copy.workspaceAria}>
         <div className={`board-player-header board-card-header${topAccuracy === undefined ? "" : " has-accuracy"}`}>
           <PlayerStrip player={orderedPlayers.top} />
           {topAccuracy !== undefined && (
-            <span className="board-card-accuracy">{`${orderedPlayers.top.color === "white" ? "White" : "Black"} · ${Math.round(topAccuracy)} accuracy`}</span>
+            <span className="board-card-accuracy">{copy.accuracy(orderedPlayers.top.color === "white" ? "White" : "Black", Math.round(topAccuracy))}</span>
           )}
-          <span className="board-card-turn">{`${sideToMove} to move`}</span>
+          <span className="board-card-turn">{copy.toMove(sideToMove)}</span>
           <div className="board-toolbar">
             <BoardControls
               menuRef={boardControlsRef}
@@ -300,7 +373,7 @@ export function ReviewBoardSurface({
                 <div
                   style={{ width: "100%", height: "100%", ...(boardSquareStyles[square] ?? {}) }}
                   role="group"
-                  aria-label={boardSquareDescription(square)}
+                  aria-label={boardSquareDescription(square, language)}
                 >
                   {children}
                 </div>
@@ -343,13 +416,13 @@ export function ReviewBoardSurface({
               boardStyle: WINDOWLIGHT_BOARD_APPEARANCE.boardStyle,
             }} />
             {pendingPromotion && (
-              <div className="promotion-chooser" role="dialog" aria-label="Choose promotion piece">
+              <div className="promotion-chooser" role="dialog" aria-label={copy.promoteAria}>
                 <div className="promotion-pieces">
                   {([
-                    ["q", "Queen"],
-                    ["r", "Rook"],
-                    ["b", "Bishop"],
-                    ["n", "Knight"],
+                    ["q", copy.queen],
+                    ["r", copy.rook],
+                    ["b", copy.bishop],
+                    ["n", copy.knight],
                   ] as const).map(([piece, label]) => {
                     const PromotionPiece = pieces[`${positionFen.split(" ")[1] === "b" ? "b" : "w"}${piece.toUpperCase()}`];
                     return (
@@ -368,20 +441,20 @@ export function ReviewBoardSurface({
                     );
                   })}
                 </div>
-                <button type="button" className="promotion-cancel" onClick={() => setPendingPromotion(null)}>Cancel</button>
+                <button type="button" className="promotion-cancel" onClick={() => setPendingPromotion(null)}>{copy.cancel}</button>
               </div>
             )}
             {!pendingPromotion && boardDisplay.boardQualityBadge && presentation.showMoveBadge && (branch && selectedBranchMove && selectedBranchQuality?.state === "complete"
-              ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={orientation} classification={selectedBranchQuality.classification} />
+              ? <BoardQualityBadge square={selectedBranchMove.uci.slice(2, 4)} orientation={orientation} classification={selectedBranchQuality.classification} language={language} />
               : currentAnalysis && !branch
-                ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={orientation} classification={currentAnalysis.classification} />
+                ? <BoardQualityBadge square={currentAnalysis.uci.slice(2, 4)} orientation={orientation} classification={currentAnalysis.classification} language={language} />
                 : null)}
           </div>
         </div>
         <div className={`board-card-footer${bottomAccuracy === undefined ? "" : " has-accuracy"}`}>
           <PlayerStrip player={orderedPlayers.bottom} />
           {bottomAccuracy !== undefined && (
-            <span className="board-card-accuracy">{`${orderedPlayers.bottom.color === "white" ? "White" : "Black"} · ${Math.round(bottomAccuracy)} accuracy`}</span>
+            <span className="board-card-accuracy">{copy.accuracy(orderedPlayers.bottom.color === "white" ? "White" : "Black", Math.round(bottomAccuracy))}</span>
           )}
           {record.subtitle ? <span className="board-card-meta">{record.subtitle}</span> : null}
         </div>
@@ -389,20 +462,20 @@ export function ReviewBoardSurface({
         <div className="move-dock">
           <div className="move-status">
             <span>
-              <strong>{branch ? `Analysis variation · ${selectedBranchMove?.san ?? "root"}` : currentMove ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}` : "Starting position"}</strong>
+              <strong>{branch ? copy.variation(selectedBranchMove?.san ?? "root") : currentMove ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}` : copy.startingPosition}</strong>
               <small>{branch
                 ? selectedBranchQuality?.state === "complete"
-                  ? `${QUALITY_META[selectedBranchQuality.classification].label} · Accuracy ${selectedBranchQuality.accuracy.toFixed(1)}`
+                  ? copy.qualityAccuracy(qualityLabel(selectedBranchQuality.classification, language), selectedBranchQuality.accuracy.toFixed(1))
                   : selectedBranchQuality?.state === "running"
-                    ? "Analyzing this move’s objective quality…"
+                    ? copy.analyzingQuality
                     : selectedBranchQuality?.state === "error"
-                      ? "Move Quality analysis failed"
-                      : `${branch.selectedIndex} / ${branch.activePath.length - 1} branch ply`
-                : `${currentPly} / ${totalPlies} ply`}</small>
+                      ? copy.qualityFailed
+                      : copy.branchPly(branch.selectedIndex, branch.activePath.length - 1)
+                : copy.ply(currentPly, totalPlies)}</small>
             </span>
-            {branch && <button type="button" className="return-to-game" onClick={onReturnToGame}>Return to game <kbd>Esc</kbd></button>}
+            {branch && <button type="button" className="return-to-game" onClick={onReturnToGame}>{copy.returnToGame}<kbd>Esc</kbd></button>}
           </div>
-          {branch && <p className="branch-session-note">Temporary variation · not saved automatically. <Link href={notebookHref}>Save this position in Notebook →</Link></p>}
+          {branch && <p className="branch-session-note">{copy.temporaryVariation}<Link href={notebookHref}>{copy.saveNotebook}</Link></p>}
           <MoveTransport
             isPlaying={playback.isPlaying}
             inVariation={branch !== null}
@@ -419,7 +492,7 @@ export function ReviewBoardSurface({
               workspace states what the board holds: FEN on demand, plus a polite
               announcement after every move. Operating the board is typed-move
               entry in Board settings, the transport, and the named move/candidate buttons. */}
-          <p className="sr-only">{`Board position: ${positionFen}`}</p>
+          <p className="sr-only">{copy.boardPosition(positionFen)}</p>
           <p className="sr-only" role="status" aria-live="polite">{positionAnnouncement}</p>
         </div>
       </section>

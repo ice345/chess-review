@@ -561,3 +561,62 @@ The queue is scoped to the selected player, and manual players have no connected
 sync backlog. Today offers no start action when no unreviewed or due position exists.
 Mistake/phase/opening/plan decision links open before the move; highlights still open
 the played move. No analysis formulas or mastery intervals changed.
+
+## September 25, 2026 — Interface language
+
+`UiLanguage` is `en` or `zh-CN`, stored as `settings.uiLanguage` and chosen in
+Settings under Interface language. It decides the wording of the whole interface.
+`CoachLanguage` is a separate decision: it is the language a lesson is *written* in,
+so an English interface can still ask for a Chinese explanation.
+
+Every screen keeps its own `COPY: Record<UiLanguage, …>` table next to the component
+that renders it — the pattern `coach-panel.tsx` established — and indexes it with
+`useUiLanguage()` (`apps/web/src/hooks/use-ui-language.ts`). That hook reads through
+`useSyncExternalStore` with a server snapshot of `en`: the prerendered HTML is
+English, the stored choice arrives after hydration, and the two agree during
+hydration, so switching language never logs a mismatch. `InterfaceLanguage` keeps
+`<html lang>` in step, which is what selects a CJK face and what a screen reader
+announces.
+
+Names that belong to the analysis rather than to a screen live in one table in
+`packages/ui`, not in each caller:
+
+- `QUALITY_LABELS` / `qualityLabel(classification, language)` — the move
+  classifications. `QUALITY_META` holds only the marks (ink, wash, symbol, motif).
+- `PHASE_LABELS` / `phaseLabel(phase, language)` — opening, middlegame, endgame.
+- `ANNOTATION_LABELS` / `annotationLabel(annotation, language)` — brilliant,
+  critical, book, forced, sacrifice, missed win, missed mate. An annotation is not a
+  classification: a move can carry one *in addition to* its quality, and the move
+  list, the evidence sentence and the exported card all have to name it the same way.
+- `HUMAN_DIFFICULTY_LABELS` — the Maia find-difficulty bands.
+
+`packages/ui` components that render text take an optional `language?: UiLanguage`
+prop and default to `en`; the package reads no application state itself. Wording that
+is only ever one screen's copy stays in that screen's component file.
+
+The English values are the previous literals, unchanged. The e2e suite runs with the
+default `en`, so the interface-language tests at `e2e/localization.spec.ts` assert
+both directions: Chinese follows the setting, and English still renders exactly what
+the rest of the suite matches on.
+
+Four English strings did change, all in the same direction: a raw canonical value was
+being printed where a name belonged. They are listed here because they are visible in
+English too.
+
+| Where | Was | Is |
+| --- | --- | --- |
+| Moves panel evidence line, phase | `middlegame` | `Middlegame` |
+| Stats/Growth eyebrows and mistake rows, phase | `middlegame` | `Middlegame` |
+| Exported position card, `Phase ·` | `middlegame` | `Phase · Middlegame` |
+| Practice difficulty sentence, Maia band | `very hard` | `Very Hard` |
+
+The first three printed the `GamePhase` enum member; the fourth printed the
+`HumanFindDifficultyLabel` id with its hyphens replaced. Both now go through
+`phaseLabel` and `HUMAN_DIFFICULTY_LABELS`, which is also what makes them translatable.
+No threshold, ranking or classification changed - only the wording of a value that had
+been leaking its identifier.
+
+`Rule ·` on the exported position card still prints the de-hyphenated
+`precedenceRule` id, because the verdict panels print the same id inside a `<code>`
+element. That is canonical analysis vocabulary, deliberately left raw in both
+languages.

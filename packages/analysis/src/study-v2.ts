@@ -7,6 +7,7 @@ import type {
   MoveQuality,
   PlayerColor,
   TrainingEvidenceReference,
+  UiLanguage,
 } from "@chess-review/shared";
 import {
   buildEngineConfigurations,
@@ -477,7 +478,7 @@ function weaknessProfiles(
   });
 }
 
-function openingFocusTitle(openings: OpeningProfileV2[]): string | undefined {
+function openingFocusTitle(openings: OpeningProfileV2[], language: UiLanguage): string | undefined {
   const chosen = openings
     .filter((opening) => opening.gameCount >= 2 && opening.problemPositions.length > 0)
     .sort((left, right) => (
@@ -487,22 +488,32 @@ function openingFocusTitle(openings: OpeningProfileV2[]): string | undefined {
       || left.name.localeCompare(right.name)
     ))[0];
   if (!chosen) return undefined;
+  if (language === "zh-CN") return `${chosen.color === "white" ? "白方" : "黑方"} ${chosen.name} 局面`;
   return `${chosen.color === "white" ? "White" : "Black"} ${chosen.name} positions`;
 }
 
-function trainingPlan(weaknesses: WeaknessProfileV2[], openings: OpeningProfileV2[]): TrainingRecommendationV2[] {
-  const openingTitle = openingFocusTitle(openings);
-  const titles: Record<RecurringWeakness["kind"], string> = {
-    "opening-decisions": openingTitle ?? "Repair recurring opening decisions",
-    "middlegame-decisions": "Improve middlegame decision quality",
-    "endgame-decisions": "Convert and hold endgames",
-    "missed-opportunities": "Convert objective opportunities",
-  };
+function trainingPlan(weaknesses: WeaknessProfileV2[], openings: OpeningProfileV2[], language: UiLanguage): TrainingRecommendationV2[] {
+  const openingTitle = openingFocusTitle(openings, language);
+  const titles: Record<RecurringWeakness["kind"], string> = language === "zh-CN"
+    ? {
+      "opening-decisions": openingTitle ?? "修复反复出现的开局决策",
+      "middlegame-decisions": "提高中局决策质量",
+      "endgame-decisions": "兑现并守住残局",
+      "missed-opportunities": "兑现客观机会",
+    }
+    : {
+      "opening-decisions": openingTitle ?? "Repair recurring opening decisions",
+      "middlegame-decisions": "Improve middlegame decision quality",
+      "endgame-decisions": "Convert and hold endgames",
+      "missed-opportunities": "Convert objective opportunities",
+    };
   return weaknesses.slice(0, 3).map((weakness, index) => ({
     rank: index + 1,
     weaknessKind: weakness.kind,
     title: titles[weakness.kind],
-    rationale: `${weakness.incidentCount} incidents across ${weakness.gameCount} games; ${weakness.trend} recent frequency.`,
+    rationale: language === "zh-CN"
+      ? `${weakness.incidentCount} 次出现于 ${weakness.gameCount} 盘对局；近期频率${weakness.trend === "improving" ? "改善" : weakness.trend === "worsening" ? "恶化" : "稳定"}。`
+      : `${weakness.incidentCount} incidents across ${weakness.gameCount} games; ${weakness.trend} recent frequency.`,
     targetPositionCount: Math.min(5, weakness.evidence.length),
     evidence: weakness.evidence.slice(0, 5),
   }));
@@ -511,6 +522,7 @@ function trainingPlan(weaknesses: WeaknessProfileV2[], openings: OpeningProfileV
 export function buildAdvancedStudyReportV2(
   inputs: readonly StudyGameInputV2[],
   filters: StudyReportFiltersV2,
+  language: UiLanguage,
   coverage?: StudyCoverageV2,
   generatedAt = new Date().toISOString(),
 ): AdvancedStudyReportV2 {
@@ -592,7 +604,7 @@ export function buildAdvancedStudyReportV2(
     specialMoves: specialMoves.slice(0, 100),
     gameHighlights: gameHighlights(games),
     weaknesses,
-    trainingPlan: trainingPlan(weaknesses, openings),
+    trainingPlan: trainingPlan(weaknesses, openings, language),
     engineConfigurations,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classificationForAnnotation, QUALITY_META } from "@chess-review/ui";
+import { ANNOTATION_LABELS, classificationForAnnotation, PHASE_LABELS, QUALITY_LABELS, QUALITY_META, annotationLabel, phaseLabel, qualityLabel } from "@chess-review/ui";
 
 describe("Move Quality Annotation System V3 metadata", () => {
   it("uses a distinct silhouette motif for every objective classification", () => {
@@ -28,7 +28,7 @@ describe("Move Quality Annotation System V3 metadata", () => {
   it("keeps the specified elite, positive, informational, warning and severe palettes", () => {
     expect(QUALITY_META).toMatchObject({
       brilliant: { ink: "#2f7f93", wash: "#d9eef2", motif: "diamond-double" },
-      great: { ink: "#647ba9", wash: "#e2e7f2", motif: "diamond-single", label: "Critical" },
+      great: { ink: "#647ba9", wash: "#e2e7f2", motif: "diamond-single" },
       best: { ink: "#3f7f73", wash: "#dceae5", motif: "circle-solid-check" },
       excellent: { ink: "#668c75", wash: "#e4ece3", motif: "circle-double-check" },
       good: { ink: "#788c72", wash: "#ebefe5", motif: "circle-check" },
@@ -42,5 +42,40 @@ describe("Move Quality Annotation System V3 metadata", () => {
       missed_win: { ink: "#95566a", wash: "#eddfe5", motif: "diamond-missed-win" },
       missed_mate: { ink: "#7f4459", wash: "#e8d6de", motif: "octagon-missed-mate" },
     });
+  });
+});
+
+describe("analysis vocabulary", () => {
+  const LANGUAGES = ["en", "zh-CN"] as const;
+
+  it("names every quality, phase and annotation in every language", () => {
+    for (const language of LANGUAGES) {
+      // A key missing from one language renders the literal string "undefined" in
+      // the board badge, the move list, the lesson and the exported card.
+      expect(Object.keys(QUALITY_LABELS[language]).sort()).toEqual(Object.keys(QUALITY_META).sort());
+      expect(Object.keys(PHASE_LABELS[language]).sort()).toEqual(["endgame", "middlegame", "opening"]);
+      expect(Object.keys(ANNOTATION_LABELS[language]).sort()).toEqual(Object.keys(ANNOTATION_LABELS.en).sort());
+      const labels = [...Object.values(QUALITY_LABELS[language]), ...Object.values(PHASE_LABELS[language]), ...Object.values(ANNOTATION_LABELS[language])];
+      expect(labels.filter((label) => label.trim().length === 0)).toEqual([]);
+    }
+  });
+
+  it("keeps the canonical English names the product has always shown", () => {
+    expect(qualityLabel("great", "en")).toBe("Critical");
+    expect(qualityLabel("missed_mate", "en")).toBe("Missed mate");
+    expect(phaseLabel("middlegame", "en")).toBe("Middlegame");
+    expect(annotationLabel("missed_win", "en")).toBe("Missed win");
+  });
+
+  it("reads as Chinese, not as the English string", () => {
+    for (const classification of Object.keys(QUALITY_META) as (keyof typeof QUALITY_META)[]) {
+      expect(qualityLabel(classification, "zh-CN")).not.toBe(qualityLabel(classification, "en"));
+    }
+    for (const phase of ["opening", "middlegame", "endgame"] as const) {
+      expect(phaseLabel(phase, "zh-CN")).not.toBe(phaseLabel(phase, "en"));
+    }
+    for (const annotation of Object.keys(ANNOTATION_LABELS.en) as (keyof typeof ANNOTATION_LABELS.en)[]) {
+      expect(annotationLabel(annotation, "zh-CN")).not.toBe(annotationLabel(annotation, "en"));
+    }
   });
 });

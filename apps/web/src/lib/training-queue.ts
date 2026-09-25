@@ -1,7 +1,7 @@
 import { dueTrainingPositions, masteryTransition } from "./training-mastery";
 import type { RecurringWeakness } from "@chess-review/analysis";
 import { parsePgn } from "@chess-review/chess-core";
-import type { StudyWeaknessKind, TrainingAttemptOutcome, TrainingEvidenceReference, TrainingQueueItem, TrainingQueueItemV3, TrainingQueueStatus } from "@chess-review/shared";
+import type { StudyWeaknessKind, TrainingAttemptOutcome, TrainingEvidenceReference, TrainingQueueItem, TrainingQueueItemV3, TrainingQueueStatus, UiLanguage } from "@chess-review/shared";
 import { notifyLocalDataChanged, openReviewDatabase, REVIEW_STORE, TRAINING_QUEUE_STORE, writeLocalData } from "./browser-storage";
 import type { ReviewRecord } from "./review-library";
 
@@ -246,10 +246,39 @@ export function trainingReviewHref(item: TrainingQueueItemV3, source = nextTrain
   return `/review/${encodeURIComponent(source.gameId)}/moves?${query}`;
 }
 
-export function validateTrainingSource(record: ReviewRecord | undefined, source: TrainingEvidenceReference): void {
-  if (!record || record.kind !== "pgn") throw new Error("This task's source game is missing. Restore its backup or remove the task.");
+type QueueErrorCopy = {
+  sourceMissing: string;
+  sourceMismatch: string;
+  taskMissing: string;
+  noMatchingSource: string;
+  saveProgress: string;
+  openTask: string;
+};
+
+const ERRORS: Record<UiLanguage, QueueErrorCopy> = {
+  en: {
+    sourceMissing: "This task's source game is missing. Restore its backup or remove the task.",
+    sourceMismatch: "This task no longer matches its source position. Remove it and add a new task from your report.",
+    taskMissing: "This training task no longer exists.",
+    noMatchingSource: "This task has no matching source position.",
+    saveProgress: "Unable to save training progress.",
+    openTask: "Unable to open this training task.",
+  },
+  "zh-CN": {
+    sourceMissing: "此任务的源对局缺失。请恢复备份或移除此任务。",
+    sourceMismatch: "此任务已与源局面不匹配。请移除后从报告中添加新任务。",
+    taskMissing: "此训练任务已不存在。",
+    noMatchingSource: "此任务没有匹配的源局面。",
+    saveProgress: "无法保存训练进度。",
+    openTask: "无法打开此训练任务。",
+  },
+};
+
+export function validateTrainingSource(record: ReviewRecord | undefined, source: TrainingEvidenceReference, language: UiLanguage = "en"): void {
+  const copy = ERRORS[language];
+  if (!record || record.kind !== "pgn") throw new Error(copy.sourceMissing);
   const move = parsePgn(record.input).plies[source.ply - 1];
-  if (!move || move.san !== source.san) throw new Error("This task no longer matches its source position. Remove it and add a new task from your report.");
+  if (!move || move.san !== source.san) throw new Error(copy.sourceMismatch);
 }
 
 export async function listTrainingQueue(playerKey?: string): Promise<TrainingQueueItemV3[]> {
@@ -273,6 +302,7 @@ async function updateTask(
   action: "start" | "review",
   key?: string,
   outcome: TrainingAttemptOutcome = "legacy",
+  language: UiLanguage = "en",
 ): Promise<TrainingQueueItemV3> {
   const db = await openReviewDatabase();
   let saved: TrainingQueueItemV3 | undefined;
@@ -282,14 +312,15 @@ async function updateTask(
       const read = store.get(id);
       read.onsuccess = () => {
         try {
-          if (!read.result) throw new Error("This training task no longer exists.");
+          const copy = ERRORS[language];
+          if (!read.result) throw new Error(copy.taskMissing);
           const item = normalizeTrainingItem(read.result as TrainingQueueItem);
           const source = action === "start" ? nextTrainingPosition(item) ?? item.evidence[0] : item.evidence.find((source) => trainingPositionKey(source) === key);
-          if (!source) throw new Error("This task has no matching source position.");
+          if (!source) throw new Error(copy.noMatchingSource);
           const game = tx.objectStore(REVIEW_STORE).get(source.gameId);
           game.onsuccess = () => {
             try {
-              validateTrainingSource(game.result as ReviewRecord | undefined, source);
+              validateTrainingSource(game.result as ReviewRecord | undefined, source, language);
               const now = new Date().toISOString();
               if (action === "review" && key !== undefined) {
                 // A review records what the visitor did with the position, which is what
@@ -307,9 +338,9 @@ async function updateTask(
               item.status = "in-progress"; delete item.completionKind; delete item.completedAt;
               saved = normalizeTrainingItem({ ...item, updatedAt: now });
               store.put(saved, id);
-            } catch (error) { fail(error instanceof Error ? error : new Error("Unable to save training progress.")); }
+            } catch (error) { fail(error instanceof Error ? error : new Error(ERRORS[language].saveProgress)); }
           };
-        } catch (error) { fail(error instanceof Error ? error : new Error("Unable to open this training task.")); }
+        } catch (error) { fail(error instanceof Error ? error : new Error(ERRORS[language].openTask)); }
       };
     });
     notifyLocalDataChanged();
@@ -317,7 +348,7 @@ async function updateTask(
   } finally { db.close(); }
 }
 
-export function startTrainingTask(id: string): Promise<TrainingQueueItemV3> { return updateTask(id, "start"); }
+export function startTrainingTask(id: string, language: UiLanguage = "en"): Promise<TrainingQueueItemV3> { return updateTask(id, "start", undefined, "legacy", language); }
 /**
  * Records one review of a source position with what it was worth.
  *
@@ -330,8 +361,9 @@ export function reviewTrainingPosition(
   id: string,
   source: Pick<TrainingEvidenceReference, "gameId" | "ply">,
   outcome: TrainingAttemptOutcome,
+  language: UiLanguage = "en",
 ): Promise<TrainingQueueItemV3> {
-  return updateTask(id, "review", trainingPositionKey(source), outcome);
+  return updateTask(id, "review", trainingPositionKey(source), outcome, language);
 }
 
 export async function saveTrainingQueueItem(item: TrainingQueueItem, options: { ifAbsent?: boolean } = {}): Promise<void> {

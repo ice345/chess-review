@@ -5,9 +5,10 @@ import { DeskEmptyState } from "./desk-empty-state";
 import { PlatformHeading } from "./platform-heading";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import type { ExternalPlatform, SyncedGame } from "@chess-review/shared";
+import type { ExternalPlatform, SyncedGame, UiLanguage } from "@chess-review/shared";
 import { deleteReviewRecord } from "../lib/local-data";
 import { useLibrarySnapshot } from "../hooks/use-library-snapshot";
+import { useUiLanguage } from "../hooks/use-ui-language";
 import { providerKindFor } from "../lib/provider-kind";
 import { buildReviewRecordFromSyncedGame, saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { SourceChip } from "./source-chip";
@@ -20,27 +21,203 @@ type LibraryEntry =
 type SideColor = "white" | "black";
 
 const LIBRARY_PAGE_SIZE = 60;
-const SOURCE_CHIPS: Array<{ id: ProviderFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "chesscom", label: "Chess.com" },
-  { id: "lichess", label: "Lichess" },
-  { id: "manual", label: "Manual" },
-];
-const STATUS_CHIPS: Array<{ id: AnalysisFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "reviewed", label: "Analyzed" },
-  { id: "not-reviewed", label: "Waiting" },
-];
-const RESULT_CHIPS = [
-  { id: "all", label: "Any result" },
-  { id: "win", label: "Win" },
-  { id: "loss", label: "Loss" },
-  { id: "draw", label: "Draw" },
-] as const;
 
-function monthHeading(iso: string): string {
+type HistoryCopy = {
+  filterAll: string;
+  filterManual: string;
+  analyzed: string;
+  waiting: string;
+  anyResult: string;
+  win: string;
+  loss: string;
+  draw: string;
+  undated: string;
+  game: string;
+  analyze: string;
+  open: string;
+  white: string;
+  black: string;
+  whiteLetter: string;
+  blackLetter: string;
+  playedAsWhite: string;
+  playedAsBlack: string;
+  preparing: string;
+  analyzeArrow: string;
+  openArrow: string;
+  delete: string;
+  rowAriaLabel: (mark: string, title: string, action: string) => string;
+  unableToOpen: string;
+  deleteConfirm: string;
+  unableToDelete: string;
+  chapterSaved: string;
+  chapterCabinet: string;
+  titleSaved: string;
+  titleCabinet: string;
+  importAGame: string;
+  retryLoading: string;
+  libraryViews: string;
+  allGames: string;
+  savedReviews: string;
+  statsArrow: string;
+  historySummary: string;
+  allRecords: string;
+  pending: string;
+  sourceManual: (n: number) => string;
+  sourceChesscom: (n: number) => string;
+  sourceLichess: (n: number) => string;
+  libraryFilters: string;
+  searchPlayers: string;
+  searchPlaceholder: string;
+  source: string;
+  status: string;
+  result: string;
+  timeControl: string;
+  anyTime: string;
+  preparingSaved: (completed: number, total: number) => string;
+  loadingHistory: string;
+  noMatching: string;
+  tryAnother: string;
+  clearFilters: string;
+  emptyTitle: string;
+  importAGameArrow: string;
+  emptyBody: string;
+  focusDay: (day: string, month: string, n: number) => string;
+  loadMore: (n: number, shown: number, total: number) => string;
+  monthsWithGames: string;
+};
+
+const COPY: Record<UiLanguage, HistoryCopy> = {
+  en: {
+    filterAll: "All",
+    filterManual: "Manual",
+    analyzed: "Analyzed",
+    waiting: "Waiting",
+    anyResult: "Any result",
+    win: "Win",
+    loss: "Loss",
+    draw: "Draw",
+    undated: "Undated",
+    game: "Game",
+    analyze: "Analyze",
+    open: "Open",
+    white: "White",
+    black: "Black",
+    whiteLetter: "W",
+    blackLetter: "B",
+    playedAsWhite: "Played as White",
+    playedAsBlack: "Played as Black",
+    preparing: "Preparing…",
+    analyzeArrow: "Analyze →",
+    openArrow: "Open →",
+    delete: "Delete",
+    rowAriaLabel: (mark, title, action) => `${mark}: ${title}. ${action}`,
+    unableToOpen: "Unable to open this game. Try again.",
+    deleteConfirm: "Delete this review and its training references? Imported source games remain available. Background work will pause.",
+    unableToDelete: "Unable to delete this review. Try again.",
+    chapterSaved: "Library / Saved reviews",
+    chapterCabinet: "Library / Score cabinet",
+    titleSaved: "Pick up where you left off.",
+    titleCabinet: "A quiet cabinet of games.",
+    importAGame: "Import a game",
+    retryLoading: "Retry loading games",
+    libraryViews: "Library views",
+    allGames: "All games",
+    savedReviews: "Saved reviews",
+    statsArrow: "Stats →",
+    historySummary: "History summary",
+    allRecords: "All records",
+    pending: "Pending",
+    sourceManual: (n) => `${n} Manual`,
+    sourceChesscom: (n) => `${n} Chess.com`,
+    sourceLichess: (n) => `${n} Lichess`,
+    libraryFilters: "Library filters",
+    searchPlayers: "Search players or events",
+    searchPlaceholder: "Search a player, opening, or event",
+    source: "Source",
+    status: "Status",
+    result: "Result",
+    timeControl: "Time control",
+    anyTime: "Any time",
+    preparingSaved: (completed, total) => `Preparing saved games… ${completed} / ${total}. This one-time update keeps future visits fast.`,
+    loadingHistory: "Loading history…",
+    noMatching: "No matching games",
+    tryAnother: "Try another player, source or result.",
+    clearFilters: "Clear filters",
+    emptyTitle: "Your first game belongs here.",
+    importAGameArrow: "Import a game →",
+    emptyBody: "Bring a PGN or a saved position to your desk. Your games and notes will stay together in this browser.",
+    focusDay: (day, month, n) => `Focus ${day} ${month}, ${n} ${n === 1 ? "game" : "games"}`,
+    loadMore: (n, shown, total) => `Load ${n} more in this month · ${shown} of ${total}`,
+    monthsWithGames: "Months with games",
+  },
+  "zh-CN": {
+    filterAll: "全部",
+    filterManual: "手动",
+    analyzed: "已分析",
+    waiting: "等待",
+    anyResult: "任意结果",
+    win: "胜",
+    loss: "负",
+    draw: "和",
+    undated: "无日期",
+    game: "对局",
+    analyze: "分析",
+    open: "打开",
+    white: "白方",
+    black: "黑方",
+    whiteLetter: "白",
+    blackLetter: "黑",
+    playedAsWhite: "执白",
+    playedAsBlack: "执黑",
+    preparing: "准备中…",
+    analyzeArrow: "分析 →",
+    openArrow: "打开 →",
+    delete: "删除",
+    rowAriaLabel: (mark, title, action) => `${mark}：${title}。${action}`,
+    unableToOpen: "无法打开这盘对局。请再试一次。",
+    deleteConfirm: "删除这次复盘及其训练引用？已导入的源对局仍可用。后台工作将暂停。",
+    unableToDelete: "无法删除这次复盘。请再试一次。",
+    chapterSaved: "棋库 / 已保存的复盘",
+    chapterCabinet: "棋库 / 棋谱柜",
+    titleSaved: "从上次停下的地方继续。",
+    titleCabinet: "一柜安静的对局。",
+    importAGame: "导入对局",
+    retryLoading: "重新加载对局",
+    libraryViews: "棋库视图",
+    allGames: "全部对局",
+    savedReviews: "已保存的复盘",
+    statsArrow: "统计 →",
+    historySummary: "历史摘要",
+    allRecords: "全部记录",
+    pending: "待处理",
+    sourceManual: (n) => `${n} 手动`,
+    sourceChesscom: (n) => `${n} Chess.com`,
+    sourceLichess: (n) => `${n} Lichess`,
+    libraryFilters: "棋库筛选",
+    searchPlayers: "搜索棋手或赛事",
+    searchPlaceholder: "搜索棋手、开局或赛事",
+    source: "来源",
+    status: "状态",
+    result: "结果",
+    timeControl: "时间控制",
+    anyTime: "任意时间",
+    preparingSaved: (completed, total) => `正在准备已保存的对局… ${completed} / ${total}。这是一次性更新，之后访问会更快。`,
+    loadingHistory: "正在加载历史…",
+    noMatching: "没有匹配的对局",
+    tryAnother: "试试其他棋手、来源或结果。",
+    clearFilters: "清除筛选",
+    emptyTitle: "你的第一盘对局属于这里。",
+    importAGameArrow: "导入对局 →",
+    emptyBody: "把 PGN 或已保存的局面带到你的桌上。对局和笔记会一起留在本浏览器中。",
+    focusDay: (day, month, n) => `聚焦 ${month} ${day} 日，${n} 盘对局`,
+    loadMore: (n, shown, total) => `本月再加载 ${n} 条 · ${shown} / ${total}`,
+    monthsWithGames: "有对局的月份",
+  },
+};
+
+function monthHeading(iso: string, undated: string): string {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "Undated";
+  if (Number.isNaN(date.getTime())) return undated;
   return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
@@ -81,10 +258,10 @@ function dayParts(iso: string): { key: string; label: string } {
   };
 }
 
-function groupByMonth(entries: LibraryEntry[]): Array<{ heading: string; key: string; entries: LibraryEntry[] }> {
+function groupByMonth(entries: LibraryEntry[], undated: string): Array<{ heading: string; key: string; entries: LibraryEntry[] }> {
   const groups: Array<{ heading: string; key: string; entries: LibraryEntry[] }> = [];
   for (const entry of entries) {
-    const heading = monthHeading(entry.date);
+    const heading = monthHeading(entry.date, undated);
     const last = groups.at(-1);
     if (last?.heading === heading) last.entries.push(entry);
     else groups.push({ heading, key: monthKey(heading), entries: [entry] });
@@ -103,10 +280,10 @@ function groupByDay(entries: LibraryEntry[]): Array<{ key: string; label: string
   return groups;
 }
 
-function resultMark(result: string | undefined): string {
-  if (result === "win") return "Win";
-  if (result === "loss") return "Loss";
-  if (result === "draw" || result === "1/2-1/2") return "Draw";
+function resultMark(result: string | undefined, copy: HistoryCopy): string {
+  if (result === "win") return copy.win;
+  if (result === "loss") return copy.loss;
+  if (result === "draw" || result === "1/2-1/2") return copy.draw;
   if (result === "1-0") return "1-0";
   if (result === "0-1") return "0-1";
   return "";
@@ -155,8 +332,8 @@ function entryTimeClass(entry: LibraryEntry): string | undefined {
 }
 
 
-function entryStatus(entry: LibraryEntry, analyzedLabel: string | undefined): string {
-  if (entry.kind === "pending") return "Waiting";
+function entryStatus(entry: LibraryEntry, analyzedLabel: string | undefined, waiting: string): string {
+  if (entry.kind === "pending") return waiting;
   return analyzedLabel ?? "";
 }
 
@@ -227,6 +404,7 @@ function ScoreRow({
   onDelete: (record: ReviewRecord) => void;
   onOpenReview: (href: string) => void;
 }) {
+  const copy = COPY[useUiLanguage()];
   const result = entryResult(entry) ?? "";
   const side = entrySide(entry);
   const dateIso = entry.kind === "pending" ? entry.game.playedAt : entry.record.updatedAt;
@@ -257,22 +435,22 @@ function ScoreRow({
       data-side={side}
       role="link"
       tabIndex={0}
-      aria-label={`${resultMark(result) || "Game"}: ${entryTitle(entry)}. ${entry.kind === "pending" ? "Analyze" : "Open"}`}
+      aria-label={copy.rowAriaLabel(resultMark(result, copy) || copy.game, entryTitle(entry), entry.kind === "pending" ? copy.analyze : copy.open)}
       onClick={onRowActivate}
       onKeyDown={onRowActivate}
     >
       <span className="library-score-bar" aria-hidden="true" />
       {listFen ? <MiniFenThumb fen={listFen} /> : null}
       <span className="library-score-marks">
-        {resultMark(result) ? <span className="library-score-result" data-result={result}>{resultMark(result)}</span> : null}
+        {resultMark(result, copy) ? <span className="library-score-result" data-result={result}>{resultMark(result, copy)}</span> : null}
         {side ? (
           <span
             className="library-score-side"
             data-side={side}
-            title={side === "white" ? "White" : "Black"}
-            aria-label={side === "white" ? "Played as White" : "Played as Black"}
+            title={side === "white" ? copy.white : copy.black}
+            aria-label={side === "white" ? copy.playedAsWhite : copy.playedAsBlack}
           >
-            {side === "white" ? "W" : "B"}
+            {side === "white" ? copy.whiteLetter : copy.blackLetter}
           </span>
         ) : null}
       </span>
@@ -283,16 +461,16 @@ function ScoreRow({
       <span className="library-score-meta">
         <SourceChip provider={entry.kind === "pending" ? providerKindFor({ external: entry.game.external }) : providerKindFor(entry.record)} />
         {entryTimeClass(entry) ? <span className="library-score-time">{entryTimeClass(entry)}</span> : null}
-        {entryStatus(entry, statusLabel) ? <span className="library-score-status">{entryStatus(entry, statusLabel)}</span> : null}
+        {entryStatus(entry, statusLabel, copy.waiting) ? <span className="library-score-status">{entryStatus(entry, statusLabel, copy.waiting)}</span> : null}
         <time dateTime={dateIso}>{new Date(dateIso).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</time>
       </span>
       {entry.kind === "pending" ? (
         <button type="button" className="text-button library-score-open" disabled={busy} onClick={() => onAnalyze(entry.game)}>
-          {working === rowId ? "Preparing…" : "Analyze →"}
+          {working === rowId ? copy.preparing : copy.analyzeArrow}
         </button>
       ) : (
         <span className="library-score-actions">
-          <Link className="library-score-open" href={reviewOpenHref(entry.record)} onClick={(event) => event.stopPropagation()}>Open →</Link>
+          <Link className="library-score-open" href={reviewOpenHref(entry.record)} onClick={(event) => event.stopPropagation()}>{copy.openArrow}</Link>
           <button
             type="button"
             className="text-button danger"
@@ -302,7 +480,7 @@ function ScoreRow({
               onDelete(entry.record);
             }}
           >
-            Delete
+            {copy.delete}
           </button>
         </span>
       )}
@@ -350,6 +528,7 @@ function MiniFenThumb({ fen }: { fen: string }) {
 }
 
 export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
+  const copy = COPY[useUiLanguage()];
   const router = useRouter();
   const { snapshot, error: libraryError, loading: refreshing, indexing, refresh } = useLibrarySnapshot();
   const records = snapshot?.records ?? null;
@@ -399,7 +578,7 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
     ...pendingGames.map((game) => ({ kind: "pending" as const, date: game.playedAt, game })),
     ...reviewedRecords.map((record) => ({ kind: "review" as const, date: record.updatedAt, record })),
   ].sort((left, right) => right.date.localeCompare(left.date));
-  const indexMonths = useMemo(() => groupByMonth(libraryEntries), [libraryEntries]);
+  const indexMonths = useMemo(() => groupByMonth(libraryEntries, copy.undated), [libraryEntries, copy.undated]);
   const activeMonth = useMemo(() => {
     if (indexMonths.length === 0) return null;
     return indexMonths.find((group) => group.key === selectedMonthKey) ?? indexMonths[0]!;
@@ -416,9 +595,9 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
   const chesscomCount = libraryEntries.filter((entry) => entryProvider(entry) === "chesscom").length;
   const lichessCount = libraryEntries.filter((entry) => entryProvider(entry) === "lichess").length;
   const sourceLabel = [
-    manualCount > 0 ? `${manualCount} Manual` : null,
-    chesscomCount > 0 ? `${chesscomCount} Chess.com` : null,
-    lichessCount > 0 ? `${lichessCount} Lichess` : null,
+    manualCount > 0 ? copy.sourceManual(manualCount) : null,
+    chesscomCount > 0 ? copy.sourceChesscom(chesscomCount) : null,
+    lichessCount > 0 ? copy.sourceLichess(lichessCount) : null,
   ].filter((value): value is string => value !== null).join(" · ") || "—";
 
   // Keep selection on a real month when filters or data change.
@@ -467,7 +646,7 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
       window.sessionStorage.setItem(`open-chess-review:auto:${record.id}`, "1");
       router.push(`/review/${record.id}`);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to open this game. Try again.");
+      setActionError(error instanceof Error ? error.message : copy.unableToOpen);
     } finally {
       preparing.current = null;
       setWorking(null);
@@ -475,11 +654,11 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
   }
 
   function removeReview(record: ReviewRecord) {
-    if (!window.confirm("Delete this review and its training references? Imported source games remain available. Background work will pause.")) return;
+    if (!window.confirm(copy.deleteConfirm)) return;
     setWorking(record.id);
     setActionError(null);
     void deleteReviewRecord(record.id).then(() => window.location.reload()).catch((error) => {
-      setActionError(error instanceof Error ? error.message : "Unable to delete this review. Try again.");
+      setActionError(error instanceof Error ? error.message : copy.unableToDelete);
       setWorking(null);
     });
   }
@@ -491,44 +670,44 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
   return (
     <main className="page-scroll utility-page library-page">
       <PlatformHeading
-        chapter={savedOnly ? "Library / Saved reviews" : "Library / Score cabinet"}
-        title={savedOnly ? "Pick up where you left off." : "A quiet cabinet of games."}
-        actions={<Link className="primary-link" href="/import">Import a game</Link>}
+        chapter={savedOnly ? copy.chapterSaved : copy.chapterCabinet}
+        title={savedOnly ? copy.titleSaved : copy.titleCabinet}
+        actions={<Link className="primary-link" href="/import">{copy.importAGame}</Link>}
       />
       {(libraryError || actionError) && (
         <p className="error" role="alert">
           {actionError ?? libraryError}{" "}
-          <button type="button" className="text-button" disabled={refreshing} onClick={() => { setActionError(null); void refresh(); }}>Retry loading games</button>
+          <button type="button" className="text-button" disabled={refreshing} onClick={() => { setActionError(null); void refresh(); }}>{copy.retryLoading}</button>
         </p>
       )}
-      <nav className="library-views" aria-label="Library views">
-        <Link href="/history" aria-current={!savedOnly ? "page" : undefined}>All games</Link>
-        <Link href="/review" aria-current={savedOnly ? "page" : undefined}>Saved reviews</Link>
-        <Link href="/stats">Stats →</Link>
+      <nav className="library-views" aria-label={copy.libraryViews}>
+        <Link href="/history" aria-current={!savedOnly ? "page" : undefined}>{copy.allGames}</Link>
+        <Link href="/review" aria-current={savedOnly ? "page" : undefined}>{copy.savedReviews}</Link>
+        <Link href="/stats">{copy.statsArrow}</Link>
       </nav>
       <section className={`history-list library-sheet${showMonthIndex ? " has-month-index" : ""}`}>
         {snapshot && (
-          <p className="history-summary study-ink-stats" aria-label="History summary">
-            <span><strong>{libraryEntries.length}</strong> All records</span>
-            <span><strong>{listedAnalyzed}</strong> Analyzed</span>
-            <span><strong>{listedPending}</strong> Pending</span>
+          <p className="history-summary study-ink-stats" aria-label={copy.historySummary}>
+            <span><strong>{libraryEntries.length}</strong> {copy.allRecords}</span>
+            <span><strong>{listedAnalyzed}</strong> {copy.analyzed}</span>
+            <span><strong>{listedPending}</strong> {copy.pending}</span>
             <span><strong>{sourceLabel}</strong></span>
           </p>
         )}
-        <div className="library-toolbar" aria-label="Library filters">
+        <div className="library-toolbar" aria-label={copy.libraryFilters}>
           <label className="library-search">
-            <span className="sr-only">Search players or events</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a player, opening, or event" />
+            <span className="sr-only">{copy.searchPlayers}</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.searchPlaceholder} />
           </label>
           <div className="library-chip-stack">
-            <ChipRow label="Source" value={provider} options={SOURCE_CHIPS} onChange={(id) => setProvider(id as ProviderFilter)} />
-            <ChipRow label="Status" value={analysisState} options={STATUS_CHIPS} onChange={(id) => setAnalysisState(id as AnalysisFilter)} />
-            <ChipRow label="Result" value={result} options={RESULT_CHIPS} onChange={setResult} />
+            <ChipRow label={copy.source} value={provider} options={[{ id: "all", label: copy.filterAll }, { id: "chesscom", label: "Chess.com" }, { id: "lichess", label: "Lichess" }, { id: "manual", label: copy.filterManual }]} onChange={(id) => setProvider(id as ProviderFilter)} />
+            <ChipRow label={copy.status} value={analysisState} options={[{ id: "all", label: copy.filterAll }, { id: "reviewed", label: copy.analyzed }, { id: "not-reviewed", label: copy.waiting }]} onChange={(id) => setAnalysisState(id as AnalysisFilter)} />
+            <ChipRow label={copy.result} value={result} options={[{ id: "all", label: copy.anyResult }, { id: "win", label: copy.win }, { id: "loss", label: copy.loss }, { id: "draw", label: copy.draw }]} onChange={setResult} />
             {timeClasses.length > 0 && (
               <ChipRow
-                label="Time control"
+                label={copy.timeControl}
                 value={timeClass}
-                options={[{ id: "all", label: "Any time" }, ...timeClasses.map((value) => ({ id: value, label: value.slice(0, 1).toUpperCase() + value.slice(1) }))]}
+                options={[{ id: "all", label: copy.anyTime }, ...timeClasses.map((value) => ({ id: value, label: value.slice(0, 1).toUpperCase() + value.slice(1) }))]}
                 onChange={setTimeClass}
               />
             )}
@@ -537,19 +716,19 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
         {loading ? (
           <p className="utility-empty" role="status">
             {indexing
-              ? `Preparing saved games… ${indexing.completed} / ${indexing.total}. This one-time update keeps future visits fast.`
-              : "Loading history…"}
+              ? copy.preparingSaved(indexing.completed, indexing.total)
+              : copy.loadingHistory}
           </p>
         ) : empty ? (
           snapshot?.records.length || snapshot?.games.length ? (
             <div className="utility-empty">
-              <strong>No matching games</strong>
-              <span>Try another player, source or result.</span>
-              <button type="button" className="secondary" onClick={() => { setQuery(""); setProvider("all"); setAnalysisState("all"); setTimeClass("all"); setResult("all"); }}>Clear filters</button>
+              <strong>{copy.noMatching}</strong>
+              <span>{copy.tryAnother}</span>
+              <button type="button" className="secondary" onClick={() => { setQuery(""); setProvider("all"); setAnalysisState("all"); setTimeClass("all"); setResult("all"); }}>{copy.clearFilters}</button>
             </div>
           ) : (
-            <DeskEmptyState title="Your first game belongs here." actions={<Link className="primary-link" href="/import">Import a game →</Link>}>
-              Bring a PGN or a saved position to your desk. Your games and notes will stay together in this browser.
+            <DeskEmptyState title={copy.emptyTitle} actions={<Link className="primary-link" href="/import">{copy.importAGameArrow}</Link>}>
+              {copy.emptyBody}
             </DeskEmptyState>
           )
         ) : (
@@ -581,7 +760,7 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
                             type="button"
                             className="library-day-label"
                             aria-pressed={dayFocused}
-                            aria-label={`Focus ${day.label} ${activeMonth.heading}, ${day.entries.length} ${day.entries.length === 1 ? "game" : "games"}`}
+                            aria-label={copy.focusDay(day.label, activeMonth.heading, day.entries.length)}
                             onClick={() => focusDay(day.key)}
                           >
                             {day.label}
@@ -613,12 +792,12 @@ export function HistoryPage({ savedOnly = false }: { savedOnly?: boolean }) {
                   className="text-button library-load-more"
                   onClick={() => setWithinMonthVisible((count) => count + LIBRARY_PAGE_SIZE)}
                 >
-                  Load {Math.min(LIBRARY_PAGE_SIZE, monthEntries.length - withinMonthVisible)} more in this month · {withinMonthVisible} of {monthEntries.length}
+                  {copy.loadMore(Math.min(LIBRARY_PAGE_SIZE, monthEntries.length - withinMonthVisible), withinMonthVisible, monthEntries.length)}
                 </button>
               ) : null}
             </div>
             {showMonthIndex ? (
-              <nav className="library-month-index" aria-label="Months with games">
+              <nav className="library-month-index" aria-label={copy.monthsWithGames}>
                 {indexMonths.map((group) => {
                   const current = group.key === (activeMonth?.key ?? selectedMonthKey);
                   return (

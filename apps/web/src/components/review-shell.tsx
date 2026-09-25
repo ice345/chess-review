@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useShallow } from "zustand/react/shallow";
 import { replayUciLine } from "@chess-review/chess-core";
 import { buildHumanAnalysis, matchesHumanAnalysisIdentity } from "@chess-review/analysis";
-import { formatMoveNotation, type StockfishMoveAnalysis } from "@chess-review/shared";
+import { formatMoveNotation, type StockfishMoveAnalysis, type UiLanguage } from "@chess-review/shared";
+import { useUiLanguage } from "../hooks/use-ui-language";
 import { TrainingSession } from "./training-session";
 import { ReviewRuntimeProvider } from "./review-runtime";
 import { ReviewSessionProvider } from "./review-session-state";
@@ -46,10 +47,86 @@ import { orderPlayersForBoard } from "../lib/player-identity";
 import { saveReviewRecord, type ReviewRecord } from "../lib/review-library";
 import { useReviewStore } from "../store/review-store";
 
+type ShellCopy = {
+  stepStart: string;
+  stepEnd: string;
+  stepKeyMoment: (index: number) => string;
+  navReview: string;
+  navMoves: string;
+  navStudy: string;
+  navAnalysis: string;
+  navNotebook: string;
+  variationRoot: string;
+  variationAnnouncement: (san: string) => string;
+  startingAnnouncement: (side: string) => string;
+  moveAnnouncement: (moveNumber: string, san: string, side: string) => string;
+  kickerStart: string;
+  kickerKeyMoment: (index: number, total: number) => string;
+  kickerMove: (moveNumber: number) => string;
+  displayWalkThrough: string;
+  displayPractice: string;
+  ledeMoments: (count: number) => string;
+  ledeEachMove: string;
+  sideWhite: string;
+  sideBlack: string;
+};
+
+/* The review desk's own wording. The side names are here rather than only in the
+   Coach because the shell announces them to a screen reader after every move. */
+const COPY: Record<UiLanguage, ShellCopy> = {
+  en: {
+    stepStart: "Start",
+    stepEnd: "End",
+    stepKeyMoment: (index) => `Key moment ${index}`,
+    navReview: "Review",
+    navMoves: "Moves",
+    navStudy: "Study",
+    navAnalysis: "Analysis",
+    navNotebook: "Notebook",
+    variationRoot: "root",
+    variationAnnouncement: (san) => `Analysis variation, ${san}.`,
+    startingAnnouncement: (side) => `Starting position. ${side} to move.`,
+    moveAnnouncement: (moveNumber, san, side) => `${moveNumber} ${san}. ${side} to move.`,
+    kickerStart: "Start",
+    kickerKeyMoment: (index, total) => `Key moment ${index} of ${total}`,
+    kickerMove: (moveNumber) => `Move ${moveNumber}`,
+    displayWalkThrough: "Walk through this game.",
+    displayPractice: "Practice this position",
+    ledeMoments: (count) => `${count} ${count === 1 ? "moment carries" : "moments carry"} what changed in this game.`,
+    ledeEachMove: "Each move, then the evidence for the one on the board.",
+    sideWhite: "White",
+    sideBlack: "Black",
+  },
+  "zh-CN": {
+    stepStart: "开始",
+    stepEnd: "结束",
+    stepKeyMoment: (index) => `关键节点 ${index}`,
+    navReview: "复盘",
+    navMoves: "着法",
+    navStudy: "学习",
+    navAnalysis: "分析",
+    navNotebook: "笔记",
+    variationRoot: "起点",
+    variationAnnouncement: (san) => `变例，${san}。`,
+    startingAnnouncement: (side) => `起始局面。轮到${side}走。`,
+    moveAnnouncement: (moveNumber, san, side) => `${moveNumber} ${san}。轮到${side}走。`,
+    kickerStart: "开始",
+    kickerKeyMoment: (index, total) => `关键节点 ${index} / ${total}`,
+    kickerMove: (moveNumber) => `第 ${moveNumber} 步`,
+    displayWalkThrough: "逐步走过这盘棋。",
+    displayPractice: "练习这个局面",
+    ledeMoments: (count) => `这盘棋有 ${count} 个关键节点，记录着局势的变化。`,
+    ledeEachMove: "每一步，然后是棋盘上这一步的依据。",
+    sideWhite: "白方",
+    sideBlack: "黑方",
+  },
+};
+
 function reviewStepTrail(
   currentPly: number,
   totalPlies: number,
   keyPlies: readonly number[],
+  copy: ShellCopy,
 ): { label: string; current: boolean }[] {
   const keyIndex = keyPlies.indexOf(currentPly);
   let currentId: string;
@@ -63,15 +140,17 @@ function reviewStepTrail(
     }
   }
   return [
-    { label: "Start", current: currentId === "start" },
-    ...keyPlies.map((_, index) => ({ label: `Key moment ${index + 1}`, current: currentId === `k${index}` })),
-    { label: "End", current: currentId === "end" },
+    { label: copy.stepStart, current: currentId === "start" },
+    ...keyPlies.map((_, index) => ({ label: copy.stepKeyMoment(index + 1), current: currentId === `k${index}` })),
+    { label: copy.stepEnd, current: currentId === "end" },
   ];
 }
 
 export function ReviewShell({ children }: { children: ReactNode }) {
   const params = useParams<{ gameId: string }>();
   const pathname = usePathname();
+  const language = useUiLanguage();
+  const copy = COPY[language];
   const search = useSearchParams().toString();
   const query = new URLSearchParams(search);
   const trainingId = query.get("training");
@@ -331,13 +410,13 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   // burying it under More left the free half of the product looking like a
   // utility beside History and Settings.
   const primary = [
-    { href: root, label: "Review" },
-    { href: `${root}/moves`, label: "Moves" },
-    { href: `${root}/coach`, label: "Study" },
-    { href: `${root}/engine`, label: "Analysis" },
+    { href: root, label: copy.navReview },
+    { href: `${root}/moves`, label: copy.navMoves },
+    { href: `${root}/coach`, label: copy.navStudy },
+    { href: `${root}/engine`, label: copy.navAnalysis },
   ];
   const more = [
-    { href: `${root}/notebook`, label: "Notebook" },
+    { href: `${root}/notebook`, label: copy.navNotebook },
   ];
   const sectionHref = (href: string) => (
     trainingId
@@ -439,7 +518,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
     humanPositionError: humanRuntime.error,
     humanServiceState: humanRuntime.serviceState,
     coachProvider: coachRuntime.provider,
-    uiLanguage: settings.uiLanguage,
+    // The snapshot above deliberately freezes the analysis settings so an in-flight
+    // engine request is not disturbed. The language is not one of those: it has to
+    // follow the setting, or a language change inside a review would not reach the
+    // lesson panel until the route remounted.
+    uiLanguage: language,
     coachLanguage: coachRuntime.language,
     coachModel: coachRuntime.selectedModel,
     coachServiceState: coachRuntime.serviceState,
@@ -487,10 +570,10 @@ export function ReviewShell({ children }: { children: ReactNode }) {
 
   // What a screen reader hears after every move or route change.
   const positionAnnouncement = review.branch
-    ? `Analysis variation, ${selectedBranchMove?.san ?? "root"}.`
+    ? copy.variationAnnouncement(selectedBranchMove?.san ?? copy.variationRoot)
     : currentMove === null
-      ? `Starting position. ${review.game?.initialFen.split(" ")[1] === "b" ? "Black" : "White"} to move.`
-      : `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "\u2026"} ${currentMove.san}. ${currentMove.color === "white" ? "Black" : "White"} to move.`;
+      ? copy.startingAnnouncement(review.game?.initialFen.split(" ")[1] === "b" ? copy.sideBlack : copy.sideWhite)
+      : copy.moveAnnouncement(`${currentMove.moveNumber}${currentMove.color === "white" ? "." : "\u2026"}`, currentMove.san, currentMove.color === "white" ? copy.sideBlack : copy.sideWhite);
 
   // Practice owns the answer; a withheld guided moment borrows the same policy so
   // the board, the exports and the panels cannot disagree about what is visible.
@@ -501,37 +584,37 @@ export function ReviewShell({ children }: { children: ReactNode }) {
   const keyPlies = review.analysis ? criticalMomentPlies(review.analysis.criticalMoments) : [];
   const keyPos = review.analysis ? keyMomentPosition(review.analysis.criticalMoments, review.currentPly) : null;
   const reviewKickerState = atStartPly
-    ? "Start"
+    ? copy.kickerStart
     : keyPos
-      ? `Key moment ${keyPos.index} of ${keyPos.total}`
+      ? copy.kickerKeyMoment(keyPos.index, keyPos.total)
       : currentMove
-        ? `Move ${currentMove.moveNumber}`
-        : "Start";
+        ? copy.kickerMove(currentMove.moveNumber)
+        : copy.kickerStart;
   const reviewDisplay = atStartPly
-    ? "Walk through this game."
+    ? copy.displayWalkThrough
     : retro.active
-      ? "Practice this position"
+      ? copy.displayPractice
       : concealed && keyPos
-        ? `Key moment ${keyPos.index} of ${keyPos.total}`
+        ? copy.kickerKeyMoment(keyPos.index, keyPos.total)
         : keyPos && currentAnalysis
           ? formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })
           : currentAnalysis
-            ? `${formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })} · ${displayedMoveQualityLabel(currentAnalysis)}`
+            ? `${formatMoveNotation({ fenBefore: currentAnalysis.fenBefore, color: currentAnalysis.color, san: currentAnalysis.san })} · ${displayedMoveQualityLabel(currentAnalysis, language)}`
             : currentMove
               ? `${currentMove.moveNumber}${currentMove.color === "white" ? "." : "…"} ${currentMove.san}`
-              : "Walk through this game.";
+              : copy.displayWalkThrough;
   const reviewLede = atStartPly
     ? keyPlies.length > 0
-      ? `${keyPlies.length} ${keyPlies.length === 1 ? "moment carries" : "moments carry"} what changed in this game.`
-      : "Each move, then the evidence for the one on the board."
+      ? copy.ledeMoments(keyPlies.length)
+      : copy.ledeEachMove
     : retro.active || keyPos || concealed || !currentAnalysis
       ? null
-      : moveEvidenceSentence(currentAnalysis);
+      : moveEvidenceSentence(currentAnalysis, language);
 
   const sceneMode = retro.active ? "practice" : keyPos ? "moment" : atStartPly ? "start" : "move";
 
-  const reviewSteps = reviewStepTrail(review.currentPly, totalPlies, keyPlies);
-  const sideToMove = review.positionFen.split(" ")[1] === "b" ? "Black" : "White";
+  const reviewSteps = reviewStepTrail(review.currentPly, totalPlies, keyPlies, copy);
+  const sideToMove = review.positionFen.split(" ")[1] === "b" ? copy.sideBlack : copy.sideWhite;
   const topAccuracy = review.analysis?.[orderedPlayers.top.color].accuracy;
   const bottomAccuracy = review.analysis?.[orderedPlayers.bottom.color].accuracy;
 

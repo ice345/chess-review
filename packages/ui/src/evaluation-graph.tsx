@@ -1,12 +1,48 @@
 import { useState } from "react";
-import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis } from "@chess-review/shared";
-import { QUALITY_META, QualityIcon } from "./quality-icon";
+import { formatMoveNotation, type AnyGameAnalysis, type EngineScore, type MoveAnalysis, type UiLanguage } from "@chess-review/shared";
+import { phaseLabel } from "./phase-labels";
+import { qualityLabel, QualityIcon } from "./quality-icon";
 
 export interface EvaluationGraphProps {
   analysis: AnyGameAnalysis;
   currentPly: number;
   onSelectPly: (ply: number) => void;
+  language?: UiLanguage;
 }
+
+type GraphCopy = {
+  graphLabel: string;
+  graphTitle: string;
+  goToPly: (ply: number, classification: string) => string;
+  goToStart: string;
+  pointTitle: (ply: number, san: string, classification: string, score: string) => string;
+  startTitle: (score: string) => string;
+  startingPosition: string;
+  accuracy: (value: string) => string;
+};
+
+const COPY: Record<UiLanguage, GraphCopy> = {
+  en: {
+    graphLabel: "Stockfish evaluation graph",
+    graphTitle: "Stockfish evaluation by ply; select a point to navigate",
+    goToPly: (ply, classification) => `Go to ply ${ply}, ${classification}`,
+    goToStart: "Go to starting position",
+    pointTitle: (ply, san, classification, score) => `Ply ${ply} · ${san} · ${classification} · ${score}`,
+    startTitle: (score) => `Starting position · ${score}`,
+    startingPosition: "Starting position",
+    accuracy: (value) => `Accuracy ${value}`,
+  },
+  "zh-CN": {
+    graphLabel: "Stockfish 评分图",
+    graphTitle: "Stockfish 逐步评分；选择一点可跳转",
+    goToPly: (ply, classification) => `跳到第 ${ply} 步，${classification}`,
+    goToStart: "跳到起始局面",
+    pointTitle: (ply, san, classification, score) => `第 ${ply} 步 · ${san} · ${classification} · ${score}`,
+    startTitle: (score) => `起始局面 · ${score}`,
+    startingPosition: "起始局面",
+    accuracy: (value) => `准确率 ${value}`,
+  },
+};
 
 function graphValue(score: EngineScore): number {
   if (score.kind === "mate") return score.mateIn > 0 ? 6 : -6;
@@ -19,7 +55,8 @@ function scoreLabel(score: EngineScore): string {
   return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(2)}`;
 }
 
-export function EvaluationGraph({ analysis, currentPly, onSelectPly }: EvaluationGraphProps) {
+export function EvaluationGraph({ analysis, currentPly, onSelectPly, language = "en" }: EvaluationGraphProps) {
+  const copy = COPY[language];
   const [hoveredPly, setHoveredPly] = useState<number | null>(null);
   const width = 1040;
   const height = 292;
@@ -38,24 +75,24 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
   ];
   const line = points.map((point) => `${x(point.ply)},${y(point.score)}`).join(" ");
   const boundaries = [
-    ...(analysis.division.middlePly === undefined ? [] : [{ ply: analysis.division.middlePly, label: "Middlegame" }]),
-    ...(analysis.division.endPly === undefined ? [] : [{ ply: analysis.division.endPly, label: "Endgame" }]),
+    ...(analysis.division.middlePly === undefined ? [] : [{ ply: analysis.division.middlePly, phase: "middlegame" as const }]),
+    ...(analysis.division.endPly === undefined ? [] : [{ ply: analysis.division.endPly, phase: "endgame" as const }]),
   ];
   const hovered = points.find((point) => point.ply === hoveredPly) ?? points.find((point) => point.ply === currentPly) ?? points[0];
   const phaseSegments = [
-    { start: 0, end: analysis.division.middlePly ?? total, label: "Opening", color: "#f3e8cf" },
-    ...(analysis.division.middlePly === undefined ? [] : [{ start: analysis.division.middlePly, end: analysis.division.endPly ?? total, label: "Middlegame", color: "#dce8e5" }]),
-    ...(analysis.division.endPly === undefined ? [] : [{ start: analysis.division.endPly, end: total, label: "Endgame", color: "#eadfe5" }]),
+    { start: 0, end: analysis.division.middlePly ?? total, phase: "opening" as const, color: "#f3e8cf" },
+    ...(analysis.division.middlePly === undefined ? [] : [{ start: analysis.division.middlePly, end: analysis.division.endPly ?? total, phase: "middlegame" as const, color: "#dce8e5" }]),
+    ...(analysis.division.endPly === undefined ? [] : [{ start: analysis.division.endPly, end: total, phase: "endgame" as const, color: "#eadfe5" }]),
   ];
 
   return (
-    <div className="evaluation-graph" aria-label="Stockfish evaluation graph">
+    <div className="evaluation-graph" aria-label={copy.graphLabel}>
       <svg viewBox={`0 0 ${width} ${height}`} role="img">
-        <title>Stockfish evaluation by ply; select a point to navigate</title>
+        <title>{copy.graphTitle}</title>
         <rect x={left} y={top} width={plotWidth} height={plotHeight} rx="8" fill="#fbf8f1" />
         <clipPath id="evaluation-plot-clip"><rect x={left} y={top} width={plotWidth} height={plotHeight} rx="8" /></clipPath>
         <g clipPath="url(#evaluation-plot-clip)">
-          {phaseSegments.map((segment) => <rect key={segment.label} x={x(segment.start)} y={top} width={Math.max(0, x(segment.end) - x(segment.start))} height={plotHeight} fill={segment.color} opacity=".54" />)}
+          {phaseSegments.map((segment) => <rect key={segment.phase} x={x(segment.start)} y={top} width={Math.max(0, x(segment.end) - x(segment.start))} height={plotHeight} fill={segment.color} opacity=".54" />)}
         </g>
         {[3, 0, -3].map((value) => {
           const rowY = top + ((6 - value) / 12) * plotHeight;
@@ -66,9 +103,9 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
             </g>
           );
         })}
-        {phaseSegments.map((segment) => <text key={`${segment.label}-label`} x={x(segment.start) + 8} y="26" fill="#687b85" fontSize="11" fontWeight="700" letterSpacing="1">{segment.label.toUpperCase()}</text>)}
+        {phaseSegments.map((segment) => <text key={`${segment.phase}-label`} x={x(segment.start) + 8} y="26" fill="#687b85" fontSize="11" fontWeight="700" letterSpacing="1">{phaseLabel(segment.phase, language).toUpperCase()}</text>)}
         {boundaries.map((boundary) => (
-          <g key={boundary.label}>
+          <g key={boundary.phase}>
             <line x1={x(boundary.ply)} x2={x(boundary.ply)} y1={top} y2={height - bottom} stroke="#8999a0" strokeDasharray="4 6" />
           </g>
         ))}
@@ -83,7 +120,7 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
               key={point.ply}
               role="button"
               tabIndex={0}
-              aria-label={move ? `Go to ply ${point.ply}, ${QUALITY_META[move.classification].label}` : "Go to starting position"}
+              aria-label={move ? copy.goToPly(point.ply, qualityLabel(move.classification, language)) : copy.goToStart}
               onClick={() => onSelectPly(point.ply)}
               onMouseEnter={() => setHoveredPly(point.ply)}
               onMouseLeave={() => setHoveredPly(null)}
@@ -94,7 +131,7 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
               }}
               style={{ cursor: "pointer" }}
             >
-              <title>{move ? `Ply ${point.ply} · ${move.san} · ${QUALITY_META[move.classification].label} · ${scoreLabel(point.score)}` : `Starting position · ${scoreLabel(point.score)}`}</title>
+              <title>{move ? copy.pointTitle(point.ply, move.san, qualityLabel(move.classification, language), scoreLabel(point.score)) : copy.startTitle(scoreLabel(point.score))}</title>
               <circle cx={x(point.ply)} cy={y(point.score)} r="12" fill="transparent" />
               {move ? (
                 <g transform={`translate(${x(point.ply) - markerSize / 2} ${y(point.score) - markerSize / 2})`} pointerEvents="none">
@@ -108,7 +145,7 @@ export function EvaluationGraph({ analysis, currentPly, onSelectPly }: Evaluatio
           );
         })}
       </svg>
-      {hovered && <div className="evaluation-graph-detail"><strong>{hovered.move ? formatMoveNotation({ fenBefore: hovered.move.fenBefore, color: hovered.move.color, san: hovered.move.san }) : "Starting position"}</strong><span>{scoreLabel(hovered.score)}</span>{hovered.move && <><span>{QUALITY_META[hovered.move.classification].label}</span><small>Accuracy {hovered.move.accuracy.toFixed(1)}</small></>}</div>}
+      {hovered && <div className="evaluation-graph-detail"><strong>{hovered.move ? formatMoveNotation({ fenBefore: hovered.move.fenBefore, color: hovered.move.color, san: hovered.move.san }) : copy.startingPosition}</strong><span>{scoreLabel(hovered.score)}</span>{hovered.move && <><span>{qualityLabel(hovered.move.classification, language)}</span><small>{copy.accuracy(hovered.move.accuracy.toFixed(1))}</small></>}</div>}
     </div>
   );
 }

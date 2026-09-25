@@ -76,6 +76,7 @@ it('explains a mistake through human behaviour when the played move was the popu
     isSacrifice: false,
     isEngineBest: false,
     tacticalMotifCount: 0,
+    language: "en",
   });
 
   expect(comparison.playedMoveProbability).toBeCloseTo(0.31);
@@ -107,6 +108,7 @@ it('still explains a mistake whose played move Maia never listed', () => {
     isSacrifice: false,
     isEngineBest: false,
     tacticalMotifCount: 0,
+    language: "en",
   });
 
   expect(comparison.playedMovePolicyRank).toBe(23);

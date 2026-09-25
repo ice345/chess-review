@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { UiLanguage } from "@chess-review/shared";
 import {
   EXPLORER_DEFAULT_POPULATION,
   EXPLORER_RATING_FLOORS,
@@ -14,14 +15,7 @@ import {
 import { ExplorerRequestError, loadExplorerPosition, type ExplorerResult } from "../../lib/opening-explorer";
 import { useReviewStore } from "../../store/review-store";
 import { describeFetchAge } from "../../lib/review-format";
-
-const SOURCE_LABEL: Record<ExplorerSource, string> = {
-  lichess: "All players",
-  masters: "Masters",
-};
-
-/** The masters database is one elite cohort; the players database takes both filters. */
-const MASTERS_SAMPLE = "human master games";
+import { useUiLanguage } from "../../hooks/use-ui-language";
 
 /** Speed presets, so the control stays one select instead of a checkbox wall. */
 const SPEED_PRESETS: Record<string, ExplorerSpeed[]> = {
@@ -30,6 +24,118 @@ const SPEED_PRESETS: Record<string, ExplorerSpeed[]> = {
   blitz: ["blitz"],
   rapid: ["rapid"],
   bullet: ["bullet"],
+};
+
+type ExplorerCopy = {
+  sources: Record<ExplorerSource, string>;
+  mastersSample: string;
+  aria: string;
+  databaseAria: string;
+  rating: string;
+  ratingAria: string;
+  allRatings: string;
+  speed: string;
+  speedAria: string;
+  speedClub: string;
+  speedAll: string;
+  speedBlitz: string;
+  speedRapid: string;
+  speedBullet: string;
+  privacy: string;
+  databaseSample: (database: string, sample: string) => string;
+  position: (fen: string) => string;
+  gamesLine: (source: string, white: number, draw: number, black: number) => string;
+  cachedFailed: string;
+  fetched: (age: string) => string;
+  staleNote: (database: string) => string;
+  freshNote: (database: string) => string;
+  lookingUp: string;
+  empty: (database: string) => string;
+  couldNotPlay: string;
+  playMove: (san: string, games: number) => string;
+  numbers: (games: string, white: number, draw: number, black: number) => string;
+  note: string;
+  retry: string;
+  unavailable: string;
+  unconfigured: string;
+  offline: (database: string) => string;
+  rateLimited: (database: string) => string;
+  failed: (database: string) => string;
+};
+
+const COPY: Record<UiLanguage, ExplorerCopy> = {
+  en: {
+    sources: { lichess: "All players", masters: "Masters" },
+    mastersSample: "human master games",
+    aria: "Opening explorer",
+    databaseAria: "Explorer database",
+    rating: "Rating",
+    ratingAria: "Explorer rating filter",
+    allRatings: "All ratings",
+    speed: "Speed",
+    speedAria: "Explorer speed filter",
+    speedClub: "Blitz, rapid, classical",
+    speedAll: "All speeds",
+    speedBlitz: "Blitz only",
+    speedRapid: "Rapid only",
+    speedBullet: "Bullet only",
+    privacy: "This panel sends the current position to lichess.org\u2019s public opening explorer through this site\u2019s server, and caches the answer in this browser. Nothing from your library, games or account is sent.",
+    databaseSample: (database, sample) => `${database} database \u00b7 ${sample}`,
+    position: (fen) => `Position ${fen}`,
+    gamesLine: (source, white, draw, black) => `${source} games \u00b7 W ${white}% \u00b7 D ${draw}% \u00b7 B ${black}%`,
+    cachedFailed: "Cached answer \u00b7 this refresh failed \u00b7 ",
+    fetched: (age) => `fetched ${age}`,
+    staleNote: (database) => `These are human frequencies from the ${database} sample, not a best-move ranking.`,
+    freshNote: (database) => `Frequencies of other players' games in the ${database} sample \u2014 not an evaluation.`,
+    lookingUp: "Looking up this position\u2026",
+    empty: (database) => `No games in this database reached this position. Nobody in the ${database} sample has played it.`,
+    couldNotPlay: "That move could not be played on this position.",
+    playMove: (san, games) => `Play ${san}, ${games} games`,
+    numbers: (games, white, draw, black) => `${games} \u00b7 W ${white}% D ${draw}% B ${black}%`,
+    note: "Select a move to explore it on the board. Frequencies are other players\u2019 games, not an evaluation \u2014 Stockfish still decides what is best, and this panel does not change Maia or the game analysis.",
+    retry: "Retry explorer",
+    unavailable: "The opening explorer is unavailable.",
+    unconfigured: "This deployment has no Lichess explorer token, so the lookup cannot run.",
+    offline: (database) => `This site could not reach the ${database} lookup.`,
+    rateLimited: (database) => `The ${database} lookup is rate-limited right now.`,
+    failed: (database) => `The ${database} lookup failed.`,
+  },
+  "zh-CN": {
+    sources: { lichess: "所有棋手", masters: "大师" },
+    mastersSample: "人类大师对局",
+    aria: "开局浏览器",
+    databaseAria: "浏览器数据库",
+    rating: "等级分",
+    ratingAria: "浏览器等级分筛选",
+    allRatings: "全部等级分",
+    speed: "速度",
+    speedAria: "浏览器速度筛选",
+    speedClub: "闪棋、快棋、经典",
+    speedAll: "全部速度",
+    speedBlitz: "仅闪棋",
+    speedRapid: "仅快棋",
+    speedBullet: "仅超快棋",
+    privacy: "本面板会把当前局面经本网站服务器发往 lichess.org 的公开开局浏览器，并把答案缓存在这个浏览器里。不会发送你的棋库、对局或账户中的任何内容。",
+    databaseSample: (database, sample) => `${database} 数据库 · ${sample}`,
+    position: (fen) => `局面 ${fen}`,
+    gamesLine: (source, white, draw, black) => `${source} 对局 · 胜 ${white}% · 和 ${draw}% · 负 ${black}%`,
+    cachedFailed: "缓存结果 · 此次刷新失败 · ",
+    fetched: (age) => `获取于 ${age}`,
+    staleNote: (database) => `这些是 ${database} 样本中的人类出现频率，不是最佳着法排名。`,
+    freshNote: (database) => `${database} 样本中其他棋手对局的出现频率——不是评分。`,
+    lookingUp: "正在查询此局面…",
+    empty: (database) => `此数据库中没有对局走到这个局面。${database} 样本里还没有人走过。`,
+    couldNotPlay: "这一步无法在此局面走出。",
+    playMove: (san, games) => `走 ${san}，${games} 盘`,
+    numbers: (games, white, draw, black) => `${games} · 胜 ${white}% 和 ${draw}% 负 ${black}%`,
+    note: "选择一步在棋盘上探索。频率来自其他棋手的对局，不是评分——仍由 Stockfish 决定什么是最佳，本面板不会改变 Maia 或对局分析。",
+    retry: "重试开局浏览器",
+    unavailable: "开局浏览器不可用。",
+    unconfigured: "此部署没有 Lichess 开局浏览器令牌，因此无法查询。",
+    offline: (database) => `本网站无法连接 ${database} 查询。`,
+    rateLimited: (database) => `${database} 查询目前受到速率限制。`,
+    failed: (database) => `${database} 查询失败。`,
+  },
 };
 
 function speedPreset(speeds: ExplorerSpeed[]): string {
@@ -62,6 +168,8 @@ type ExplorerState =
  * loaded analysis and the rest of Review keep working.
  */
 export function OpeningExplorerPanel({ fen }: { fen: string }) {
+  const language = useUiLanguage();
+  const copy = COPY[language];
   const [source, setSource] = useState<ExplorerSource>("lichess");
   const [population, setPopulation] = useState<ExplorerPopulationV1>(EXPLORER_DEFAULT_POPULATION);
   // A retry is a one-shot intent, not part of the position's identity: it is
@@ -101,10 +209,10 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted || latestRun.current !== run) return;
-        setEntry({ key: requestKey, state: failureState(error) });
+        setEntry({ key: requestKey, state: failureState(error, copy.unavailable) });
       });
     return () => controller.abort();
-  }, [fen, source, population, rerunToken, requestKey]);
+  }, [fen, source, population, rerunToken, requestKey, copy.unavailable]);
 
   function playMove(uci: string) {
     const promotion = uci[4];
@@ -113,15 +221,15 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
       uci.slice(2, 4),
       promotion === "q" || promotion === "r" || promotion === "b" || promotion === "n" ? promotion : undefined,
     );
-    setPlayError(played ? null : "That move could not be played on this position.");
+    setPlayError(played ? null : copy.couldNotPlay);
   }
 
   // The position the numbers describe, so they can never be read as belonging to
   // a different position on the board.
-  const database = SOURCE_LABEL[source];
+  const database = copy.sources[source];
   // The numbers name their own population: "blitz among 1600+" and "every speed at
   // every rating" are different censuses of different games.
-  const sample = source === "masters" ? MASTERS_SAMPLE : explorerPopulationLabel(population);
+  const sample = source === "masters" ? copy.mastersSample : explorerPopulationLabel(population, language);
   const retryButton = <ExplorerRetry onRetry={() => setRerunToken((token) => token + 1)} />;
   const tracked = "result" in state ? state.result : null;
   const usable = tracked && (state.status === "fresh" || state.status === "stale") ? tracked : null;
@@ -129,14 +237,14 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
   return (
     <section
       className="explorer-panel"
-      aria-label="Opening explorer"
+      aria-label={copy.aria}
       data-state={state.status}
       aria-busy={state.status === "loading"}
     >
-      <div className="explorer-sources" role="group" aria-label="Explorer database">
+      <div className="explorer-sources" role="group" aria-label={copy.databaseAria}>
         {EXPLORER_SOURCES.map((value) => (
           <button type="button" key={value} className={source === value ? "active" : ""} aria-pressed={source === value} onClick={() => setSource(value)}>
-            {SOURCE_LABEL[value]}
+            {copy.sources[value]}
           </button>
         ))}
       </div>
@@ -144,9 +252,9 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
       <div className="explorer-population">
         {source === "lichess" && (
           <label>
-            <span>Rating</span>
+            <span>{copy.rating}</span>
             <select
-              aria-label="Explorer rating filter"
+              aria-label={copy.ratingAria}
               value={population.ratingFloor === null ? "all" : String(population.ratingFloor)}
               onChange={(event) => setPopulation({
                 ...population,
@@ -154,64 +262,62 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
               })}
             >
               {EXPLORER_RATING_FLOORS.map((floor) => <option key={floor} value={floor}>{floor}+</option>)}
-              <option value="all">All ratings</option>
+              <option value="all">{copy.allRatings}</option>
             </select>
           </label>
         )}
         <label>
-          <span>Speed</span>
+          <span>{copy.speed}</span>
           <select
-            aria-label="Explorer speed filter"
+            aria-label={copy.speedAria}
             value={speedPreset(population.speeds)}
             onChange={(event) => setPopulation({ ...population, speeds: [...SPEED_PRESETS[event.target.value] ?? SPEED_PRESETS.club!] })}
           >
-            <option value="club">Blitz, rapid, classical</option>
-            <option value="all">All speeds</option>
-            <option value="blitz">Blitz only</option>
-            <option value="rapid">Rapid only</option>
-            <option value="bullet">Bullet only</option>
+            <option value="club">{copy.speedClub}</option>
+            <option value="all">{copy.speedAll}</option>
+            <option value="blitz">{copy.speedBlitz}</option>
+            <option value="rapid">{copy.speedRapid}</option>
+            <option value="bullet">{copy.speedBullet}</option>
           </select>
         </label>
       </div>
 
       <small className="explorer-privacy">
-        This panel sends the current position to lichess.org&rsquo;s public opening explorer through this site&rsquo;s
-        server, and caches the answer in this browser. Nothing from your library, games or account is sent.
+        {copy.privacy}
       </small>
 
       <div className="explorer-summary">
-        <small>{database} database · {sample}</small>
-        <small style={{ overflowWrap: "anywhere" }}>Position {fen}</small>
+        <small>{copy.databaseSample(database, sample)}</small>
+        <small style={{ overflowWrap: "anywhere" }}>{copy.position(fen)}</small>
         {usable && <>
           <strong>{usable.position.totalGames.toLocaleString()}</strong>
           <span>
-            {SOURCE_LABEL[usable.position.source]} games · W {usable.position.whitePercent}% ·
-            D {usable.position.drawPercent}% · B {usable.position.blackPercent}%
+            {copy.gamesLine(copy.sources[usable.position.source], usable.position.whitePercent, usable.position.drawPercent, usable.position.blackPercent)}
           </span>
           {usable.position.opening && <small>{usable.position.opening.eco} · {usable.position.opening.name}</small>}
           <small className={usable.stale ? "explorer-stale" : undefined}>
-            {usable.stale ? "Cached answer · this refresh failed · " : ""}fetched {describeFetchAge(usable.fetchedAt)}
+            {usable.stale ? copy.cachedFailed : ""}{copy.fetched(describeFetchAge(usable.fetchedAt, language))}
             {usable.stale ? <> {retryButton}</> : null}
           </small>
           <small>
             {usable.stale
-              ? `These are human frequencies from the ${database} sample, not a best-move ranking.`
-              : `Frequencies of other players' games in the ${database} sample — not an evaluation.`}
+              ? copy.staleNote(database)
+              : copy.freshNote(database)}
           </small>
         </>}
       </div>
 
-      {state.status === "loading" && <p className="utility-note" role="status">Looking up this position…</p>}
+      {state.status === "loading" && <p className="utility-note" role="status">{copy.lookingUp}</p>}
 
       {state.status === "empty" && (
         <p className="utility-empty" role="status">
-          No games in this database reached this position. Nobody in the {database} sample has played it. {retryButton}
+          {copy.empty(database)} {retryButton}
         </p>
       )}
 
       {isFailure(state) && (
         <p className="error" role="alert">
-          {failureCaption(state.status, database)} {state.message} {retryButton}
+          {failureCaption(state.status, database, copy)} {state.message} {retryButton}
         </p>
       )}
 
@@ -222,7 +328,7 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
           <ul className="explorer-moves">
             {usable.position.moves.map((move) => (
               <li key={move.uci}>
-                <button type="button" onClick={() => playMove(move.uci)} aria-label={`Play ${move.san}, ${move.games} games`}>
+                <button type="button" onClick={() => playMove(move.uci)} aria-label={copy.playMove(move.san, move.games)}>
                   <strong>{move.san}</strong>
                   <span className="explorer-bar" aria-hidden="true">
                     <i style={{ width: `${move.whitePercent}%` }} />
@@ -230,13 +336,13 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
                     <i style={{ width: `${move.blackPercent}%` }} />
                   </span>
                   <span className="explorer-numbers">
-                    {move.games.toLocaleString()} · W {move.whitePercent}% D {move.drawPercent}% B {move.blackPercent}%
+                    {copy.numbers(move.games.toLocaleString(), move.whitePercent, move.drawPercent, move.blackPercent)}
                   </span>
                 </button>
               </li>
             ))}
           </ul>
-          <small className="explorer-note">Select a move to explore it on the board. Frequencies are other players&rsquo; games, not an evaluation — Stockfish still decides what is best, and this panel does not change Maia or the game analysis.</small>
+          <small className="explorer-note">{copy.note}</small>
         </>
       )}
     </section>
@@ -245,28 +351,29 @@ export function OpeningExplorerPanel({ fen }: { fen: string }) {
 
 /** The panel's own retry: it re-issues this request and nothing else. */
 function ExplorerRetry({ onRetry }: { onRetry: () => void }) {
+  const copy = COPY[useUiLanguage()];
   return (
     <button type="button" className="text-button" onClick={onRetry}>
-      Retry explorer
+      {copy.retry}
     </button>
   );
 }
 
-function failureState(error: unknown): ExplorerState {
+function failureState(error: unknown, unavailable: string): ExplorerState {
   if (error instanceof ExplorerRequestError) return { status: error.kind, message: error.message };
   if (error instanceof Error) return { status: "failed", message: error.message };
-  return { status: "failed", message: "The opening explorer is unavailable." };
+  return { status: "failed", message: unavailable };
 }
 
 function isFailure(state: ExplorerState): state is { status: "offline" | "rate-limited" | "failed" | "unconfigured"; message: string } {
   return state.status === "offline" || state.status === "rate-limited" || state.status === "failed" || state.status === "unconfigured";
 }
 
-function failureCaption(status: "offline" | "rate-limited" | "failed" | "unconfigured", database: string): string {
+function failureCaption(status: "offline" | "rate-limited" | "failed" | "unconfigured", database: string, copy: ExplorerCopy): string {
   // The explorer has required an API token since 2026-03-03, so this is deployment
   // configuration rather than a visitor error, and it says so.
-  if (status === "unconfigured") return "This deployment has no Lichess explorer token, so the lookup cannot run.";
-  if (status === "offline") return `This site could not reach the ${database} lookup.`;
-  if (status === "rate-limited") return `The ${database} lookup is rate-limited right now.`;
-  return `The ${database} lookup failed.`;
+  if (status === "unconfigured") return copy.unconfigured;
+  if (status === "offline") return copy.offline(database);
+  if (status === "rate-limited") return copy.rateLimited(database);
+  return copy.failed(database);
 }

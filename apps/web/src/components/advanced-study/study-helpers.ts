@@ -2,35 +2,27 @@
 
 import type {
   HistoryAnalysisJobV1,
-  StudyWeaknessKind,
-  SyncedGame,
+  UiLanguage,
 } from "@chess-review/shared";
 import type { StudyReportFiltersV2 } from "@chess-review/analysis";
 
 export type StudyTab = "overview" | "ratings" | "openings" | "middlegame" | "endgame" | "mistakes" | "highlights" | "plan" | "coverage";
 
-export const NAV_GROUPS: Array<{ id: string; label?: string; tabs: Array<{ id: StudyTab; label: string }> }> = [
-  { id: "overview", tabs: [{ id: "overview", label: "Overview" }] },
-  { id: "analysis", label: "Analysis", tabs: [
-    { id: "ratings", label: "Rating" },
-    { id: "openings", label: "Openings" },
-    { id: "middlegame", label: "Middlegame" },
-    { id: "endgame", label: "Endgame" },
+export const NAV_GROUPS: Array<{ id: string; tabs: Array<{ id: StudyTab }> }> = [
+  { id: "overview", tabs: [{ id: "overview" }] },
+  { id: "analysis", tabs: [
+    { id: "ratings" },
+    { id: "openings" },
+    { id: "middlegame" },
+    { id: "endgame" },
   ] },
-  { id: "improvement", label: "Improvement", tabs: [
-    { id: "mistakes", label: "Mistakes" },
-    { id: "highlights", label: "Highlights" },
-    { id: "plan", label: "Plan" },
+  { id: "improvement", tabs: [
+    { id: "mistakes" },
+    { id: "highlights" },
+    { id: "plan" },
   ] },
-  { id: "data", label: "Data", tabs: [{ id: "coverage", label: "Coverage" }] },
+  { id: "data", tabs: [{ id: "coverage" }] },
 ];
-
-export const WEAKNESS_COPY: Record<StudyWeaknessKind, { title: string; description: string }> = {
-  "opening-decisions": { title: "Opening decisions", description: "Repeated objective errors in opening positions." },
-  "middlegame-decisions": { title: "Middlegame decisions", description: "Repeated objective errors in middlegame positions." },
-  "endgame-decisions": { title: "Endgame decisions", description: "Repeated objective errors after the structural endgame boundary." },
-  "missed-opportunities": { title: "Missed opportunities", description: "Repeated verified missed-win or missed-mate evidence." },
-};
 
 export const DEFAULT_FILTERS: StudyReportFiltersV2 = {
   providers: [],
@@ -53,19 +45,36 @@ export function detailedJobCounts(job: HistoryAnalysisJobV1) {
   return { cached, completed, failed, pending, done: cached + completed, total: job.items.length };
 }
 
-export function liveAnalysisStatus(jobs: readonly HistoryAnalysisJobV1[]): string | null {
+type StatusCopy = {
+  running: string;
+  paused: string;
+  waiting: string;
+  line: (done: number, total: number, phase: string, excluded: number) => string;
+};
+
+const STATUS_COPY: Record<UiLanguage, StatusCopy> = {
+  en: {
+    running: "analysis running",
+    paused: "paused",
+    waiting: "waiting to start",
+    line: (done, total, phase, excluded) => `${done} / ${total} games analyzed · ${phase}${excluded > 0 ? ` · ${excluded} excluded` : ""}`,
+  },
+  "zh-CN": {
+    running: "分析进行中",
+    paused: "已暂停",
+    waiting: "等待开始",
+    line: (done, total, phase, excluded) => `${done} / ${total} 盘已分析 · ${phase}${excluded > 0 ? ` · ${excluded} 盘已排除` : ""}`,
+  },
+};
+
+export function liveAnalysisStatus(jobs: readonly HistoryAnalysisJobV1[], language: UiLanguage = "en"): string | null {
   const live = jobs.find((job) => !job.supersededBy && ["running", "queued", "paused"].includes(job.status));
   if (!live) return null;
   const counts = detailedJobCounts(live);
   const excluded = live.excludedItems?.length ?? 0;
-  const phase = live.status === "running" ? "analysis running" : live.status === "paused" ? "paused" : "waiting to start";
-  return `${counts.done} / ${counts.total} games analyzed · ${phase}${excluded > 0 ? ` · ${excluded} excluded` : ""}`;
-}
-
-export function gameLabel(gameId: string, games: readonly SyncedGame[]): string {
-  const game = games.find((item) => item.id === gameId);
-  if (!game) return `Game ${gameId.slice(0, 12)}`;
-  return `${game.white.username} vs ${game.black.username} · ${new Date(game.playedAt).toLocaleDateString()}`;
+  const copy = STATUS_COPY[language];
+  const phase = live.status === "running" ? copy.running : live.status === "paused" ? copy.paused : copy.waiting;
+  return copy.line(counts.done, counts.total, phase, excluded);
 }
 
 export function historyJobSignature(job: HistoryAnalysisJobV1): string {
@@ -90,29 +99,6 @@ export function collapseHistoryJobs(jobs: readonly HistoryAnalysisJobV1[]): Arra
 }
 
 export type HistoryJobAction = "pause" | "resume" | "cancel" | "retry";
-
-export function explainHistoryAnalysisError(error: string): string | null {
-  if (/outside MultiPV/i.test(error)) {
-    return "This game is legal, but Stockfish did not return a complete line for the played move. Retry to retrieve the missing objective evidence.";
-  }
-  if (/no scored principal variation|completed line|worker exited/i.test(error)) {
-    return "The game passed rules validation, but the engine returned no complete evaluation line. Retry after other browser analysis has stopped.";
-  }
-  return null;
-}
-
-export function scopeLabel(filters: StudyReportFiltersV2, gameCount: number): string {
-  const provider = filters.providers.length === 0
-    ? "All platforms"
-    : filters.providers.map((value) => value === "chesscom" ? "Chess.com" : "Lichess").join(" + ");
-  const time = filters.timeClasses.length === 0 ? "All time controls" : filters.timeClasses.join(" + ");
-  const color = filters.playerColors.length === 0
-    ? "Both colors"
-    : filters.playerColors.map((value) => value === "white" ? "White" : "Black").join(" + ");
-  const rated = filters.rated === "all" ? "All games" : filters.rated === "rated" ? "Rated" : "Casual";
-  const dates = filters.dateFrom || filters.dateTo ? " · Date range" : "";
-  return provider + " · " + time + " · " + rated + " · " + color + dates + " · " + gameCount + " games";
-}
 
 export function historyJobPresentation(groups: Array<{ job: HistoryAnalysisJobV1; duplicateCount: number }>) {
   const current = groups.filter(({ job }) => !job.supersededBy);

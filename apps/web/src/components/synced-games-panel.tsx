@@ -3,12 +3,43 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import type { SyncedGame } from "@chess-review/shared";
+import type { SyncedGame, UiLanguage } from "@chess-review/shared";
+import { useUiLanguage } from "../hooks/use-ui-language";
 import { externalGameKey } from "../lib/review-status";
 import type { LibrarySnapshot } from "../lib/library-snapshot";
 import { openSyncedGameRecord } from "./import-desk";
 import { SourceChip } from "./source-chip";
 
+type SyncedGamesCopy = {
+  unableToOpen: string;
+  recentGames: string;
+  fromAccounts: string;
+  game: string;
+  openReview: string;
+  preparing: string;
+  analyzeThisGame: string;
+};
+
+const COPY: Record<UiLanguage, SyncedGamesCopy> = {
+  en: {
+    unableToOpen: "Unable to open synced game.",
+    recentGames: "Recent games",
+    fromAccounts: "From your accounts",
+    game: "game",
+    openReview: "Open review →",
+    preparing: "Preparing…",
+    analyzeThisGame: "Analyze this game →",
+  },
+  "zh-CN": {
+    unableToOpen: "无法打开已同步的对局。",
+    recentGames: "最近对局",
+    fromAccounts: "来自你的账号",
+    game: "对局",
+    openReview: "打开复盘 →",
+    preparing: "准备中…",
+    analyzeThisGame: "分析这盘对局 →",
+  },
+};
 
 /**
  * Games that exist in a connected account but have no review record yet. Kept
@@ -28,6 +59,7 @@ export function SyncedGamesPanel({
   limit?: number;
   onOpened?: () => void;
 }) {
+  const copy = COPY[useUiLanguage()];
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +82,7 @@ export function SyncedGamesPanel({
       onOpened?.();
       router.push(`/review/${id}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to open synced game.");
+      setError(cause instanceof Error ? cause.message : copy.unableToOpen);
       working.current = false;
       setBusyId(null);
     }
@@ -58,7 +90,7 @@ export function SyncedGamesPanel({
 
   return (
     <section className="synced-games-section paper-panel">
-      <div className="panel-heading"><h2>Recent games</h2><span className="panel-meta">From your accounts</span></div>
+      <div className="panel-heading"><h2>{copy.recentGames}</h2><span className="panel-meta">{copy.fromAccounts}</span></div>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="synced-game-grid">
         {shown.map((game) => {
@@ -68,10 +100,10 @@ export function SyncedGamesPanel({
               <SourceChip provider={game.external.provider} />
               <strong>{game.white.username} <i>vs</i> {game.black.username}</strong>
 
-              <small>{game.timeClass ?? "game"} · {new Date(game.playedAt).toLocaleDateString()}</small>
+              <small>{game.timeClass ?? copy.game} · {new Date(game.playedAt).toLocaleDateString()}</small>
               {reviewId
-                ? <Link href={`/review/${reviewId}`}>Open review →</Link>
-                : <button type="button" className="text-button" disabled={busyId !== null} onClick={() => void open(game)}>{busyId === game.id ? "Preparing…" : "Analyze this game →"}</button>}
+                ? <Link href={`/review/${reviewId}`}>{copy.openReview}</Link>
+                : <button type="button" className="text-button" disabled={busyId !== null} onClick={() => void open(game)}>{busyId === game.id ? copy.preparing : copy.analyzeThisGame}</button>}
             </article>
           );
         })}

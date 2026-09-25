@@ -1,3 +1,5 @@
+import type { UiLanguage } from "@chess-review/shared";
+
 /**
  * Canonical piece identity: the selectable piece sets and the authored asset
  * files behind the default set.
@@ -27,15 +29,26 @@ export function boardPieceImageKey(piece: string): PieceAssetKey {
   return `${piece === piece.toUpperCase() ? "w" : "b"}${piece.toUpperCase()}` as PieceAssetKey;
 }
 
-const PIECE_NAMES: Record<PieceAssetKey, string> = {
-  wP: "White pawn", wN: "White knight", wB: "White bishop", wR: "White rook", wQ: "White queen", wK: "White king",
-  bP: "Black pawn", bN: "Black knight", bB: "Black bishop", bR: "Black rook", bQ: "Black queen", bK: "Black king",
+const PIECE_NAMES: Record<UiLanguage, Record<PieceAssetKey, string>> = {
+  en: {
+    wP: "White pawn", wN: "White knight", wB: "White bishop", wR: "White rook", wQ: "White queen", wK: "White king",
+    bP: "Black pawn", bN: "Black knight", bB: "Black bishop", bR: "Black rook", bQ: "Black queen", bK: "Black king",
+  },
+  "zh-CN": {
+    wP: "白方兵", wN: "白方马", wB: "白方象", wR: "白方车", wQ: "白方后", wK: "白方王",
+    bP: "黑方兵", bN: "黑方马", bB: "黑方象", bR: "黑方车", bQ: "黑方后", bK: "黑方王",
+  },
 };
 
 /** What a screen reader calls a piece: "White knight". */
-export function boardPieceName(key: PieceAssetKey): string {
-  return PIECE_NAMES[key];
+export function boardPieceName(key: PieceAssetKey, language: UiLanguage): string {
+  return PIECE_NAMES[language][key];
 }
+
+const SQUARE_COPY: Record<UiLanguage, (square: string) => string> = {
+  en: (square) => `Square ${square}`,
+  "zh-CN": (square) => `格子 ${square}`,
+};
 
 /** What a screen reader calls a square: "Square e4".
  *
@@ -43,6 +56,6 @@ export function boardPieceName(key: PieceAssetKey): string {
  * the squares themselves are not focusable, so operating the board is the move
  * entry, the transport and the named move and candidate buttons.
  */
-export function boardSquareDescription(square: string): string {
-  return `Square ${square}`;
+export function boardSquareDescription(square: string, language: UiLanguage): string {
+  return SQUARE_COPY[language](square);
 }

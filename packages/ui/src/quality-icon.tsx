@@ -1,4 +1,4 @@
-import type { MoveAnnotation, MoveClassification } from "@chess-review/shared";
+import type { MoveAnnotation, MoveClassification, UiLanguage } from "@chess-review/shared";
 
 export type QualityMotif =
   | "diamond-double"
@@ -21,31 +21,89 @@ export interface QualityMeta {
   wash: string;
   symbol: string;
   motif: QualityMotif;
-  label: string;
 }
 
+/**
+ * The marks only. The name of a classification is language-dependent and lives in
+ * `QUALITY_LABELS`; keeping the two apart is what stops a translated screen from
+ * changing the visual identity by accident.
+ */
 export const QUALITY_META: Record<MoveClassification, QualityMeta> = {
-  brilliant: { ink: "#2f7f93", wash: "#d9eef2", symbol: "!!", motif: "diamond-double", label: "Brilliant" },
-  great: { ink: "#647ba9", wash: "#e2e7f2", symbol: "!", motif: "diamond-single", label: "Critical" },
-  best: { ink: "#3f7f73", wash: "#dceae5", symbol: "✓", motif: "circle-solid-check", label: "Best" },
-  excellent: { ink: "#668c75", wash: "#e4ece3", symbol: "✓✓", motif: "circle-double-check", label: "Excellent" },
-  good: { ink: "#788c72", wash: "#ebefe5", symbol: "✓", motif: "circle-check", label: "Good" },
-  book: { ink: "#786c92", wash: "#eae5ef", symbol: "", motif: "square-book", label: "Book" },
-  interesting: { ink: "#9c7a42", wash: "#f2e6cb", symbol: "!?", motif: "square-interesting", label: "Interesting" },
-  forced: { ink: "#647985", wash: "#e5ebec", symbol: "→", motif: "square-forced", label: "Forced" },
-  inaccuracy: { ink: "#a18739", wash: "#f4e8be", symbol: "?!", motif: "ring-inaccuracy", label: "Inaccuracy" },
-  mistake: { ink: "#b26e4d", wash: "#f2ddd2", symbol: "?", motif: "square-mistake", label: "Mistake" },
-  blunder: { ink: "#a34e5b", wash: "#f0d9de", symbol: "??", motif: "octagon-blunder", label: "Blunder" },
-  miss: { ink: "#985263", wash: "#eedce1", symbol: "×", motif: "circle-miss", label: "Miss" },
-  missed_win: { ink: "#95566a", wash: "#eddfe5", symbol: "↘", motif: "diamond-missed-win", label: "Missed win" },
-  missed_mate: { ink: "#7f4459", wash: "#e8d6de", symbol: "#?", motif: "octagon-missed-mate", label: "Missed mate" },
+  brilliant: { ink: "#2f7f93", wash: "#d9eef2", symbol: "!!", motif: "diamond-double" },
+  great: { ink: "#647ba9", wash: "#e2e7f2", symbol: "!", motif: "diamond-single" },
+  best: { ink: "#3f7f73", wash: "#dceae5", symbol: "✓", motif: "circle-solid-check" },
+  excellent: { ink: "#668c75", wash: "#e4ece3", symbol: "✓✓", motif: "circle-double-check" },
+  good: { ink: "#788c72", wash: "#ebefe5", symbol: "✓", motif: "circle-check" },
+  book: { ink: "#786c92", wash: "#eae5ef", symbol: "", motif: "square-book" },
+  interesting: { ink: "#9c7a42", wash: "#f2e6cb", symbol: "!?", motif: "square-interesting" },
+  forced: { ink: "#647985", wash: "#e5ebec", symbol: "→", motif: "square-forced" },
+  inaccuracy: { ink: "#a18739", wash: "#f4e8be", symbol: "?!", motif: "ring-inaccuracy" },
+  mistake: { ink: "#b26e4d", wash: "#f2ddd2", symbol: "?", motif: "square-mistake" },
+  blunder: { ink: "#a34e5b", wash: "#f0d9de", symbol: "??", motif: "octagon-blunder" },
+  miss: { ink: "#985263", wash: "#eedce1", symbol: "×", motif: "circle-miss" },
+  missed_win: { ink: "#95566a", wash: "#eddfe5", symbol: "↘", motif: "diamond-missed-win" },
+  missed_mate: { ink: "#7f4459", wash: "#e8d6de", symbol: "#?", motif: "octagon-missed-mate" },
 };
+
+/**
+ * Classification names, per interface language.
+ *
+ * This is product vocabulary, not screen copy: the board badge, the move list, the
+ * evaluation graph, the summary and the PNG export all name the same classification.
+ * One table keeps them from drifting apart, the same way one table holds the marks.
+ *
+ * `great` is named "Critical" on purpose - the label follows the classification's
+ * meaning (a critical/only move), not the internal key. See docs/move-classification.md.
+ */
+export const QUALITY_LABELS: Record<UiLanguage, Record<MoveClassification, string>> = {
+  en: {
+    brilliant: "Brilliant", great: "Critical", best: "Best", excellent: "Excellent",
+    good: "Good", book: "Book", interesting: "Interesting", forced: "Forced",
+    inaccuracy: "Inaccuracy", mistake: "Mistake", blunder: "Blunder", miss: "Miss",
+    missed_win: "Missed win", missed_mate: "Missed mate",
+  },
+  "zh-CN": {
+    brilliant: "精彩", great: "关键", best: "最佳", excellent: "优秀",
+    good: "良好", book: "定式", interesting: "有趣", forced: "强制",
+    inaccuracy: "不精确", mistake: "失误", blunder: "漏着", miss: "错过",
+    missed_win: "错过胜机", missed_mate: "错过杀棋",
+  },
+};
+
+export function qualityLabel(classification: MoveClassification, language: UiLanguage): string {
+  return QUALITY_LABELS[language][classification];
+}
+
+/**
+ * The move annotations, per interface language.
+ *
+ * Separate from `QUALITY_LABELS` because an annotation is not a classification: a
+ * move can carry a sacrifice or a missed win *in addition to* its quality, and the
+ * move list, the evidence sentence and the export all name them. `critical` here is
+ * the annotation, which is not the same value as the `great` classification.
+ */
+export const ANNOTATION_LABELS: Record<UiLanguage, Record<MoveAnnotation, string>> = {
+  en: {
+    brilliant: "Brilliant", critical: "Critical", book: "Book", forced: "Forced",
+    sacrifice: "Sacrifice", missed_win: "Missed win", missed_mate: "Missed mate",
+  },
+  "zh-CN": {
+    brilliant: "精彩", critical: "关键", book: "定式", forced: "强制",
+    sacrifice: "弃子", missed_win: "错过胜机", missed_mate: "错过杀棋",
+  },
+};
+
+export function annotationLabel(annotation: MoveAnnotation, language: UiLanguage): string {
+  return ANNOTATION_LABELS[language][annotation];
+}
 
 export interface QualityIconProps {
   classification: MoveClassification;
   size?: number;
   title?: string;
   decorative?: boolean;
+  /** Which language the accessible name uses. The marks themselves do not change. */
+  language?: UiLanguage;
 }
 
 const textStyle = {
@@ -124,9 +182,9 @@ export function classificationForAnnotation(annotation: MoveAnnotation): MoveCla
 }
 
 /** Project-owned Move Quality Annotation System V3, rendered as inline SVG. */
-export function QualityIcon({ classification, size = 28, title, decorative = false }: QualityIconProps) {
+export function QualityIcon({ classification, size = 28, title, decorative = false, language = "en" }: QualityIconProps) {
   const meta = QUALITY_META[classification];
-  const label = title ?? meta.label;
+  const label = title ?? qualityLabel(classification, language);
   return (
     <svg
       width={size}
