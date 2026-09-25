@@ -2,7 +2,16 @@ node_modules/
 .venv/
 **/__pycache__/
 .pytest_cache/
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 .next/
+# Next rewrites this per command: `next dev` and `next build` record different
+# type paths. `apps/web` typechecks with `next typegen && tsc`, so it is
+# generated output, never source.
+next-env.d.ts
 dist/
 target/
 apps/desktop/src-tauri/binaries/
@@ -43,3 +52,9 @@ page-screenshot.png
 /scripts/verify-kickers.mjs
 /apps/web/scripts/
 /make-ui-review-bundle-local.sh
+
+# Tool caches and stray logs. None of these is source.
+.turbo/
+.vercel/
+.eslintcache
+*.log
