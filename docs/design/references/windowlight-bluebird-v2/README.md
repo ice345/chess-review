@@ -59,5 +59,4 @@ Do **not** take from these images:
 
 These images are historical composition references. The owner-approved v4 platform
 redesign now supersedes their left-rail and full-room-background requirements.
-See `../../implementation/2026-09-24-bluebird-integration.md` for shipped scope and
-remaining work. Do not restore the old environment during the staged migration.
+Do not restore the old environment during the staged migration.

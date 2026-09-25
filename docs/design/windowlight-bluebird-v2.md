@@ -14,8 +14,8 @@ document as a description of current behaviour.
 
 ## September 22 amendment — Bluebird desk, batch one
 
-Owner requested implementation of the [Bluebird platform proposal](proposals/2026-09-22-bluebird-platform-direction.md).
-This amendment takes precedence over older composition and motif prohibitions below.
+The owner requested implementation of the Bluebird platform redesign. This amendment
+takes precedence over older composition and motif prohibitions below.
 
 Implemented in this batch:
 
@@ -874,7 +874,6 @@ If the answer is only “it looks more cinematic,” reject the change.
 - Notebook 使用实色纸底，避免说明和编辑器文字与室内背景叠加。
 - 用户点击结束复盘后，仅当现有 `reviewSessionCounts().browsedEverything` 为真时，在总结页头保留的 58px 区域显示原创飞鸟 SVG，进入动画 600ms，不循环、不挡按钮。每次打开合格的完成总结会播放一次；不是已掌握或已解题的声明。
 - 提前结束使用 Review summary 标签和原有已浏览数量，不播放飞鸟。减少动态效果偏好下静态显示。
-- 验收范围和未覆盖项目见 `proposals/2026-09-23-bluebird-batches-acceptance.md`。
 
 ### 2026-09-23 — 第三批：页面衔接与空状态
 
@@ -887,17 +886,15 @@ If the answer is only “it looks more cinematic,” reject the change.
 ## September 24, 2026 — v4 migration authority
 
 The owner-approved v4 design supersedes older room/left-rail composition requirements.
-See [implementation and handoff](implementation/2026-09-24-bluebird-integration.md).
 The first production slice changes the shared shell, Stats composition and source marks.
-Home/import/library and review interiors remain pending staged migration; the watercolour
-asset is stored in the prototype directory and is not yet part of production.
+Home/import/library and review interiors remain pending staged migration; the approved
+watercolour ships as `apps/web/public/atmosphere/bluebird-watercolor.webp`.
 
 ### v4 A2 implementation
 
 Home now ships the approved watercolor as a compressed WebP, with separate recent
 and practice entry sections. Import has one source sheet; Library and Review index
-share a component. Position exploration remains available in a disclosure. See the
-integration handoff for completed checks and remaining state-restoration work.
+share a component. Position exploration remains available in a disclosure.
 
 
 ## September 24 — Practice rehearsal amendment
@@ -905,5 +902,4 @@ integration handoff for completed checks and remaining state-restoration work.
 The practice hub now groups Today on a cool paper sheet and its method in a warmer
 margin, stacked on narrow screens. This is a bounded use of existing wash tokens,
 not a return to the photographic room or a new bird asset. The broader atmosphere
-proposal in [the browser audit](audits/2026-09-24-atmosphere-practice.md) remains
-planned; only its explicitly listed shipped scope is implemented.
+proposal remains planned; only its explicitly listed shipped scope is implemented.

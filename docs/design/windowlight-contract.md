@@ -237,9 +237,9 @@ If the answer exposes a regression, fix it instead of updating the baseline.
 
 The owner approved all 14 v4 page designs and authorized production integration.
 The persistent left rail, photographic room requirement and old mockup layout authority
-above are superseded by the [integration plan](implementation/2026-09-24-bluebird-integration.md).
-Production now uses a top navigation, one mobile disclosure, solid cool paper ground,
-and shared centered page boundaries. Individual page interiors are migrating in stages;
+above are superseded. Production now uses a top navigation, one mobile disclosure,
+solid cool paper ground, and shared centered page boundaries. Individual page
+interiors are migrating in stages;
 this is not a claim that all 14 pages are integrated. Stats is retained with real library,
 source, result, time-control and practice counts. Source icons use image/SVG assets,
 never alphabet badges. Chess semantics and board colors remain unchanged.

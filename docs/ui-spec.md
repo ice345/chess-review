@@ -560,6 +560,4 @@ Practice uses a cool task sheet and warmer method margin, stacked below 720px.
 The queue is scoped to the selected player, and manual players have no connected-account
 sync backlog. Today offers no start action when no unreviewed or due position exists.
 Mistake/phase/opening/plan decision links open before the move; highlights still open
-the played move. No analysis formulas or mastery intervals changed. See
-[the audit and implementation plan](design/audits/2026-09-24-atmosphere-practice.md)
-for observed issues, shipped fixes and the outstanding attempt-to-queue integration.
+the played move. No analysis formulas or mastery intervals changed.
